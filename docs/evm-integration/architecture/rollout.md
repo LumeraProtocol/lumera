@@ -113,6 +113,83 @@ These items come from the remaining roadmap work and should be treated as explic
 | External block explorer readiness | Stage 3 and Stage 4 | High | must be staged on testnet and have a production rollout decision before mainnet |
 | Testnet faucet availability | Stage 3 | Medium | must be available before broad external testnet migration and contract testing, or an explicit manual funding alternative must be documented |
 | Migration-proof expiry decision | Stage 0 and Stage 4 | High | must be explicitly decided before mainnet: implement a new proof format or document the accepted limitation with a finite migration window |
+| EVM launch-parameter policy | Stage 0 and Stage 4 | High | must decide and verify the initial EVM, feemarket, ERC20, ERC20-policy, consensus-gas, and `x/evmigration` values before tagging the release and before live-network upgrade |
+
+### EVM Launch Parameter Decisions Before Tagging
+
+Before tagging the `v1.20.0` EVM release, the release owner must fill this table with the intended values and attach the RC/devnet evidence showing that those values are present in the first post-upgrade block. Treat any blank decision as a release blocker.
+
+The current code seeds most of these from `config/evm.go`, `app/evm/genesis.go`, and `app/upgrades/v1_20_0/upgrade.go`. That makes them easy to overlook: they may not require a governance parameter proposal, but they still become live network behavior at upgrade height.
+
+#### Chain Identity, Denom, and VM Params
+
+| Parameter / decision | Current code default | Required decision before tag | Why it matters | Verification |
+| --- | --- | --- | --- | --- |
+| Cosmos chain ID | network-specific, e.g. `lumera-mainnet-1` | confirm the target network chain ID in release notes, scripts, Portal config, wallets, explorers, and migration proof payload docs | migration proofs include the Cosmos chain ID; a mismatch makes valid-looking proofs fail | run the RC against the target network config and record `status.node_info.network` |
+| EVM chain ID | `76857769` | confirm this is final for mainnet and is not reused by another EVM network | wallets, replay protection, JSON-RPC, explorers, and migration proof payloads depend on it | `eth_chainId` must return `0x494b329`; migration proof payloads must include `76857769` |
+| EVM native denom / gas fee denom | `ulume` | confirm the gas token denom stays `ulume` | a wrong denom breaks EVM fees, bank metadata, fee checking, and user balances | `lumerad q evm params` shows `evm_denom=ulume`; bank metadata contains `ulume` |
+| EVM extended denom | `alume` | confirm the 18-decimal internal denom stays `alume` | precisebank and EVM 18-decimal accounting depend on this mapping | `lumerad q evm params` shows `extended_denom_options.extended_denom=alume`; bank metadata contains `alume` |
+| EVM coin info initialization | seeded by upgrade handler after skipping upstream EVM `InitGenesis` | confirm the upgrade handler writes Lumera coin info, not upstream `aatom` defaults | stale upstream coin info can make the chain start with wrong EVM accounting even if params later look correct | first post-upgrade smoke test must query VM params and execute a funded EVM transfer using `ulume` |
+| Active static precompiles | P256, Bech32, staking, distribution, ICS20, bank, gov, slashing, action, supernode, wasm | confirm this complete set is intended for mainnet; explicitly decide if any should be disabled before tag | precompiles are part of the public EVM surface and can expose Cosmos state transitions to contracts | query VM params and run smoke calls for standard and Lumera custom precompiles on RC/devnet |
+
+#### Fee Market and Block Capacity
+
+| Parameter / decision | Current code default | Required decision before tag | Why it matters | Verification |
+| --- | --- | --- | --- | --- |
+| `feemarket.no_base_fee` | `false` | confirm EIP-1559 dynamic base fee is enabled from upgrade | `true` disables base-fee behavior and changes EVM fee expectations | `lumerad q feemarket params` shows `no_base_fee=false` |
+| `feemarket.base_fee` | `0.0025` `ulume` per gas, equivalent to `2.5 gwei` in 18-decimal EVM units | confirm launch base fee is acceptable for mainnet UX and spam resistance | too low invites spam; too high breaks ordinary wallet and contract tests | record base fee from `lumerad q feemarket params` and `eth_gasPrice` after upgrade |
+| `feemarket.min_gas_price` | `0.0005` `ulume` per gas, equivalent to `0.5 gwei` | confirm the floor is acceptable during low traffic | prevents base fee decay to zero; too high can make quiet-chain transactions unexpectedly expensive | drive low-traffic blocks on RC/devnet and confirm base fee floors at the intended value |
+| `feemarket.base_fee_change_denominator` | `16` | confirm the responsiveness target | lower values make base fee more volatile; higher values react more slowly to congestion | run the mixed-workload load test and record base-fee movement over sustained congestion |
+| Consensus `block.max_gas` | `25,000,000` | confirm this is the intended first EVM block gas limit | finite max gas is required for meaningful EIP-1559 target-gas behavior and migration capacity planning | query consensus params after upgrade and compare to `25,000,000` |
+| Validator local minimum gas prices | operator config, not chain state | publish the recommended `minimum-gas-prices` for `ulume` and ensure it does not conflict with feemarket expectations | inconsistent validator floors can cause confusing CheckTx behavior or local rejection | include the exact value in validator release notes and test node restart with the generated `app.toml` |
+
+#### ERC20, IBC, and Precompile Policy
+
+| Parameter / decision | Current code default | Required decision before tag | Why it matters | Verification |
+| --- | --- | --- | --- | --- |
+| `erc20.enable_erc20` | `true` | confirm ERC20 conversion/precompile support is enabled at launch | `false` silently disables expected EVM token behavior | `lumerad q erc20 params` shows `enable_erc20=true` |
+| `erc20.permissionless_registration` | `false` | confirm permissionless token-pair registration remains disabled | leaving this open can allow denom squatting and spam token-pair creation | `lumerad q erc20 params` shows `permissionless_registration=false` |
+| ERC20 auto-registration policy mode | `allowlist` | confirm mainnet starts in allowlist mode | controls whether IBC denoms can automatically become ERC20 token pairs | query policy state or run the IBC ERC20 registration smoke test |
+| Default allowed base denoms | inert placeholders for `uatom`, `uosmo`, `uusdc`, `inj` with empty traces | decide which real IBC channels, if any, should be activated for mainnet before broad bridge support | placeholder entries do not match real packets; real channel binding is required before production IBC ERC20 auto-registration | for each allowed denom, verify the exact port/channel trace by governance-controlled policy update and test a packet over that path |
+| Custom Lumera precompiles | action `0x...0901`, supernode `0x...0902`, wasm `0x...0903` | confirm all custom precompiles are launch-ready or remove disabled ones before tag | these are contract-callable public APIs; regressions can affect dApps even if normal Cosmos messages work | run precompile-specific RC smoke tests and include results in release sign-off |
+
+#### EVMigration Params
+
+| Parameter / decision | Current code default | Required decision before tag | Why it matters | Verification |
+| --- | --- | --- | --- | --- |
+| `enable_migration` | `true` | decide immediate-open vs controlled-open and ensure first post-upgrade state matches that decision | if `true`, migration can open as soon as the upgraded chain produces blocks | `lumerad q evmigration params` immediately after upgrade |
+| `migration_end_time` | `0` meaning no deadline | set a finite mainnet deadline if the no-expiry proof format remains; otherwise explicitly document why no deadline is acceptable | an unlimited window extends support and proof-replay risk indefinitely | query params and compare the Unix timestamp to the public migration-window announcement |
+| `max_migrations_per_block` | `50` | decide the per-block claim throttle from RC/devnet load tests | too high can stress blocks/RPC; too low can create user backlog | run migration traffic at the proposed limit alongside normal Cosmos/EVM traffic |
+| `max_validator_delegations` | `2000` | calculate mainnet validator maximum and decide a cap with buffer | validator migrations iterate delegations, unbondings, and redelegations; under-sizing blocks large validators, over-sizing increases per-tx work | run `scripts/chain-helper.sh max-validator-delegations --json` once the exact `migration-estimate` query is available, then choose the cap from the observed maximum plus buffer |
+| `max_multisig_sub_keys` | `20` | decide the maximum supported multisig size for launch | larger values increase proof size, gas, and coordinator complexity | rehearse multisig migrations at or near the proposed ceiling and verify ante / keeper rejection above it |
+
+Tagging should not proceed until the release notes contain the final intended values for every row above, and the RC evidence shows the upgrade handler initializes those values without relying on an after-the-fact governance change.
+
+### EVMigration Activation Policy
+
+The current `x/evmigration` default genesis params are migration-enabled with no deadline. On an upgrade path, unless the upgrade handler explicitly seeds different values, migration can become available as soon as the first upgraded block is live.
+
+Before testnet and mainnet, choose one of these activation policies and test that the chain actually starts with that policy:
+
+- **Immediate-open policy**: migration is available immediately after the upgrade. This is operationally simpler, but public messaging, support staffing, RPC capacity, and migration monitoring must be live before validators restart.
+- **Controlled-open policy**: migration remains disabled until post-upgrade smoke tests pass. This requires an implementation or governance path that is already effective at upgrade time; a normal post-upgrade parameter proposal is too slow to prevent an initial open window.
+
+Mainnet should not rely on an assumed manual "open the window" step unless the release candidate proves that `enable_migration=false` or the intended `migration_end_time` is already in state at the first post-upgrade block.
+
+## Failure Modes and Mitigations
+
+The most likely rollout failures are known enough to plan for directly:
+
+| What could go wrong | Impact | Mitigation |
+| --- | --- | --- |
+| Upgrade handler initializes an unexpected denom, EVM coin info, ERC20 params, or evmigration params | chain can restart with unusable fees, disabled ERC20 behavior, or an unintended migration window | RC/devnet/testnet must verify first-post-upgrade params and denom state from on-chain queries before promotion |
+| Migration opens before support, RPC capacity, or public messaging is ready | users can start irreversible migrations during a confusing or under-monitored period | choose immediate-open or controlled-open explicitly; if controlled-open is desired, encode it in the release, not a slow post-upgrade proposal |
+| `MsgMigrateValidator` load is underestimated | validator migration can consume much more work than ordinary account migration and is not throttled by `max_migrations_per_block` | measure delegation, unbonding, and redelegation counts; tune `max_validator_delegations`; schedule validator migrations before broad user migration |
+| Multisig proof size or coordinator workflow is underestimated | large K/N groups can be expensive and operationally error-prone | cap and test `max_multisig_sub_keys`; rehearse external co-signer file handoff; publish coordinator templates |
+| Invalid embedded-proof transactions are admitted fee-free | public RPC and mempool can be abused even though state is safe | require ante / CheckTx rejection evidence in RC and public-RPC load tests |
+| Chain registry or wallet defaults change too early | users may import the same mnemonic and see an empty new address before migration instructions are clear | use Portal-local chain definitions during the migration window; update public registries only after the window closes |
+| Explorer/indexer support trails the chain upgrade | users and partners may see missing receipts, logs, or migrated-address state | stage explorer on testnet; communicate whether mainnet explorer is launch-ready or intentionally trailing |
+| A critical bug appears after migrations have started | restoring a pre-upgrade snapshot would discard migrated state and post-upgrade txs | treat forward-fix as default after migrations begin; reserve snapshot restore for an extraordinary, publicly acknowledged decision |
 
 ## Contingency Principles
 
@@ -158,6 +235,7 @@ Rollout should stop on meaningful bugs. Promotion from devnet to testnet to main
   - `migrate`
   - `verify`
 - do not promote to testnet until devnet is clean again
+- if the first post-upgrade block exposes unexpected evmigration params, stop the rehearsal and fix the upgrade-handler / genesis seeding path before trying a live network
 
 ### Testnet
 
@@ -207,7 +285,10 @@ Before touching any live network, cut an RC for `v1.20.0` and re-run the full va
 - validate operator-facing config defaults against the [Node Operator EVM Configuration Guide](../user-guides/node-evm-config-guide.md)
 - complete the first version of the fee market monitoring runbook and disaster recovery procedure for EVM state
 - run baseline load and performance benchmarks for mixed Cosmos + EVM traffic
+- fill the EVM launch parameter decision matrix and record RC evidence for VM params, fee market params, ERC20 params, ERC20 policy, consensus gas, and `x/evmigration` params
 - decide whether migration-proof expiry will be implemented before mainnet or accepted as a documented limitation with a finite migration window
+- decide whether migration opens immediately after upgrade or only after smoke tests; verify the RC initializes `x/evmigration` params accordingly
+- verify invalid embedded-proof migration transactions are rejected in ante / CheckTx, not merely during DeliverTx
 - verify release artifacts, checksums, build reproducibility, and operator install instructions
 
 ### Release Exit Criteria
@@ -250,6 +331,7 @@ Upgrade an existing devnet chain from pre-EVM Lumera to `v1.20.0` and confirm th
    - blocks resume
    - validators rejoin
    - stores load correctly
+   - evmigration params match the selected activation policy
    - JSON-RPC is live
    - Cosmos txs still work
    - EVM txs work
@@ -278,6 +360,9 @@ Before promoting beyond devnet, run a basic mixed-workload performance check:
 - sustained EVM transaction flow for multiple consecutive blocks
 - sustained mixed Cosmos + EVM transaction flow for multiple consecutive blocks
 - migration traffic running at or near `max_migrations_per_block` alongside normal user traffic
+- validator migrations under realistic delegation / unbonding / redelegation counts, because `max_migrations_per_block` throttles `MsgClaimLegacyAccount` only and does not rate-limit `MsgMigrateValidator`
+- multisig migrations near the intended `max_multisig_sub_keys` ceiling
+- invalid-proof migration attempts against public RPC, confirming they are rejected before entering mempool / block execution
 - observation of:
   - block time stability
   - validator participation stability
@@ -293,6 +378,7 @@ The exact target numbers can be tuned by operators, but the key gate is that mig
 - no store migration errors
 - no chain halt after restart
 - no unexpected fee-denom, coin-info, or RPC failures
+- evmigration starts with the expected activation params and migration cannot open earlier than planned
 
 ### Devnet Upgrade Communication
 
@@ -416,6 +502,7 @@ Validate the upgrade and migration flow on a public network with external valida
   - fallback path: documented manual distribution or partner pre-funding process
 - if using the current faucet path referenced in the [Remix guide](../guides/remix-guide.md), verify that it works with the upgraded testnet account model and expected wallet flows
 - update Portal before the testnet upgrade so it ships the new EVM testnet chain definition in its local JSON file; keep the current pre-EVM testnet definition in the public chain registry during the migration window, and only replace the registry definition after the migration window closes
+- confirm whether testnet migration should be open immediately after the upgrade or only after smoke tests, and ensure the release candidate enforces that behavior at first post-upgrade block
 - prepare the block explorer rollout for testnet using the [External Block Explorer Integration Plan](../guides/block-explorer.md)
 - use testnet to validate whether block explorer rollout can be considered mainnet-ready or must trail mainnet launch as a staged follow-up
 - ask wallets, explorers, RPC providers, and exchanges to point staging systems to upgraded testnet
@@ -431,7 +518,8 @@ Validate the upgrade and migration flow on a public network with external valida
 4. Confirm when the first post-upgrade snapshot and state-sync serve point will be published for new nodes joining the upgraded testnet.
 5. Network resumes.
 6. Run immediate post-upgrade smoke tests.
-7. Enable and test migration flows.
+7. Verify `x/evmigration` params on-chain before announcing migration availability.
+8. Enable and test migration flows if the selected activation policy did not already open them at restart.
 
 ### Testnet Soak Plan
 
@@ -472,6 +560,7 @@ Validate the upgrade and migration flow on a public network with external valida
 - monitoring runbook and disaster recovery procedure have been exercised by the operator team
 - block explorer has been staged on testnet and its mainnet rollout plan is explicit
 - post-upgrade snapshot / state-sync distribution timing is documented for integrators spinning up fresh nodes
+- first-post-upgrade evmigration params match the selected activation policy
 - external integrators confirm readiness or provide bounded follow-ups
 
 ### Testnet Communication
@@ -520,7 +609,7 @@ Convert successful testnet results into a production-ready mainnet release packa
 - final simple-contract deployment checklist based on the [Remix guide](../guides/remix-guide.md)
 - final RPC, wallet, explorer, and exchange integration notes
 - final node-operator configuration checklist based on the [Node Operator EVM Configuration Guide](../user-guides/node-evm-config-guide.md)
-- final EVM parameter review using the [Mainnet Parameter Tuning Guide](../user-guides/tune-guide.md)
+- final EVM parameter review using the [Mainnet Parameter Tuning Guide](../user-guides/tune-guide.md), with the EVM launch parameter decision matrix updated from testnet evidence
 - final block explorer rollout checklist based on the [External Block Explorer Integration Plan](../guides/block-explorer.md)
 - final fee market monitoring runbook
 - final disaster recovery procedure covering EVM state, upgrade incidents, and migration incidents
@@ -542,6 +631,16 @@ Convert successful testnet results into a production-ready mainnet release packa
   - `migration_end_time`
   - `max_migrations_per_block`
   - `max_validator_delegations`
+  - `max_multisig_sub_keys`
+- final confirmation for non-migration EVM launch values:
+  - EVM chain ID
+  - EVM native denom and extended denom
+  - active static precompile set
+  - fee market `no_base_fee`, `base_fee`, `min_gas_price`, and `base_fee_change_denominator`
+  - consensus `block.max_gas`
+  - ERC20 `enable_erc20` and `permissionless_registration`
+  - ERC20 registration policy mode and any mainnet IBC denom trace allowlist entries
+- final decision on whether migration is open at first post-upgrade block or gated until after smoke tests, with the RC proving the chosen behavior
 
 ### Mainnet Go/No-Go Checklist
 
@@ -554,8 +653,9 @@ Convert successful testnet results into a production-ready mainnet release packa
 - load-testing results are accepted as sufficient for rollout
 - block explorer rollout status is explicit: ready at launch or intentionally staged after launch
 - migration-proof expiry decision is explicit and documented
+- evmigration activation policy and launch params are explicit and tested on the RC, devnet, and testnet
 - support and comms staff have prepared FAQ and incident templates
-- pre-upgrade snapshots and rollback documentation are prepared
+- pre-upgrade snapshots, restore procedures, and binary rollback documentation are prepared
 
 ### Mainnet Readiness Communication
 
@@ -601,7 +701,8 @@ Recommended timing:
    - JSON-RPC availability
    - feemarket behavior sane
    - no store-upgrade anomalies
-5. Open the migration support window and publish the post-upgrade status update.
+   - evmigration params match the selected activation policy
+5. Open the migration support window only after the activation policy and smoke-test status are confirmed, or publish that the window is already open if immediate-open was deliberately selected.
 6. Publish when post-upgrade snapshots and state-sync serve points will be available for new nodes, indexers, and integrators.
 
 ### Mainnet Migration Sequence
@@ -626,6 +727,7 @@ During the migration window:
 - if the current migration proof format remains without expiry, operate with a finite `migration_end_time` and treat any migration-window extension as an explicit governance and security decision
 - support tracks stuck or confusing cases
 - governance can adjust migration params if needed, but only in a controlled and publicly announced way
+- any increase to `max_migrations_per_block`, `max_validator_delegations`, or `max_multisig_sub_keys` must be treated as an operational capacity and security change, not a routine support tweak
 
 The migration window should be finite on mainnet. An explicit end time reduces long-tail risk and forces ecosystem cleanup.
 
@@ -690,6 +792,10 @@ After the migration window closes:
 - upgrade-day restart health
 - migration counts and failures
 - per-block migration rate-limit saturation
+- validator migration sizes relative to `max_validator_delegations`
+- multisig proof sizes relative to `max_multisig_sub_keys`
+- invalid-proof CheckTx rejection counts and mempool behavior on public RPC
+- evmigration param changes and any drift from the announced migration-window policy
 - EVM tx success and fee behavior
 - RPC stability and rate-limiter behavior
 - validator migration success
@@ -778,6 +884,8 @@ Before mainnet, operators need a concrete binary rollback runbook, not just a pr
 - which config files must be reverted or preserved
 - when a snapshot restore is required versus when a binary-only restart is sufficient
 - who announces the coordinated restart time
+
+Binary-only rollback is only a narrow tool. Once the store upgrade has been applied and the chain has committed upgraded state, operators should assume a pre-EVM binary requires a coordinated restore to a compatible pre-upgrade snapshot unless the incident commander explicitly publishes a tested exception.
 
 ### Halt Coordination
 

@@ -161,6 +161,32 @@ func (s *lumeraValidatorSuite) TestEVMJSONRPCRateLimitPublicProfileIfEnabled() {
 		}
 	}
 	s.Require().Greater(tooManyRequests, 0, "expected at least one HTTP 429 from enabled JSON-RPC rate limiter")
+
+	// The burst above intentionally drains the shared per-IP token bucket. The
+	// rest of this suite reuses the same endpoint/client IP, so wait for the
+	// limiter to refill before returning to avoid leaking spurious 429s into
+	// later EVM tests.
+	s.waitForRateLimitRefill(rpc)
+}
+
+// waitForRateLimitRefill probes eth_chainId until the JSON-RPC rate limiter
+// stops returning 429, confirming the per-IP token bucket has refilled. It is a
+// best-effort cleanup step: on timeout it logs and returns rather than failing,
+// since refill behavior is not what the calling test asserts.
+func (s *lumeraValidatorSuite) waitForRateLimitRefill(rpc string) {
+	s.T().Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		status, err := postJSONRPCStatus(rpc, "eth_chainId", []any{})
+		if err == nil && status != http.StatusTooManyRequests {
+			return
+		}
+		if time.Now().After(deadline) {
+			s.T().Logf("rate limiter still returning 429 after refill wait (last status=%d err=%v); continuing", status, err)
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 func (s *lumeraValidatorSuite) TestEVMFeeMarketBaseFeeActive() {

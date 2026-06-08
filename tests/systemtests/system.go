@@ -68,8 +68,8 @@ type SystemUnderTest struct {
 	verbose           bool
 	ChainStarted      bool
 	projectName       string
-	dirty             bool // requires full reset when marked dirty
-	stopping          bool // true while StopChain is running (suppresses exit errors)
+	dirty             bool        // requires full reset when marked dirty
+	stopping          atomic.Bool // true while StopChain is running (suppresses expected exit errors)
 
 	pidsLock mtxSync.RWMutex
 	pids     map[int]struct{}
@@ -328,7 +328,7 @@ func (s *SystemUnderTest) StopChain() {
 	if !s.ChainStarted {
 		return
 	}
-	s.stopping = true
+	s.stopping.Store(true)
 
 	// Pre-cleanup: unsubscribe from events while nodes are still alive
 	for _, c := range s.cleanupPreFn {
@@ -374,7 +374,7 @@ func (s *SystemUnderTest) StopChain() {
 	s.cleanupPostFn = nil
 
 	s.ChainStarted = false
-	s.stopping = false
+	s.stopping.Store(false)
 }
 
 func (s *SystemUnderTest) withEachPid(cb func(p *os.Process)) {
@@ -636,7 +636,7 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 		go func(pid int, cmd *exec.Cmd, nodeIndex int) {
 			defer wg.Done()
 			err := cmd.Wait() // blocks until shutdown
-			if err != nil {
+			if err != nil && !s.stopping.Load() {
 				s.PrintBuffer()
 				errChan <- fmt.Errorf("node %d exited unexpectedly: %w", nodeIndex, err)
 			} else {
@@ -653,13 +653,13 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 	// Wait in background and close the channel when all nodes are done
 	go func() {
 		wg.Wait()
+		close(errChan)
 
 		for err := range errChan {
-			if err != nil && !s.stopping {
+			if err != nil {
 				t.Errorf("%v", err)
 			}
 		}
-		close(errChan)
 	}()
 }
 

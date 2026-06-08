@@ -53,3 +53,30 @@ func TestInitAppConfigEVMDefaults(t *testing.T) {
 	require.True(t, evmMempoolCfg.IsValid(), "Lumera.EVMMempool field not found")
 	require.False(t, evmMempoolCfg.FieldByName("BroadcastDebug").Bool(), "broadcast debug must be disabled by default")
 }
+
+// TestInitCometBFTConfigRPCHardening locks in the RPC defense-in-depth
+// overrides applied in initCometBFTConfig. These protect lumerad's RPC
+// (port :26657) from misbehaving WebSocket clients accumulating dormant
+// subscriptions (see sdk-go PR #17 / lumera-devnet-1 val3 incident, where
+// ~5,000 ESTABLISHED conns saturated the listen backlog while the chain
+// itself stayed healthy). Changing these defaults should require an
+// explicit decision recorded against this test.
+func TestInitCometBFTConfigRPCHardening(t *testing.T) {
+	t.Parallel()
+
+	cfg := initCometBFTConfig()
+
+	require.NotNil(t, cfg, "initCometBFTConfig must return a config")
+	require.NotNil(t, cfg.RPC, "RPC config must not be nil")
+
+	require.True(t, cfg.RPC.CloseOnSlowClient,
+		"experimental_close_on_slow_client must default to true to prevent slow WS clients from holding subscription buffers indefinitely")
+
+	// Subscription caps are upstream CometBFT defaults — we intentionally do
+	// not narrow them; this assertion guards against accidentally loosening
+	// them, which would re-open the saturation attack surface.
+	require.Equal(t, 100, cfg.RPC.MaxSubscriptionClients,
+		"max_subscription_clients must stay at the upstream default; relaxing it re-opens the val3-style saturation surface")
+	require.Equal(t, 5, cfg.RPC.MaxSubscriptionsPerClient,
+		"max_subscriptions_per_client must stay at the upstream default")
+}

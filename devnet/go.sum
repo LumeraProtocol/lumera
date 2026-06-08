@@ -111,8 +111,6 @@ github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapp
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
 github.com/LumeraProtocol/rq-go v0.2.1 h1:8B3UzRChLsGMmvZ+UVbJsJj6JZzL9P9iYxbdUwGsQI4=
 github.com/LumeraProtocol/rq-go v0.2.1/go.mod h1:APnKCZRh1Es2Vtrd2w4kCLgAyaL5Bqrkz/BURoRJ+O8=
-github.com/LumeraProtocol/supernode/v2 v2.5.0-rc h1:VSlIV56VfM27Qvd8XpSjPoipm4ZptTeHdBXyj4IerSw=
-github.com/LumeraProtocol/supernode/v2 v2.5.0-rc/go.mod h1:ezTqf1uT80Ebb1C9NoDDEspzTnbfWdqoQsmkmDP45V8=
 github.com/LumeraProtocol/supernode/v2 v2.5.2 h1:3aacuY83E3LFvOa3du+2EiqTphknxxMWhyI/1UKKfZA=
 github.com/LumeraProtocol/supernode/v2 v2.5.2/go.mod h1:ezTqf1uT80Ebb1C9NoDDEspzTnbfWdqoQsmkmDP45V8=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=

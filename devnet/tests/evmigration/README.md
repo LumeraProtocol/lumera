@@ -4,7 +4,7 @@ This directory contains the source code for the `tests_evmigration` binary — a
 
 For the full guide (modes, Makefile targets, upgrade walkthrough, and module coverage), see:
 
-**[docs/devnet-evmigration-tests.md](../../docs/devnet-evmigration-tests.md)**
+**[docs/evm-integration/evmigration/devnet-tests.md](../../../docs/evm-integration/evmigration/devnet-tests.md)**
 
 ## Multisig mode
 

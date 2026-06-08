@@ -250,7 +250,7 @@ Coverage at unit, preflight, integration, and ante layers is complete for all co
 
 ### High priority (before mainnet)
 
-1. ~~**Security audit of EVM integration layer**~~ — DONE. See [security-audit.md](security-audit.md).
+1. ~~**Security audit of EVM integration layer**~~ — DONE. See [security-audit-2026-03-20.md](../audits/security-audit-2026-03-20.md).
 2. ~~**Production JSON-RPC hardening profile**~~ — DONE. CORS origin lockdown (`app/openrpc/http.go`), namespace exposure lockdown (`cmd/lumera/cmd/jsonrpc_policy.go`), rate limiter fixed to front public port (Bug #20).
 3. **External block explorer integration** — Blockscout or Etherscan-compatible explorer. All comparable chains have this at mainnet.
 

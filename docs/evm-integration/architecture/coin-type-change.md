@@ -54,8 +54,10 @@ Lumera chose **Approach 2A (claim-and-move)** -- the chain performs a one-time a
 
 ### How it works
 
-1. User submits `MsgClaimLegacyAccount { legacy_addr, new_addr, legacy_signature }`.
-2. Chain verifies the legacy signature: `secp256k1_sign(SHA256("lumera-evm-migration:<legacy_addr>:<new_addr>"))`.
+1. User submits `MsgClaimLegacyAccount { legacy_address, new_address, legacy_proof, new_proof }`.
+2. Chain verifies both sides of the migration intent:
+   - legacy Cosmos key signs `SHA256("lumera-evm-migration:<chainID>:<evmChainID>:claim:<legacyAddr>:<newAddr>")`
+   - new EVM key signs `"lumera-evm-migration:<chainID>:<evmChainID>:claim:<legacyAddr>:<newAddr>"`
 3. Chain atomically migrates all address-keyed state from old -> new across 10 modules (bank, staking, distribution, authz, feegrant, auth, supernode, action, claim, evmigration).
 4. The old address becomes empty; the new address holds all state.
 

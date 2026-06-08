@@ -1,6 +1,6 @@
 # EVM Integration Security Audit
 
-**Date:** 2026-03-20 (updated 2026-04-01)
+**Date:** 2026-03-20 (updated 2026-04-01, 2026-05-29)
 **Auditor:** Codex static review
 **Scope:** Lumera EVM app wiring, ante, mempool/broadcast, JSON-RPC exposure, static precompiles, ERC20 IBC registration policy, and `x/evmigration`
 
@@ -14,15 +14,15 @@ The EVM integration is materially stronger than a typical first Cosmos-EVM launc
 - Supernode precompile caller-binding fix
 - Action precompile soft-rejection handling fix
 
-At the time of audit, the risk was concentrated in three places. Two have since been fixed:
+At the time of the original audit, the risk was concentrated in three places. All three previously tracked findings have since been fixed or narrowed:
 
 1. ~~public JSON-RPC rate limiting is easy to bypass with the current proxy topology~~ — **FIXED (Bug #20)**: rate limiter now wraps the public alias listener
 2. ~~validator-migration gas bounding undercounts redelegations after the destination-side redelegation fix~~ — **FIXED (Bug #21)**: pre-check now counts both source and destination redelegations
-3. ERC20 auto-registration allowlisting trusts base denoms without IBC provenance — **OPEN**
+3. ~~ERC20 auto-registration allowlisting trusts base denoms without IBC provenance~~ — **FIXED**: base-denom entries are now bound to full IBC trace provenance
 
-Additionally, migration proof domain separation was partially addressed (Bug #22: chain IDs added, expiry still missing).
+Additionally, migration proof domain separation was partially addressed (Bug #22: chain IDs added, expiry still missing). A follow-up post-merge audit found that invalid embedded migration proofs were not checked until message execution, allowing fee-free invalid migration transactions through ante/mempool admission. The `evm-audit` branch adds ante-level proof verification for `MsgClaimLegacyAccount` and `MsgMigrateValidator`.
 
-I did not find evidence of an active critical auth bypass in the currently checked-in EVM entry points. The remaining launch consideration is the ERC20 provenance policy (Finding #3).
+I did not find evidence of an active critical auth bypass in the currently checked-in EVM entry points. The remaining launch considerations are operational hardening: migration proof expiry policy, public RPC configuration, and devnet coverage of public RPC profiles.
 
 ## Method
 
@@ -42,15 +42,15 @@ This review was a code and documentation audit of the current repository state. 
 - `app/evm_jsonrpc_ratelimit.go:111-149`
 - `app/app.go:397-399`
 
-**What happens**
+**What happened originally**
 
-At startup, `wrapJSONRPCAliasStartPreRun` rewrites `json-rpc.address` to an internal loopback address and remembers the original public address for the alias proxy. The alias proxy is then started on the original public address.
+At startup, `wrapJSONRPCAliasStartPreRun` rewrote `json-rpc.address` to an internal loopback address and remembered the original public address for the alias proxy. The old rate-limit proxy used that rewritten internal address as upstream and listened on its own separate `lumera.json-rpc-ratelimit.proxy-address`, so enabling rate limiting created an additional protected port while the normal public alias port stayed unrestricted.
 
-The rate-limit proxy, however, uses the rewritten internal `json-rpc.address` as its upstream and listens on its own separate `lumera.json-rpc-ratelimit.proxy-address`.
+**Current behavior**
 
-That means enabling the rate-limit proxy does **not** rate-limit the normal public JSON-RPC port. It creates an additional rate-limited port while leaving the main public alias port unrestricted.
+When the alias proxy is active, enabling `lumera.json-rpc-ratelimit.enable` now wraps the public alias listener directly. `proxy-address` is only a standalone fallback listen address when the alias proxy is inactive.
 
-**Impact**
+**Original impact**
 
 - operators can believe public RPC is protected when it is not
 - attackers can bypass the limiter by using the normal public JSON-RPC address instead of the alternate proxy port
@@ -60,15 +60,15 @@ That means enabling the rate-limit proxy does **not** rate-limit the normal publ
 
 This is a security-control bypass caused by startup wiring, not by misconfigured nginx. The built-in limiter is currently an opt-in alternate endpoint, not an in-line control on the public endpoint.
 
-**Recommendation**
+**Fix**
 
-- make the rate limiter wrap the public alias listener instead of exposing a second port
-- or, when rate limiting is enabled, move the alias proxy behind the limiter and fail startup if both are configured inconsistently
-- at minimum, document that operators must firewall the public alias port and only expose the rate-limited port
+- rate limiter wraps the public alias listener when aliasing is active
+- startup topology no longer exposes a second protected port while leaving the primary alias unprotected
+- config template comments were refreshed to describe the alias-wrapped and standalone fallback modes
 
 **Priority**
 
-Blocker before advertising the built-in rate limiter as a public-RPC protection mechanism.
+Resolved. Keep an explicit devnet/public-profile scenario so this topology remains covered.
 
 ### 2. Medium: validator migration gas cap undercounts destination-side redelegations — FIXED (Bug #21)
 
@@ -183,6 +183,33 @@ This is not a direct theft vector because the proof binds funds to the intended 
 - include a deadline in any future proof format revision
 - if compatibility must be preserved, support a v2 proof alongside the current format and deprecate the old one for new migrations
 
+### 5. High: invalid embedded migration proofs can pass fee-free ante admission — FIXED ON `evm-audit`
+
+**Affected code**
+
+- `app/evm/ante.go`
+- `x/evmigration/keeper/ante.go`
+- `x/evmigration/keeper/msg_server_claim_legacy.go`
+- `x/evmigration/keeper/msg_server_migrate_validator.go`
+
+**What happened**
+
+Migration-only transactions intentionally skip the standard Cosmos fee, signature, and sequence ante subchain because authorization comes from proofs embedded in the migration message. Before the follow-up fix, the reduced ante path checked only basic message shape. Invalid but structurally well-formed migration proofs could be admitted to CheckTx/mempool and fail only in message execution.
+
+**Impact**
+
+- invalid migration attempts were fee-free and unsigned at the Cosmos envelope layer
+- public tx ingress could be pressured with many invalid migration tx variants
+- `MaxMigrationsPerBlock` did not bound failed invalid-proof attempts because successful migration finalization increments that counter
+
+**Fix**
+
+The reduced migration ante path now calls `VerifyMigrationProofsForAnte` on the evmigration keeper for each migration message. The check validates params, proof pair shape, and both cryptographic proofs using the Cosmos chain ID, EVM chain ID, migration kind, legacy address, and new address before the tx can pass ante.
+
+**Priority**
+
+Resolved on `evm-audit`; keep regression tests for invalid legacy proof and invalid new proof rejection in ante.
+
 ## Strengths
 
 The current implementation has several meaningful security-positive properties:
@@ -201,10 +228,11 @@ These are not all code bugs, but they are worth doing before or shortly after la
 - Set a finite `migration_end_time` before mainnet. Open-ended migration windows increase long-tail operational risk.
 - Treat JSON-RPC tracing as a privileged operator feature. Keep it disabled on public RPC unless traffic is tightly controlled.
 - ~~Add metrics for mempool queue depth, EVM broadcast failures, and rate-limit hits so operators can see attacks in progress.~~ — **DONE**: `app/evm_mempool_metrics.go` exposes Prometheus gauges (`size`, `pending`, `queued`, `broadcast_queue_depth`) and a labeled rejection counter (`rejections_total{source,reason}`), validated by 10 unit tests and 2 Prometheus e2e integration tests.
-- Add an integration test that verifies "rate-limit enabled" really constrains the public RPC port, not only the alternate proxy port.
+- Add a devnet/public-profile test that verifies "rate-limit enabled" constrains the public JSON-RPC alias listener.
 - Add a validator-migration regression test for destination-only redelegation fan-in.
+- Add migration ante tests for invalid embedded legacy and new proofs.
 - ~~Add policy tests around "same base denom, different IBC trace" to force an explicit trust decision.~~ — **DONE**: `TestERC20Policy_AllowlistMode_BlocksWrongChannel`, `BlocksMultiHopOnSameChannel`, and `MultiHopTraceAllowed` verify that the same base denom (`uatom`) is blocked or allowed based on its full IBC trace, forcing an explicit governance trust decision per provenance path.
 
 ## Conclusion
 
-The EVM integration is mainnet-ready from a code-security perspective, and it is notably ahead of many first-wave Cosmos-EVM launches in defensive engineering. Findings #1 (rate-limit bypass) and #2 (gas cap undercount) have been fixed. Finding #4 (proof domain separation) has been partially addressed with chain ID inclusion. Finding #3 (provenance-blind base-denom allowlist) has been fixed: base denom entries now require full IBC trace verification, and default genesis entries are inert placeholders until governance binds real channels.
+The EVM integration is mainnet-ready from a code-security perspective, and it is notably ahead of many first-wave Cosmos-EVM launches in defensive engineering. Findings #1 (rate-limit bypass), #2 (gas cap undercount), and #3 (provenance-blind base-denom allowlist) have been fixed. Finding #4 (proof domain separation) has been partially addressed with chain ID inclusion. Finding #5 (invalid embedded migration proofs admitted before execution) is fixed on the `evm-audit` branch by ante-level proof verification.

@@ -3,8 +3,11 @@ package main
 import (
 	"bytes"
 	"flag"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"gen/tests/common"
 )
 
 func TestHelpUsageIncludesDescription(t *testing.T) {
@@ -26,5 +29,12 @@ func TestHelpUsageIncludesDescription(t *testing.T) {
 		if !strings.Contains(help, want) {
 			t.Fatalf("help output missing %q:\n%s", want, help)
 		}
+	}
+}
+
+func TestDetectKeyStyleFallsBackToLegacy(t *testing.T) {
+	got := detectKeyStyle(filepath.Join(t.TempDir(), "missing-lumerad"), "v1.11.0")
+	if got != common.KeyStyleLegacy {
+		t.Fatalf("detectKeyStyle fallback = %+v, want legacy", got)
 	}
 }

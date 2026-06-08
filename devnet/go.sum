@@ -113,6 +113,8 @@ github.com/LumeraProtocol/rq-go v0.2.1 h1:8B3UzRChLsGMmvZ+UVbJsJj6JZzL9P9iYxbdUw
 github.com/LumeraProtocol/rq-go v0.2.1/go.mod h1:APnKCZRh1Es2Vtrd2w4kCLgAyaL5Bqrkz/BURoRJ+O8=
 github.com/LumeraProtocol/supernode/v2 v2.5.0-rc h1:VSlIV56VfM27Qvd8XpSjPoipm4ZptTeHdBXyj4IerSw=
 github.com/LumeraProtocol/supernode/v2 v2.5.0-rc/go.mod h1:ezTqf1uT80Ebb1C9NoDDEspzTnbfWdqoQsmkmDP45V8=
+github.com/LumeraProtocol/supernode/v2 v2.5.2 h1:3aacuY83E3LFvOa3du+2EiqTphknxxMWhyI/1UKKfZA=
+github.com/LumeraProtocol/supernode/v2 v2.5.2/go.mod h1:ezTqf1uT80Ebb1C9NoDDEspzTnbfWdqoQsmkmDP45V8=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

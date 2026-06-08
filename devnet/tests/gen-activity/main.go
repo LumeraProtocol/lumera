@@ -260,18 +260,18 @@ func resolveFunder(cli *common.ChainCLI, key string, dryRun bool) string {
 }
 
 // detectKeyStyle probes `lumerad version` and maps it to a KeyStyle. On failure
-// it falls back to the EVM style with a warning, matching the design's
-// non-fatal version-probe behavior.
+// it falls back to the legacy style with a warning; legacy keys remain usable
+// on EVM-era chains, while EVM keys are unusable on pre-EVM chains.
 func detectKeyStyle(bin, cutover string) common.KeyStyle {
 	version, err := detectLumeradVersion(bin)
 	if err != nil {
-		log.Printf("WARN: detect lumerad version failed (%v); assuming EVM key style", err)
-		return common.KeyStyleEVM
+		log.Printf("WARN: detect lumerad version failed (%v); assuming legacy key style", err)
+		return common.KeyStyleLegacy
 	}
 	ks, err := common.KeyStyleForVersion(version, cutover)
 	if err != nil {
-		log.Printf("WARN: classify version %q failed (%v); assuming EVM key style", version, err)
-		return common.KeyStyleEVM
+		log.Printf("WARN: classify version %q failed (%v); assuming legacy key style", version, err)
+		return common.KeyStyleLegacy
 	}
 	log.Printf("detected lumerad %s", version)
 	return ks

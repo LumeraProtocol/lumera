@@ -3,8 +3,10 @@ package common
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestAddKeyWithStylePassesExplicitKeyStyleFlags(t *testing.T) {
@@ -51,6 +53,59 @@ func TestParseSyncBroadcastHandlesQueryTxResponse(t *testing.T) {
 	}
 }
 
+func TestSendBankNoWaitRejectsUnparseableBroadcastOutput(t *testing.T) {
+	cases := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{"missing JSON", "broadcast accepted maybe", "no JSON tx response"},
+		{"malformed JSON", `{"txhash":}`, "parse tx response JSON"},
+		{"unexpected JSON", `{"message":"not a tx response"}`, "tx response missing txhash"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cli := &ChainCLI{Bin: staticLumerad(t, tc.output, 0), ChainID: "chain", RPC: "tcp://localhost:26657"}
+			_, err := cli.SendBankNoWait("funder", 1, 2, "lumera1to", "10ulume")
+			if err == nil {
+				t.Fatal("SendBankNoWait error = nil, want parse error")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("SendBankNoWait error = %q, want substring %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestSubmitTxRejectsUnparseableBroadcastOutput(t *testing.T) {
+	cli := &ChainCLI{Bin: staticLumerad(t, "not json", 0), ChainID: "chain", RPC: "tcp://localhost:26657"}
+
+	_, err := cli.SubmitTx("tx", "bank", "send", "from", "to", "10ulume", "--from", "from")
+	if err == nil {
+		t.Fatal("SubmitTx error = nil, want parse error")
+	}
+	if !strings.Contains(err.Error(), "no JSON tx response") {
+		t.Fatalf("SubmitTx error = %q, want missing JSON error", err)
+	}
+}
+
+func TestWaitForNextBlockReturnsInitialHeightError(t *testing.T) {
+	cli := &ChainCLI{Bin: staticLumerad(t, "rpc unavailable", 1), ChainID: "chain", RPC: "tcp://localhost:26657"}
+
+	start := time.Now()
+	err := cli.WaitForNextBlock(time.Second)
+	if err == nil {
+		t.Fatal("WaitForNextBlock error = nil, want height query error")
+	}
+	if !strings.Contains(err.Error(), "get starting height") {
+		t.Fatalf("WaitForNextBlock error = %q, want starting height context", err)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("WaitForNextBlock took %s, want immediate failure", elapsed)
+	}
+}
+
 func recordingLumerad(t *testing.T) (scriptPath, argsPath string) {
 	t.Helper()
 
@@ -64,6 +119,20 @@ func recordingLumerad(t *testing.T) (scriptPath, argsPath string) {
 		t.Fatalf("write fake lumerad: %v", err)
 	}
 	return scriptPath, argsPath
+}
+
+func staticLumerad(t *testing.T, output string, exitCode int) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	scriptPath := filepath.Join(dir, "lumerad")
+	script := "#!/bin/sh\n" +
+		"printf '%s\\n' " + shellQuote(output) + "\n" +
+		"exit " + strconv.Itoa(exitCode) + "\n"
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake lumerad: %v", err)
+	}
+	return scriptPath
 }
 
 func recordedArgs(t *testing.T, path string) []string {

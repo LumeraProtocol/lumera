@@ -120,15 +120,23 @@ func (c *ChainCLI) LatestHeight() (int64, error) {
 func (c *ChainCLI) WaitForNextBlock(timeout time.Duration) error {
 	start, err := c.LatestHeight()
 	if err != nil {
-		time.Sleep(5 * time.Second)
-		return nil
+		return fmt.Errorf("get starting height: %w", err)
 	}
 	deadline := time.Now().Add(timeout)
+	var lastErr error
 	for time.Now().Before(deadline) {
 		time.Sleep(time.Second)
-		if h, err := c.LatestHeight(); err == nil && h > start {
+		h, err := c.LatestHeight()
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if h > start {
 			return nil
 		}
+	}
+	if lastErr != nil {
+		return fmt.Errorf("timeout waiting for next block after height %d; last height query failed: %w", start, lastErr)
 	}
 	return errors.New("timeout waiting for next block")
 }
@@ -258,22 +266,14 @@ func (c *ChainCLI) SendBankNoWait(funderKey string, accNum, seq uint64, to, amou
 	if err != nil {
 		return "", fmt.Errorf("bank send: %s: %w", truncate(out, 200), err)
 	}
-	payload, ok := ExtractJSONPayload(out)
-	if !ok {
-		return "", nil
+	txHash, code, rawLog, err := parseSyncBroadcastStrict(out)
+	if err != nil {
+		return "", fmt.Errorf("bank send: %w", err)
 	}
-	var resp struct {
-		Code   uint32 `json:"code"`
-		RawLog string `json:"raw_log"`
-		TxHash string `json:"txhash"`
+	if code != 0 {
+		return txHash, fmt.Errorf("bank send rejected code=%d raw_log=%s", code, rawLog)
 	}
-	if err := json.Unmarshal([]byte(payload), &resp); err != nil {
-		return "", nil
-	}
-	if resp.Code != 0 {
-		return resp.TxHash, fmt.Errorf("bank send rejected code=%d raw_log=%s", resp.Code, resp.RawLog)
-	}
-	return resp.TxHash, nil
+	return txHash, nil
 }
 
 // SubmitTx broadcasts a tx (online, sync) signed by the --from key contained in
@@ -297,20 +297,24 @@ func (c *ChainCLI) SubmitTx(args ...string) (string, error) {
 		if err != nil {
 			lastErr = fmt.Errorf("broadcast: %s: %w", truncate(out, 200), err)
 			if _, _, isSeq := ParseIncorrectAccountSequence(lastErr); isSeq && attempt < 2 {
-				_ = c.WaitForNextBlock(15 * time.Second)
+				if waitErr := c.WaitForNextBlock(15 * time.Second); waitErr != nil {
+					return "", fmt.Errorf("wait for next block after sequence mismatch: %w", waitErr)
+				}
 				continue
 			}
 			return "", lastErr
 		}
-		txHash, code, rawLog, ok := parseSyncBroadcast(out)
-		if !ok {
-			return "", nil
+		txHash, code, rawLog, parseErr := parseSyncBroadcastStrict(out)
+		if parseErr != nil {
+			return "", fmt.Errorf("broadcast: %w", parseErr)
 		}
 		if code != 0 {
 			rejErr := fmt.Errorf("tx rejected code=%d raw_log=%s", code, rawLog)
 			if _, _, isSeq := ParseIncorrectAccountSequence(rejErr); isSeq && attempt < 2 {
 				lastErr = rejErr
-				_ = c.WaitForNextBlock(15 * time.Second)
+				if waitErr := c.WaitForNextBlock(15 * time.Second); waitErr != nil {
+					return txHash, fmt.Errorf("wait for next block after sequence mismatch: %w", waitErr)
+				}
 				continue
 			}
 			return txHash, rejErr
@@ -332,12 +336,14 @@ func (c *ChainCLI) WaitForTxInclusion(txHash string, timeout time.Duration) erro
 	for time.Now().Before(deadline) {
 		out, err := c.Run("query", "tx", txHash)
 		if err == nil {
-			if _, code, rawLog, ok := parseSyncBroadcast(out); ok {
-				if code != 0 {
-					return fmt.Errorf("tx %s failed code=%d raw_log=%s", txHash, code, rawLog)
-				}
-				return nil
+			_, code, rawLog, parseErr := parseSyncBroadcastStrict(out)
+			if parseErr != nil {
+				return fmt.Errorf("query tx %s: %w", txHash, parseErr)
 			}
+			if code != 0 {
+				return fmt.Errorf("tx %s failed code=%d raw_log=%s", txHash, code, rawLog)
+			}
+			return nil
 		}
 		time.Sleep(time.Second)
 	}
@@ -347,9 +353,14 @@ func (c *ChainCLI) WaitForTxInclusion(txHash string, timeout time.Duration) erro
 // parseSyncBroadcast extracts the tx hash, result code, and raw log from a CLI
 // broadcast or `query tx` JSON response.
 func parseSyncBroadcast(out string) (txHash string, code uint32, rawLog string, ok bool) {
+	txHash, code, rawLog, err := parseSyncBroadcastStrict(out)
+	return txHash, code, rawLog, err == nil
+}
+
+func parseSyncBroadcastStrict(out string) (txHash string, code uint32, rawLog string, err error) {
 	payload, has := ExtractJSONPayload(out)
 	if !has {
-		return "", 0, "", false
+		return "", 0, "", fmt.Errorf("no JSON tx response in output: %s", truncate(out, 200))
 	}
 	var resp struct {
 		Code       uint32 `json:"code"`
@@ -361,13 +372,19 @@ func parseSyncBroadcast(out string) (txHash string, code uint32, rawLog string, 
 			TxHash string `json:"txhash"`
 		} `json:"tx_response"`
 	}
-	if json.Unmarshal([]byte(payload), &resp) != nil {
-		return "", 0, "", false
+	if err := json.Unmarshal([]byte(payload), &resp); err != nil {
+		return "", 0, "", fmt.Errorf("parse tx response JSON: %s: %w", truncate(payload, 200), err)
 	}
 	if resp.TxResponse != nil {
-		return resp.TxResponse.TxHash, resp.TxResponse.Code, resp.TxResponse.RawLog, true
+		if resp.TxResponse.TxHash == "" {
+			return "", 0, "", fmt.Errorf("tx response missing txhash: %s", truncate(payload, 200))
+		}
+		return resp.TxResponse.TxHash, resp.TxResponse.Code, resp.TxResponse.RawLog, nil
 	}
-	return resp.TxHash, resp.Code, resp.RawLog, true
+	if resp.TxHash == "" {
+		return "", 0, "", fmt.Errorf("tx response missing txhash: %s", truncate(payload, 200))
+	}
+	return resp.TxHash, resp.Code, resp.RawLog, nil
 }
 
 // HasRedelegation reports whether a redelegation from src to dst already exists

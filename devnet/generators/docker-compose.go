@@ -44,6 +44,7 @@ type DockerComposeService struct {
 	CapAdd        []string                               `yaml:"cap_add,omitempty"`
 	SecurityOpt   []string                               `yaml:"security_opt,omitempty"`
 	Logging       *DockerComposeLogging                  `yaml:"logging,omitempty"`
+	Restart       string                                 `yaml:"restart,omitempty"`
 }
 
 type DockerComposeNetwork struct {
@@ -226,6 +227,10 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 		service := DockerComposeService{
 			Build:         ".",
 			ContainerName: serviceName,
+			// Auto-restart on lumerad crashes / host pkill mishaps.
+			// start.sh wait_for_lumera() propagates lumerad exit code to PID 1,
+			// so a non-zero exit triggers docker restart and rejoins the chain.
+			Restart: "unless-stopped",
 			Ports: []string{
 				fmt.Sprintf("%d:%d", validator.Port, DefaultP2PPort),
 				fmt.Sprintf("%d:%d", validator.RPCPort, DefaultRPCPort),

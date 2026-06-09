@@ -2,27 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"testing"
 )
-
-func TestParseIncorrectAccountSequence(t *testing.T) {
-	err := errors.New("tx rejected code=32 raw_log=account sequence mismatch, expected 7, got 6: incorrect account sequence")
-
-	expected, got, ok := parseIncorrectAccountSequence(err)
-	if !ok {
-		t.Fatal("expected incorrect account sequence error to be detected")
-	}
-	if expected != 7 || got != 6 {
-		t.Fatalf("unexpected parsed sequence mismatch: expected=%d got=%d", expected, got)
-	}
-}
-
-func TestParseIncorrectAccountSequenceRejectsOtherErrors(t *testing.T) {
-	if _, _, ok := parseIncorrectAccountSequence(errors.New("some other error")); ok {
-		t.Fatal("expected unrelated error to be ignored")
-	}
-}
 
 func TestAuthAccountLooksVesting(t *testing.T) {
 	t.Run("proto vesting type", func(t *testing.T) {

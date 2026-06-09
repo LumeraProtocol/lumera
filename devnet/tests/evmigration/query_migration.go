@@ -6,7 +6,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -348,56 +347,6 @@ func accountSequenceForFirstTx(addr string) (accountNumber uint64, sequence uint
 		return 0, 0, nil
 	}
 	return 0, 0, err
-}
-
-// parseSignatureMismatchAccountNumber extracts the expected account number from
-// a "signature verification failed" error message.
-func parseSignatureMismatchAccountNumber(err error) (uint64, bool) {
-	if err == nil {
-		return 0, false
-	}
-	low := strings.ToLower(err.Error())
-	if !strings.Contains(low, "signature verification failed") {
-		return 0, false
-	}
-	// Example:
-	// "signature verification failed; please verify account number (76) and chain-id (...): unauthorized"
-	m := regexp.MustCompile(`account number \((\d+)\)`).FindStringSubmatch(err.Error())
-	if len(m) != 2 {
-		return 0, false
-	}
-	n, parseErr := strconv.ParseUint(m[1], 10, 64)
-	if parseErr != nil {
-		return 0, false
-	}
-	return n, true
-}
-
-// parseIncorrectAccountSequence extracts the expected and got sequence numbers
-// from an "incorrect account sequence" error message.
-func parseIncorrectAccountSequence(err error) (expected uint64, got uint64, ok bool) {
-	if err == nil {
-		return 0, 0, false
-	}
-	low := strings.ToLower(err.Error())
-	if !strings.Contains(low, "incorrect account sequence") {
-		return 0, 0, false
-	}
-
-	m := regexp.MustCompile(`expected\s+(\d+),\s+got\s+(\d+)`).FindStringSubmatch(err.Error())
-	if len(m) != 3 {
-		return 0, 0, false
-	}
-
-	expected, err = strconv.ParseUint(m[1], 10, 64)
-	if err != nil {
-		return 0, 0, false
-	}
-	got, err = strconv.ParseUint(m[2], 10, 64)
-	if err != nil {
-		return 0, 0, false
-	}
-	return expected, got, true
 }
 
 // waitForAccountOnChain polls until the account is queryable on-chain or the timeout expires.

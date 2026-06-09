@@ -51,6 +51,43 @@ func TestExtractJSONPayload(t *testing.T) {
 		}
 	})
 
+	t.Run("returns the last of multiple JSON objects", func(t *testing.T) {
+		// A JSON-shaped log line precedes the broadcast response; the first-{/
+		// last-} span would cover both objects and be invalid JSON.
+		out := "{\"level\":\"info\",\"msg\":\"gas\"}\n{\"code\":0,\"txhash\":\"ABC\"}\n"
+		got, ok := ExtractJSONPayload(out)
+		if !ok {
+			t.Fatal("ok = false, want true")
+		}
+		if got != `{"code":0,"txhash":"ABC"}` {
+			t.Errorf("got %q", got)
+		}
+	})
+
+	t.Run("ignores braces inside string values", func(t *testing.T) {
+		// The first object has a literal '}' inside a string value, which a
+		// naive last-'}' scan would mistake for the object end.
+		out := "{\"a\":\"}\"}\n{\"txhash\":\"X\"}"
+		got, ok := ExtractJSONPayload(out)
+		if !ok {
+			t.Fatal("ok = false, want true")
+		}
+		if got != `{"txhash":"X"}` {
+			t.Errorf("got %q", got)
+		}
+	})
+
+	t.Run("pretty-printed multi-line object", func(t *testing.T) {
+		out := "gas estimate: 1\n{\n  \"code\": 0,\n  \"txhash\": \"Z\"\n}\n"
+		got, ok := ExtractJSONPayload(out)
+		if !ok {
+			t.Fatal("ok = false, want true")
+		}
+		if got != "{\n  \"code\": 0,\n  \"txhash\": \"Z\"\n}" {
+			t.Errorf("got %q", got)
+		}
+	})
+
 	t.Run("no braces yields not-ok", func(t *testing.T) {
 		if _, ok := ExtractJSONPayload("plain text"); ok {
 			t.Error("ok = true for brace-less output")

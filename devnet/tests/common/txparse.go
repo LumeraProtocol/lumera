@@ -54,15 +54,56 @@ func ParseSignatureMismatchAccountNumber(err error) (uint64, bool) {
 	return n, true
 }
 
-// ExtractJSONPayload pulls the outermost JSON object out of mixed stdout/stderr
-// command output (e.g. a gas-estimate line preceding the broadcast response).
+// ExtractJSONPayload pulls a JSON object out of mixed stdout/stderr command
+// output (e.g. a gas-estimate line preceding the broadcast response). When the
+// output contains more than one top-level object — for instance a JSON-shaped
+// log line followed by the tx response — it returns the last one, which is the
+// response callers care about. Brace scanning is string-literal aware, so
+// braces inside string values do not corrupt the extracted span. It returns the
+// raw span without validating it as JSON: callers parse it and surface their
+// own (more specific) error if the broadcast output was truncated or malformed.
 func ExtractJSONPayload(out string) (string, bool) {
-	start := strings.IndexByte(out, '{')
-	end := strings.LastIndexByte(out, '}')
-	if start == -1 || end == -1 || end < start {
-		return "", false
+	var (
+		best     string
+		found    bool
+		depth    int
+		start    = -1
+		inString bool
+		escaped  bool
+	)
+	for i := 0; i < len(out); i++ {
+		c := out[i]
+		if inString {
+			switch {
+			case escaped:
+				escaped = false
+			case c == '\\':
+				escaped = true
+			case c == '"':
+				inString = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inString = true
+		case '{':
+			if depth == 0 {
+				start = i
+			}
+			depth++
+		case '}':
+			if depth == 0 {
+				continue
+			}
+			depth--
+			if depth == 0 && start != -1 {
+				best, found = out[start:i+1], true
+				start = -1
+			}
+		}
 	}
-	return strings.TrimSpace(out[start : end+1]), true
+	return best, found
 }
 
 // ParseAuthAccountNumberAndSequence parses the JSON from `lumerad query auth

@@ -204,7 +204,7 @@ install_sncli() {
 
 # Copy devnet test binaries (used by `make devnet-evmigration-*` etc.)
 install_tests() {
-	local test_bins=("tests_validator" "tests_hermes" "tests_evmigration")
+	local test_bins=("tests_validator" "tests_hermes" "tests_evmigration" "tests-gen-activity")
 	local bin
 	for bin in "${test_bins[@]}"; do
 		if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${bin}" ]; then

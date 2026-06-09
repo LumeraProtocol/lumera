@@ -58,7 +58,7 @@ require (
 	github.com/DataDog/datadog-go v4.8.3+incompatible // indirect
 	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/LumeraProtocol/rq-go v0.2.1 // indirect
-	github.com/LumeraProtocol/supernode/v2 v2.5.0-rc // indirect
+	github.com/LumeraProtocol/supernode/v2 v2.5.2 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect

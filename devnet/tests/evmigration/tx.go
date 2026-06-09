@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"gen/tests/common"
+
 	txtypes "cosmossdk.io/api/cosmos/tx/v1beta1"
 	sdkbase "github.com/LumeraProtocol/sdk-go/blockchain/base"
 )
@@ -102,7 +104,7 @@ func runTx(args ...string) (string, error) {
 
 		lastOut = out
 		lastErr = err
-		expectedSeq, gotSeq, ok := parseIncorrectAccountSequence(err)
+		expectedSeq, gotSeq, ok := common.ParseIncorrectAccountSequence(err)
 		if !ok {
 			return out, err
 		}
@@ -154,7 +156,7 @@ func runMigrationTxWithAdaptiveAccountNumber(accountNumber, sequence uint64, arg
 		lastOut = out
 		lastErr = err
 
-		expectedAccNum, ok := parseSignatureMismatchAccountNumber(err)
+		expectedAccNum, ok := common.ParseSignatureMismatchAccountNumber(err)
 		if !ok || expectedAccNum == curAccNum {
 			return out, err
 		}
@@ -208,7 +210,7 @@ func runTxWithMode(args []string, broadcastMode string) (string, string, error) 
 		RawLog string `json:"raw_log"`
 		TxHash string `json:"txhash"`
 	}
-	if payload, ok := extractJSONPayload(out); ok && json.Unmarshal([]byte(payload), &txResp) == nil {
+	if payload, ok := common.ExtractJSONPayload(out); ok && json.Unmarshal([]byte(payload), &txResp) == nil {
 		if txResp.Code != 0 {
 			return out, txResp.TxHash, fmt.Errorf("tx rejected code=%d raw_log=%s", txResp.Code, txResp.RawLog)
 		}
@@ -216,18 +218,6 @@ func runTxWithMode(args []string, broadcastMode string) (string, string, error) 
 	}
 
 	return out, "", nil
-}
-
-// extractJSONPayload pulls the last JSON object out of mixed stdout/stderr
-// command output. This is needed for migration txs because the custom CLI emits
-// a gas-estimate line before the broadcast response when --gas=auto is used.
-func extractJSONPayload(out string) (string, bool) {
-	start := strings.IndexByte(out, '{')
-	end := strings.LastIndexByte(out, '}')
-	if start == -1 || end == -1 || end < start {
-		return "", false
-	}
-	return strings.TrimSpace(out[start : end+1]), true
 }
 
 // EVM migration txs are fee-waived, but they are still fully gas-metered.

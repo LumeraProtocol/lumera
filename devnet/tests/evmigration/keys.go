@@ -11,9 +11,10 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
-	"regexp"
 	"strconv"
 	"strings"
+
+	"gen/tests/common"
 
 	cosmoshd "github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -191,7 +192,7 @@ func detectNonLegacyCoinType() (uint32, string, error) {
 	if err != nil {
 		return 0, "", err
 	}
-	cmp, err := compareSemver(version, *flagEVMCutoverVer)
+	cmp, err := common.CompareSemver(version, *flagEVMCutoverVer)
 	if err != nil {
 		return 0, version, err
 	}
@@ -217,7 +218,7 @@ func detectLumeradVersion() (string, error) {
 			lastOut = out
 			continue
 		}
-		if ver, ok := extractSemver(string(out)); ok {
+		if ver, ok := common.ExtractSemver(string(out)); ok {
 			return ver, nil
 		}
 		lastOut = out
@@ -226,86 +227,6 @@ func detectLumeradVersion() (string, error) {
 		return "", fmt.Errorf("run version command failed: %w", lastErr)
 	}
 	return "", fmt.Errorf("could not parse semantic version from: %s", truncate(string(lastOut), 200))
-}
-
-// extractSemver parses a semantic version (vX.Y.Z) from a string, trying
-// exact match, labelled "version:" lines, and fallback line scanning.
-func extractSemver(s string) (string, bool) {
-	// Best case: plain `lumerad version` outputs just "1.11.0" (or with leading v).
-	trimmed := strings.TrimSpace(s)
-	if m := semverExact.FindStringSubmatch(trimmed); len(m) == 4 {
-		return fmt.Sprintf("v%s.%s.%s", m[1], m[2], m[3]), true
-	}
-
-	// Prefer explicit "version:" label in structured long output.
-	// Uses a word-boundary anchor so "cosmos_sdk_version:" is not matched.
-	if m := semverLabelled.FindStringSubmatch(s); len(m) == 4 {
-		return fmt.Sprintf("v%s.%s.%s", m[1], m[2], m[3]), true
-	}
-
-	// Fallback: find first semantic version on non-dependency lines.
-	// Skip build deps ("- ...@v...") and SDK version lines to avoid
-	// misidentifying the Cosmos SDK version as the app version.
-	for _, line := range strings.Split(s, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "- ") || strings.Contains(line, "@v") {
-			continue
-		}
-		if strings.Contains(line, "sdk_version") {
-			continue
-		}
-		if m := semverAny.FindStringSubmatch(line); len(m) == 4 {
-			return fmt.Sprintf("v%s.%s.%s", m[1], m[2], m[3]), true
-		}
-	}
-	return "", false
-}
-
-// compareSemver returns -1, 0, or 1 based on the ordering of two semver strings.
-func compareSemver(a, b string) (int, error) {
-	parse := func(v string) ([3]int, error) {
-		s, ok := extractSemver(v)
-		if !ok {
-			return [3]int{}, fmt.Errorf("invalid semver %q", v)
-		}
-		s = strings.TrimPrefix(s, "v")
-		parts := strings.Split(s, ".")
-		if len(parts) != 3 {
-			return [3]int{}, fmt.Errorf("invalid semver %q", v)
-		}
-		maj, err := strconv.Atoi(parts[0])
-		if err != nil {
-			return [3]int{}, err
-		}
-		min, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return [3]int{}, err
-		}
-		pat, err := strconv.Atoi(parts[2])
-		if err != nil {
-			return [3]int{}, err
-		}
-		return [3]int{maj, min, pat}, nil
-	}
-
-	av, err := parse(a)
-	if err != nil {
-		return 0, err
-	}
-	bv, err := parse(b)
-	if err != nil {
-		return 0, err
-	}
-
-	for i := 0; i < 3; i++ {
-		if av[i] < bv[i] {
-			return -1, nil
-		}
-		if av[i] > bv[i] {
-			return 1, nil
-		}
-	}
-	return 0, nil
 }
 
 // errNoSingleSigValidatorFunder signals that the local keyring has no
@@ -551,11 +472,3 @@ func signStringWithPrivHex(privHex, payload string) (string, error) {
 	}
 	return base64.StdEncoding.EncodeToString(sig), nil
 }
-
-// --- Compiled regexps for semver parsing ---
-
-var (
-	semverExact    = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)$`)
-	semverLabelled = regexp.MustCompile(`(?mi)^\s*version\s*[:=]\s*v?(\d+)\.(\d+)\.(\d+)\s*$`)
-	semverAny      = regexp.MustCompile(`v?(\d+)\.(\d+)\.(\d+)`)
-)

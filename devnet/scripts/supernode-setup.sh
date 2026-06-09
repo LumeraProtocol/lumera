@@ -59,22 +59,18 @@ VERSION_LOG_PREFIX="[SN]"
 LUMERA_SUPPORTS_EVM_VERBOSE=1
 TX_GAS_PRICES="${TX_GAS_PRICES:-0.03ulume}"
 
-# After EVM activation, the feemarket module enforces a minimum global fee in
-# its own denom (e.g. aatom/alume).  Query the feemarket params at runtime and
-# override TX_GAS_PRICES so bank-send txs satisfy the check.
+# After EVM activation, the feemarket module enforces a minimum global fee.
+# Lumera Cosmos tx fees remain in the bond denom (ulume); alume is the EVM-side
+# 18-decimal representation. Query the feemarket params for the numeric price
+# and keep the Cosmos fee denom.
 update_gas_prices_for_evm() {
-	local params evm_config base_fee fee_denom
+	local params base_fee
 	params="$($DAEMON q feemarket params --output json 2>/dev/null || true)"
 	if [[ -z "$params" ]]; then
 		return
 	fi
-	fee_denom="$(echo "$params" | jq -r '.params.fee_denom // empty' 2>/dev/null || true)"
 	base_fee="$(echo "$params" | jq -r '.params.base_fee // .params.min_gas_price // empty' 2>/dev/null || true)"
-	if [[ -z "$fee_denom" ]]; then
-		evm_config="$($DAEMON q evm config --output json 2>/dev/null || true)"
-		fee_denom="$(echo "$evm_config" | jq -r '.config.denom // empty' 2>/dev/null || true)"
-	fi
-	if [[ -n "$fee_denom" && -n "$base_fee" ]]; then
+	if [[ -n "$base_fee" ]]; then
 		# Use 2× base fee as gas price to ensure acceptance under fee fluctuation
 		local price
 		price="$(jq -nr --arg base_fee "$base_fee" '
@@ -82,8 +78,8 @@ update_gas_prices_for_evm() {
 			| if . < 0.000001 then 0.000001 else . end
 		' 2>/dev/null || true)"
 		[[ -z "$price" || "$price" == "null" ]] && price="0.000001"
-		TX_GAS_PRICES="${price}${fee_denom}"
-		echo "[SN] Feemarket active: using gas price ${TX_GAS_PRICES} (base_fee=${base_fee}${fee_denom})"
+		TX_GAS_PRICES="${price}${DENOM}"
+		echo "[SN] Feemarket active: using gas price ${TX_GAS_PRICES} (base_fee=${base_fee}${DENOM})"
 	fi
 }
 
@@ -105,8 +101,9 @@ SN_P2P_PORT="${SUPERNODE_P2P_PORT:-4445}"
 SN_GATEWAY_PORT="${SUPERNODE_GATEWAY_PORT:-8002}"
 SN_LOG="${SN_LOG:-/root/logs/supernode.log}"
 
-# Shared volume mounted to all validator containers for cross-node coordination
-SHARED_DIR="/shared"
+# Shared volume mounted to all validator containers for cross-node coordination.
+# SUPERNODE_SHARED_DIR is only for local/unit tests; containers use /shared.
+SHARED_DIR="${SUPERNODE_SHARED_DIR:-/shared}"
 CFG_DIR="${SHARED_DIR}/config"
 CFG_CHAIN="${CFG_DIR}/config.json"       # Global chain config (chain ID, mnemonics, EVM version)
 CFG_VALS="${CFG_DIR}/validators.json"    # Per-validator specs (ports, stakes, monikers)
@@ -255,46 +252,29 @@ query_account_number_sequence() {
 	' <<<"${out}" | head -n1
 }
 
-# bank_send_from_validator sends `amount` to `dest_addr` from the local
-# validator's genesis account. On single-sig hosts this is a plain `tx bank
-# send`; on multisig-validator hosts it runs generate-only → 2-of-N offline
-# signing → broadcast via the shared multisig_sign_unsigned helper. Prints the
+# bank_send_from_validator sends `amount` to `dest_addr` from the local liquid
+# funding account. Single-sig validators use their validator key; multisig
+# validators use the genesis-provisioned prepare-funder because PermanentLocked
+# multisig composites have no spendable balance for tx fees. Prints the
 # broadcast-response JSON to stdout (with .txhash when successful) so callers
 # can parse the result uniformly. Returns 0 on success, nonzero on failure.
 bank_send_from_validator() {
 	local dest_addr="$1" amount="$2"
 	local tag="${3:-[SN]}"
+	local funding_key funding_addr
 
-	if validator_is_multisig; then
-		local acc_num seq unsigned_file signed_file rc
-		IFS=$'\t' read -r acc_num seq < <(query_account_number_sequence "${GENESIS_ADDR}")
-		if [[ -z "${acc_num}" || -z "${seq}" ]]; then
-			echo "${tag} ERROR: failed to query multisig account number/sequence for ${GENESIS_ADDR}" >&2
-			return 1
-		fi
-
-		unsigned_file="$(mktemp /tmp/sn-bank-send-unsigned.XXXXXX.json)"
-		signed_file="$(mktemp /tmp/sn-bank-send-signed.XXXXXX.json)"
-		rc=0
-		{
-			run_capture ${DAEMON} tx bank send "${GENESIS_ADDR}" "${dest_addr}" "${amount}" \
-				--from "${KEY_NAME}" --chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}" \
-				--account-number "${acc_num}" --sequence "${seq}" \
-				--gas 200000 --gas-prices "${TX_GAS_PRICES}" \
-				--generate-only --output json >"${unsigned_file}" &&
-			multisig_sign_unsigned "${unsigned_file}" \
-				"${KEY_NAME}" "${GENESIS_ADDR}" \
-				"$(validator_multisig_signer_key 1)" "$(validator_multisig_signer_key 2)" \
-				"${acc_num}" "${seq}" >"${signed_file}" &&
-			run_capture ${DAEMON} tx broadcast "${signed_file}" \
-				--broadcast-mode sync --output json
-		} || rc=$?
-		rm -f "${unsigned_file}" "${signed_file}"
-		return "${rc}"
+	funding_key="$(supernode_funding_key_name)"
+	funding_addr="$(supernode_funding_address)"
+	if [[ -z "${funding_addr}" ]]; then
+		echo "${tag} ERROR: Missing funding address for ${funding_key} in accounts registry." >&2
+		return 1
 	fi
 
-	# Single-sig path: let cosmos-sdk resolve --from via the FROM_ADDR positional.
-	run_capture ${DAEMON} tx bank send "${GENESIS_ADDR}" "${dest_addr}" "${amount}" \
+	if validator_is_multisig; then
+		echo "${tag} Funding from liquid multisig helper ${funding_key} (${funding_addr})." >&2
+	fi
+
+	run_capture ${DAEMON} tx bank send "${funding_key}" "${dest_addr}" "${amount}" \
 		--chain-id "${CHAIN_ID}" \
 		--keyring-backend "${KEYRING_BACKEND}" \
 		--gas auto --gas-adjustment 1.3 \
@@ -302,8 +282,50 @@ bank_send_from_validator() {
 		--output json --yes
 }
 
+multisig_registration_feegrant_spend_limit() {
+	printf '10000000%s\n' "${DENOM}"
+}
+
+ensure_multisig_registration_feegrant() {
+	local funding_key funding_addr spend_limit grant_json grant_hash
+	if ! validator_is_multisig; then
+		return 0
+	fi
+
+	funding_key="$(supernode_funding_key_name)"
+	funding_addr="$(supernode_funding_address)"
+	if [[ -z "${funding_addr}" ]]; then
+		echo "[SN] ERROR: Missing funding address for ${funding_key} in accounts registry." >&2
+		return 1
+	fi
+
+	if run_capture ${DAEMON} q feegrant grant "${funding_addr}" "${VAL_ADDR}" --output json >/dev/null 2>&1; then
+		echo "[SN] Feegrant from ${funding_key} (${funding_addr}) to ${VAL_ADDR} already exists."
+		return 0
+	fi
+
+	spend_limit="$(multisig_registration_feegrant_spend_limit)"
+	echo "[SN] Granting registration fees from ${funding_key} (${funding_addr}) to multisig validator ${VAL_ADDR}."
+	grant_json="$(run_capture ${DAEMON} tx feegrant grant "${funding_key}" "${VAL_ADDR}" \
+		--spend-limit "${spend_limit}" \
+		--chain-id "${CHAIN_ID}" \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--gas 120000 \
+		--gas-prices "${TX_GAS_PRICES}" \
+		--output json --yes)"
+	grant_hash="$(echo "${grant_json}" | jq -r '.txhash // empty')"
+	if [[ -z "${grant_hash}" ]]; then
+		echo "[SN] ERROR: failed to obtain txhash for multisig registration feegrant" >&2
+		return 1
+	fi
+	wait_for_tx "${grant_hash}"
+}
+
 register_supernode_multisig() {
-	local acc_num seq unsigned_file signed_file bcast_json tx_hash
+	local acc_num seq unsigned_file signed_file bcast_json tx_hash feegranter_addr
+	ensure_multisig_registration_feegrant || return 1
+	feegranter_addr="$(supernode_funding_address)"
+
 	IFS=$'\t' read -r acc_num seq < <(query_account_number_sequence "${VAL_ADDR}")
 	if [[ -z "${acc_num}" || -z "${seq}" ]]; then
 		echo "[SN] ERROR: failed to query validator multisig account number/sequence for ${VAL_ADDR}"
@@ -318,6 +340,7 @@ register_supernode_multisig() {
 		--from "${KEY_NAME}" --chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}" \
 		--account-number "${acc_num}" --sequence "${seq}" \
 		--gas 500000 --gas-prices "${TX_GAS_PRICES}" \
+		--fee-granter "${feegranter_addr}" \
 		--generate-only --output json >"${unsigned_file}"
 
 	multisig_sign_unsigned "${unsigned_file}" \
@@ -343,6 +366,20 @@ registry_account_address() {
 registry_account_mnemonic() {
 	local account_name="$1"
 	accounts_registry_get_field "${account_name}" "mnemonic"
+}
+
+supernode_funding_key_name() {
+	if validator_is_multisig; then
+		printf 'prepare-funder-%s\n' "${MONIKER}"
+		return 0
+	fi
+	printf '%s\n' "${KEY_NAME}"
+}
+
+supernode_funding_address() {
+	local funding_key
+	funding_key="$(supernode_funding_key_name)"
+	registry_account_address "${funding_key}"
 }
 
 # Convenience wrappers: ensure a key of the right type exists in the right keyring.
@@ -1402,6 +1439,10 @@ configure_sncli() {
 	crudini --set "${SNCLI_CFG}" keyring local_address "\"$addr\""
 
 }
+
+if [[ "${SUPERNODE_SETUP_LIB_ONLY:-0}" == "1" ]]; then
+	return 0 2>/dev/null || exit 0
+fi
 
 # ═════════════════════════════════════════════════════════════════════════════
 # MAIN EXECUTION

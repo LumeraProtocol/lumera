@@ -26,12 +26,28 @@ import (
 // UpgradeName is the on-chain name used for this upgrade.
 const UpgradeName = "v1.20.0"
 
-// devnetMigrationWindow is how long after the upgrade block the migration
-// window stays open on devnet. Devnet derives a finite migration_end_time
-// automatically so rehearsals exercise a real deadline; testnet and mainnet
-// instead receive a specific absolute migration_end_time chosen near their
-// own upgrade.
-const devnetMigrationWindow = 2 * 24 * time.Hour
+// Devnet and testnet derive a finite migration_end_time automatically from the
+// upgrade block time so rehearsals and public testnet exercise a real deadline.
+// Mainnet instead receives a specific absolute migration_end_time chosen near
+// its own upgrade (the handler leaves it at the default 0).
+const (
+	devnetMigrationWindow  = 2 * 24 * time.Hour
+	testnetMigrationWindow = 7 * 24 * time.Hour
+)
+
+// autoMigrationWindow returns the migration window to auto-apply for the given
+// chain ID, or 0 if the deadline should be left to a manually chosen timestamp
+// (mainnet and any unrecognized chain ID).
+func autoMigrationWindow(chainID string) time.Duration {
+	switch {
+	case lcfg.IsDevnetChainID(chainID):
+		return devnetMigrationWindow
+	case lcfg.IsTestnetChainID(chainID):
+		return testnetMigrationWindow
+	default:
+		return 0
+	}
+}
 
 // StoreUpgrades declares store additions for this upgrade.
 var StoreUpgrades = storetypes.StoreUpgrades{
@@ -137,28 +153,29 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 			}
 		}
 
-		// On devnet, derive a finite migration_end_time from the upgrade block
-		// time so rehearsals run against a real deadline without hardcoding an
-		// absolute timestamp. RunMigrations already seeded the evmigration module
-		// with default params (enable_migration=true, migration_end_time=0); here
-		// we only override the deadline. Testnet and mainnet keep the default 0
-		// at upgrade and receive a specific migration_end_time chosen separately.
-		if lcfg.IsDevnetChainID(p.ChainID) {
+		// On devnet and testnet, derive a finite migration_end_time from the
+		// upgrade block time so those networks run against a real deadline without
+		// hardcoding an absolute timestamp. RunMigrations already seeded the
+		// evmigration module with default params (enable_migration=true,
+		// migration_end_time=0); here we only override the deadline. Mainnet keeps
+		// the default 0 at upgrade and receives a specific migration_end_time
+		// chosen separately near launch.
+		if window := autoMigrationWindow(p.ChainID); window > 0 {
 			if p.EvmigrationKeeper == nil {
-				return nil, fmt.Errorf("%s devnet upgrade requires evmigration keeper to be wired", UpgradeName)
+				return nil, fmt.Errorf("%s upgrade requires evmigration keeper to be wired", UpgradeName)
 			}
 			emParams, err := p.EvmigrationKeeper.Params.Get(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("get evmigration params: %w", err)
 			}
-			emParams.MigrationEndTime = ctx.BlockTime().Add(devnetMigrationWindow).Unix()
+			emParams.MigrationEndTime = ctx.BlockTime().Add(window).Unix()
 			if err := p.EvmigrationKeeper.Params.Set(ctx, emParams); err != nil {
-				return nil, fmt.Errorf("set devnet evmigration migration_end_time: %w", err)
+				return nil, fmt.Errorf("set evmigration migration_end_time: %w", err)
 			}
-			p.Logger.Info("Set devnet migration_end_time",
+			p.Logger.Info("Set migration_end_time from upgrade block time",
 				"chain_id", p.ChainID,
 				"migration_end_time", emParams.MigrationEndTime,
-				"window", devnetMigrationWindow.String(),
+				"window", window.String(),
 			)
 		}
 

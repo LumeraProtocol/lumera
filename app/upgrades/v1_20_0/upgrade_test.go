@@ -62,11 +62,13 @@ func TestV1200SetsDevnetMigrationEndTime(t *testing.T) {
 		"max_validator_delegations default should be 2500")
 }
 
-// Testnet and mainnet keep migration_end_time at the default 0 at upgrade; a
-// specific absolute timestamp is chosen for them separately.
-func TestV1200LeavesMigrationEndTimeZeroOffDevnet(t *testing.T) {
+// On testnet the handler derives a 7-day migration window from the upgrade
+// block time.
+func TestV1200SetsTestnetMigrationEndTime(t *testing.T) {
 	app := lumeraapp.Setup(t)
 	ctx := app.BaseApp.NewContext(false)
+
+	want := ctx.BlockTime().Add(7 * 24 * time.Hour).Unix()
 
 	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera-testnet-1"))
 	_, err := handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
@@ -74,8 +76,24 @@ func TestV1200LeavesMigrationEndTimeZeroOffDevnet(t *testing.T) {
 
 	after, err := app.EvmigrationKeeper.Params.Get(ctx)
 	require.NoError(t, err)
+	require.Equal(t, want, after.MigrationEndTime,
+		"testnet upgrade should set migration_end_time to upgrade block time + 7 days")
+}
+
+// Mainnet keeps migration_end_time at the default 0 at upgrade; a specific
+// absolute timestamp is chosen and applied separately near launch.
+func TestV1200LeavesMigrationEndTimeZeroOnMainnet(t *testing.T) {
+	app := lumeraapp.Setup(t)
+	ctx := app.BaseApp.NewContext(false)
+
+	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera-mainnet-1"))
+	_, err := handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
+	require.NoError(t, err)
+
+	after, err := app.EvmigrationKeeper.Params.Get(ctx)
+	require.NoError(t, err)
 	require.Equal(t, int64(0), after.MigrationEndTime,
-		"non-devnet upgrade must leave migration_end_time at the default 0")
+		"mainnet upgrade must leave migration_end_time at the default 0")
 }
 
 func TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped(t *testing.T) {

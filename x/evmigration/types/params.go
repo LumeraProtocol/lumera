@@ -26,7 +26,7 @@
 //	is reached, additional claims in the same block are rejected. This
 //	prevents a burst of migrations from consuming excessive block gas.
 //
-// MaxValidatorDelegations (uint64, default: 2000)
+// MaxValidatorDelegations (uint64, default: 2500)
 //
 //	Safety cap for MsgMigrateValidator. A validator migration must re-key
 //	every delegation record. If the total number of delegation + unbonding
@@ -45,7 +45,10 @@ var (
 	// DefaultMaxMigrationsPerBlock caps claim messages per block.
 	DefaultMaxMigrationsPerBlock uint64 = 50
 	// DefaultMaxValidatorDelegations caps delegation records for validator migration.
-	DefaultMaxValidatorDelegations uint64 = 2000
+	// Sized against live mainnet, where the largest validator's migration-object
+	// count (delegations + unbondings + redelegations) is ~1,632; 2500 clears that
+	// worst case with ~1.5x headroom. See scripts/chain-helper.sh max-validator-delegations.
+	DefaultMaxValidatorDelegations uint64 = 2500
 	// DefaultMaxMultisigSubKeys caps the number of sub-keys a multisig legacy
 	// account may have when migrating. Bounds per-tx verification cost.
 	DefaultMaxMultisigSubKeys uint32 = 20

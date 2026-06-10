@@ -1,8 +1,33 @@
 package config
 
 import (
+	"strings"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
+
+// Chain-ID prefixes identifying each Lumera network. Chain IDs are of the form
+// "<prefix>-<n>" (e.g. "lumera-mainnet-1", "lumera-devnet-3").
+const (
+	MainnetChainIDPrefix = "lumera-mainnet"
+	TestnetChainIDPrefix = "lumera-testnet"
+	DevnetChainIDPrefix  = "lumera-devnet"
+)
+
+// IsMainnetChainID reports whether chainID belongs to a Lumera mainnet network.
+func IsMainnetChainID(chainID string) bool {
+	return strings.HasPrefix(chainID, MainnetChainIDPrefix)
+}
+
+// IsTestnetChainID reports whether chainID belongs to a Lumera testnet network.
+func IsTestnetChainID(chainID string) bool {
+	return strings.HasPrefix(chainID, TestnetChainIDPrefix)
+}
+
+// IsDevnetChainID reports whether chainID belongs to a Lumera devnet network.
+func IsDevnetChainID(chainID string) bool {
+	return strings.HasPrefix(chainID, DevnetChainIDPrefix)
+}
 
 const (
 	// DefaultMaxIBCCallbackGas is the default value of maximum gas that an IBC callback can use.

@@ -25,9 +25,6 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Install dependencies
-        run: go mod download
-
       - name: Run unit tests
         run: make unit-tests
 
@@ -41,9 +38,6 @@ jobs:
 
       - name: Set up Go
         uses: ./.github/actions/setup-go
-
-      - name: Install dependencies
-        run: go mod download
 
       - name: Build lumerad
         run: go build -o ./build/lumerad ./cmd/lumera
@@ -62,9 +56,6 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Install dependencies
-        run: go mod download
-
       - name: Run integration tests
         run: make integration-tests
 
@@ -79,9 +70,6 @@ jobs:
 
       - name: Set up Go
         uses: ./.github/actions/setup-go
-
-      - name: Install dependencies
-        run: go mod download
 
       - name: Run simulation benchmark
         run: make simulation-bench

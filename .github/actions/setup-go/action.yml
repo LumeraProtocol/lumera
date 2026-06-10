@@ -1,10 +1,20 @@
 name: Setup Go from go.mod
-description: Detect the Go toolchain version from go.mod and install it with caching enabled
+description: Detect the Go toolchain version from go.mod, install it, and prime the Go module cache
 inputs:
   version:
     description: "Go version to use (overrides go.mod detection)"
     required: false
     default: ""
+  download-modules:
+    description: "Run go mod download and save the module cache immediately"
+    required: false
+    default: "true"
+  module-directories:
+    description: "Newline-delimited module directories to download"
+    required: false
+    default: |
+      .
+      tests/systemtests
 outputs:
   version:
     description: Detected Go version
@@ -42,8 +52,60 @@ runs:
 
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-    - name: Setup Go
+    - id: setup-go
+      name: Setup Go
       uses: actions/setup-go@v6.2.0
       with:
         go-version: ${{ steps.determine.outputs.version }}
         cache: true
+        cache-dependency-path: |
+          go.sum
+          tests/systemtests/go.sum
+
+    - id: go-env
+      name: Resolve Go cache paths
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "gomodcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+    - id: go-module-cache
+      name: Restore Go module cache
+      if: ${{ inputs.download-modules == 'true' && steps.setup-go.outputs.cache-hit != 'true' }}
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.go-env.outputs.gomodcache }}
+        key: go-mod-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.determine.outputs.version }}-${{ hashFiles('go.sum', 'tests/systemtests/go.sum') }}
+        restore-keys: |
+          go-mod-${{ runner.os }}-${{ runner.arch }}-go-${{ steps.determine.outputs.version }}-
+          go-mod-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Download Go modules
+      if: ${{ inputs.download-modules == 'true' }}
+      shell: bash
+      env:
+        MODULE_DIRECTORIES: ${{ inputs.module-directories }}
+      run: |
+        set -euo pipefail
+
+        while IFS= read -r module_dir || [ -n "$module_dir" ]; do
+          if [ -z "$module_dir" ]; then
+            continue
+          fi
+          if [ ! -f "$module_dir/go.mod" ]; then
+            echo "Module directory '$module_dir' does not contain go.mod" >&2
+            exit 1
+          fi
+
+          echo "Downloading Go modules in $module_dir"
+          (cd "$module_dir" && go mod download)
+        done <<< "$MODULE_DIRECTORIES"
+
+    - name: Save Go module cache
+      if: ${{ inputs.download-modules == 'true' && steps.setup-go.outputs.cache-hit != 'true' && steps.go-module-cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v4
+      continue-on-error: true
+      with:
+        path: ${{ steps.go-env.outputs.gomodcache }}
+        key: ${{ steps.go-module-cache.outputs.cache-primary-key }}

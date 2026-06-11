@@ -54,18 +54,18 @@ JSON
 fi
 
 if [[ "${args[0]}" == "query" && "${args[1]}" == "supernode" && "${args[2]}" == "list-supernodes" ]]; then
-  # Current state is the highest-height entry per supernode; states are
-  # intentionally out of order to exercise max_by(height).
+  # Current state is the highest-height entry per supernode; history entries
+  # and resulting current states are intentionally out of order.
   cat <<'JSON'
 {
   "supernodes": [
     {"validator_address": "lumeravaloper1alpha", "states": [
       {"state": "SUPERNODE_STATE_ACTIVE", "height": "10"},
-      {"state": "SUPERNODE_STATE_POSTPONED", "height": "30"},
-      {"state": "SUPERNODE_STATE_ACTIVE", "height": "20"}
+      {"state": "SUPERNODE_STATE_POSTPONED", "height": "20"},
+      {"state": "SUPERNODE_STATE_ACTIVE", "height": "30"}
     ]},
     {"validator_address": "lumeravaloper1beta", "states": [
-      {"state": "SUPERNODE_STATE_ACTIVE", "height": "5"}
+      {"state": "SUPERNODE_STATE_POSTPONED", "height": "5"}
     ]},
     {"validator_address": "lumeravaloper1gamma", "states": [
       {"state": "SUPERNODE_STATE_DISABLED", "height": "7"},
@@ -366,8 +366,10 @@ teardown() {
     and .validators.jailed == 1
     and .validators.not_jailed == 1
     and .supernodes.total == 3
-    and ((.supernodes.by_state[] | select(.state == "SUPERNODE_STATE_ACTIVE") | .count) == 2)
-    and ((.supernodes.by_state[] | select(.state == "SUPERNODE_STATE_POSTPONED") | .count) == 1)
+    and .supernodes.by_state == [
+      {"state": "SUPERNODE_STATE_ACTIVE", "count": 2},
+      {"state": "SUPERNODE_STATE_POSTPONED", "count": 1}
+    ]
   '
 }
 

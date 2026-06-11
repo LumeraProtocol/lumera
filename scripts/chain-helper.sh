@@ -651,6 +651,7 @@ stats() {
       | (.states // [])
       | if length > 0 then (max_by(.height | tonumber).state) else "SUPERNODE_STATE_UNSPECIFIED" end
     ]
+    | sort_by(.)
     | group_by(.)
     | map({state: .[0], count: length})
     | sort_by(-.count)

@@ -13,7 +13,7 @@ GRPC="${LUMERA_GRPC:-$DEFAULT_GRPC}"
 BIN="${LUMERA_BINARY:-lumerad}"
 GRPCURL="${LUMERA_GRPCURL_BINARY:-grpcurl}"
 LIMIT="${LUMERA_QUERY_LIMIT:-1000}"
-BUFFER_PERCENT="${LUMERA_BUFFER_PERCENT:-10}"
+BUFFER_PERCENT="${LUMERA_BUFFER_PERCENT:-30}"
 JSON_OUTPUT=0
 ALLOW_PARTIAL=0
 GRPC_INSECURE="${LUMERA_GRPC_INSECURE:-0}"
@@ -28,6 +28,9 @@ Commands:
   max-validator-delegations
       Calculate the highest validator migration object count and recommend a
       max_validator_delegations value.
+  stats
+      Show chain-wide counts: total accounts, total/jailed validators, and
+      total supernodes grouped by their current state.
 
 Common flags:
   --node, --rpc <url>        Tendermint RPC endpoint
@@ -43,7 +46,7 @@ Common flags:
   -h, --help                show this help
 
 max-validator-delegations flags:
-  --buffer-percent <n>      integer percent buffer for suggested_cap; default: 10
+  --buffer-percent <n>      integer percent buffer for suggested_cap; default: 30
   --allow-partial           allow staking-only fallback if evmigration
                              migration-estimate is unavailable
 
@@ -129,16 +132,43 @@ estimate_counts_tsv() {
   '
 }
 
+# staking_count_total <subcommand> <address>
+# Returns the exact total number of records for a staking sub-query using the
+# node-side count_total. Counting (.records | length) on a single page silently
+# truncates any validator that has more delegations than --page-limit (e.g. a
+# validator with 1593 delegations reads as 1000 under the default limit), which
+# is unsafe for sizing max_validator_delegations.
+staking_count_total() {
+  local subcmd="$1"
+  local addr="$2"
+  local out total page_len
+  out="$(lumerad_query staking "$subcmd" "$addr" --page-limit 1 --page-count-total)" ||
+    die 3 "staking $subcmd query failed for $addr"
+  total="$(jq -r '(.pagination.total // "") | tostring' <<<"$out")"
+  if [[ "$total" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "$total"
+    return
+  fi
+  # Nodes omit pagination.total for an empty result set, so an empty page means
+  # zero records. A non-empty page without a total means count_total is not
+  # supported and we would silently undercount, so fail loudly instead.
+  page_len="$(jq -r '
+    (.delegation_responses // .delegations
+     // .unbonding_responses // .unbonding_delegations // []) | length
+  ' <<<"$out")"
+  if [[ "$page_len" == "0" ]]; then
+    printf '0\n'
+  else
+    die 3 "staking $subcmd for $addr returned no pagination.total; node may not support --page-count-total"
+  fi
+}
+
 delegations_to_count() {
-  local valoper="$1"
-  lumerad_query staking delegations-to "$valoper" --page-limit "$LIMIT" |
-    jq -r '(.delegation_responses // .delegations // []) | length'
+  staking_count_total delegations-to "$1"
 }
 
 unbonding_from_count() {
-  local valoper="$1"
-  lumerad_query staking unbonding-delegations-from "$valoper" --page-limit "$LIMIT" |
-    jq -r '(.unbonding_responses // .unbonding_delegations // []) | length'
+  staking_count_total unbonding-delegations-from "$1"
 }
 
 grpcurl_call() {
@@ -483,11 +513,11 @@ max_validator_delegations() {
     for record in "${records[@]}"; do
       index=$((index + 1))
       IFS=$'\t' read -r operator account moniker <<<"$record"
-      progress "counting staking records $index/$total_records: ${moniker:-$operator}"
       delegations="$(delegations_to_count "$operator")"
       unbondings="$(unbonding_from_count "$operator")"
       redelegations="${redelegation_counts["$operator"]:-0}"
       total=$((delegations + unbondings + redelegations))
+      progress "counting staking records $index/$total_records: ${moniker:-$operator} count=$total (deleg=$delegations unbond=$unbondings redel=$redelegations)"
       rows+=("$operator"$'\t'"$account"$'\t'"$moniker"$'\t'"$delegations"$'\t'"$unbondings"$'\t'"$redelegations"$'\t'"$total"$'\t'"true")
     done
   else
@@ -495,11 +525,11 @@ max_validator_delegations() {
     for record in "${records[@]}"; do
       index=$((index + 1))
       IFS=$'\t' read -r operator account moniker <<<"$record"
-      progress "counting partial staking records $index/$total_records: ${moniker:-$operator}"
       delegations="$(delegations_to_count "$operator")"
       unbondings="$(unbonding_from_count "$operator")"
       redelegations="0"
       total=$((delegations + unbondings + redelegations))
+      progress "counting partial staking records $index/$total_records: ${moniker:-$operator} count=$total (deleg=$delegations unbond=$unbondings)"
       rows+=("$operator"$'\t'"$account"$'\t'"$moniker"$'\t'"$delegations"$'\t'"$unbondings"$'\t'"$redelegations"$'\t'"$total"$'\t'"false")
     done
   fi
@@ -527,6 +557,148 @@ max_validator_delegations() {
   fi
 }
 
+# fetch_all <array_field> <query args...>
+# Pages through a lumerad query, following pagination.next_key, and prints a
+# single JSON array containing every element of the named top-level array
+# field (e.g. "validators", "supernodes"). Avoids page-limit truncation when a
+# query returns more records than a single page.
+fetch_all() {
+  local field="$1"
+  shift
+  local page_key="" page next acc='[]'
+  while :; do
+    if [[ -n "$page_key" ]]; then
+      page="$(lumerad_query "$@" --page-limit "$LIMIT" --page-key "$page_key")" ||
+        die 3 "paginated query failed: $*"
+    else
+      page="$(lumerad_query "$@" --page-limit "$LIMIT")" ||
+        die 3 "paginated query failed: $*"
+    fi
+    acc="$(jq -c --argjson acc "$acc" --arg f "$field" '$acc + (.[$f] // [])' <<<"$page")"
+    next="$(jq -r '(.pagination.next_key // .pagination.nextKey // "")' <<<"$page")"
+    if [[ -z "$next" || "$next" == "null" ]]; then
+      break
+    fi
+    page_key="$next"
+  done
+  printf '%s\n' "$acc"
+}
+
+parse_stats_flags() {
+  while (($#)); do
+    case "$1" in
+      --node|--rpc)
+        require_value "$1" "${2:-}"
+        NODE="$2"
+        shift 2
+        ;;
+      --chain-id)
+        require_value "$1" "${2:-}"
+        CHAIN_ID="$2"
+        shift 2
+        ;;
+      --binary)
+        require_value "$1" "${2:-}"
+        BIN="$2"
+        shift 2
+        ;;
+      --limit)
+        require_value "$1" "${2:-}"
+        require_uint "--limit" "$2"
+        LIMIT="$2"
+        shift 2
+        ;;
+      --json)
+        JSON_OUTPUT=1
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        die 1 "unknown flag for stats: $1"
+        ;;
+    esac
+  done
+}
+
+stats() {
+  parse_stats_flags "$@"
+  require_uint "LUMERA_QUERY_LIMIT" "$LIMIT"
+  require_tools
+
+  progress "querying total accounts"
+  local accounts
+  accounts="$(lumerad_query auth accounts --page-limit 1 --page-count-total |
+    jq -r '(.pagination.total // "") | tostring')"
+  [[ "$accounts" =~ ^[0-9]+$ ]] ||
+    die 3 "auth accounts returned no pagination.total; node may not support --page-count-total"
+
+  progress "querying validators"
+  local validators_json validators_total validators_jailed
+  validators_json="$(fetch_all validators staking validators)"
+  validators_total="$(jq -r 'length' <<<"$validators_json")"
+  validators_jailed="$(jq -r '[.[] | select(.jailed == true)] | length' <<<"$validators_json")"
+
+  progress "querying supernodes"
+  local supernodes_json supernodes_total supernode_states_json
+  supernodes_json="$(fetch_all supernodes supernode list-supernodes)"
+  supernodes_total="$(jq -r 'length' <<<"$supernodes_json")"
+  # A supernode's current status is the highest-height entry in its state history.
+  supernode_states_json="$(jq -c '
+    [ .[]
+      | (.states // [])
+      | if length > 0 then (max_by(.height | tonumber).state) else "SUPERNODE_STATE_UNSPECIFIED" end
+    ]
+    | sort_by(.)
+    | group_by(.)
+    | map({state: .[0], count: length})
+    | sort_by(-.count)
+  ' <<<"$supernodes_json")"
+
+  if [[ "$JSON_OUTPUT" -eq 1 ]]; then
+    jq -n \
+      --arg command "stats" \
+      --arg chain_id "$CHAIN_ID" \
+      --arg rpc "$NODE" \
+      --argjson accounts "$accounts" \
+      --argjson validators_total "$validators_total" \
+      --argjson validators_jailed "$validators_jailed" \
+      --argjson supernodes_total "$supernodes_total" \
+      --argjson supernode_states "$supernode_states_json" \
+      '{
+        command: $command,
+        chain_id: $chain_id,
+        rpc: $rpc,
+        accounts: { total: $accounts },
+        validators: {
+          total: $validators_total,
+          jailed: $validators_jailed,
+          not_jailed: ($validators_total - $validators_jailed)
+        },
+        supernodes: {
+          total: $supernodes_total,
+          by_state: $supernode_states
+        }
+      }'
+  else
+    printf 'command: stats\n'
+    printf 'chain_id: %s\n' "$CHAIN_ID"
+    printf 'rpc: %s\n' "$NODE"
+    printf '\n'
+    printf 'accounts:\n'
+    printf '  total: %s\n' "$accounts"
+    printf 'validators:\n'
+    printf '  total:      %s\n' "$validators_total"
+    printf '  jailed:     %s\n' "$validators_jailed"
+    printf '  not_jailed: %s\n' "$((validators_total - validators_jailed))"
+    printf 'supernodes:\n'
+    printf '  total: %s\n' "$supernodes_total"
+    jq -r '.[] | "  \(.state): \(.count)"' <<<"$supernode_states_json"
+  fi
+}
+
 main() {
   if [[ "$#" -eq 0 ]]; then
     usage
@@ -537,6 +709,10 @@ main() {
     max-validator-delegations)
       shift
       max_validator_delegations "$@"
+      ;;
+    stats)
+      shift
+      stats "$@"
       ;;
     -h|--help|help)
       usage

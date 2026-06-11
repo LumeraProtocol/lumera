@@ -37,9 +37,42 @@ if [[ "${args[0]}" == "query" && "${args[1]}" == "staking" && "${args[2]}" == "v
   cat <<'JSON'
 {
   "validators": [
-    {"operator_address": "lumeravaloper1alpha", "description": {"moniker": "alpha"}},
-    {"operator_address": "lumeravaloper1beta", "description": {"moniker": "beta"}}
-  ]
+    {"operator_address": "lumeravaloper1alpha", "description": {"moniker": "alpha"}, "jailed": false},
+    {"operator_address": "lumeravaloper1beta", "description": {"moniker": "beta"}, "jailed": true}
+  ],
+  "pagination": {"total": "2"}
+}
+JSON
+  exit 0
+fi
+
+if [[ "${args[0]}" == "query" && "${args[1]}" == "auth" && "${args[2]}" == "accounts" ]]; then
+  cat <<'JSON'
+{"accounts": [{}], "pagination": {"total": "160021"}}
+JSON
+  exit 0
+fi
+
+if [[ "${args[0]}" == "query" && "${args[1]}" == "supernode" && "${args[2]}" == "list-supernodes" ]]; then
+  # Current state is the highest-height entry per supernode; history entries
+  # and resulting current states are intentionally out of order.
+  cat <<'JSON'
+{
+  "supernodes": [
+    {"validator_address": "lumeravaloper1alpha", "states": [
+      {"state": "SUPERNODE_STATE_ACTIVE", "height": "10"},
+      {"state": "SUPERNODE_STATE_POSTPONED", "height": "20"},
+      {"state": "SUPERNODE_STATE_ACTIVE", "height": "30"}
+    ]},
+    {"validator_address": "lumeravaloper1beta", "states": [
+      {"state": "SUPERNODE_STATE_POSTPONED", "height": "5"}
+    ]},
+    {"validator_address": "lumeravaloper1gamma", "states": [
+      {"state": "SUPERNODE_STATE_DISABLED", "height": "7"},
+      {"state": "SUPERNODE_STATE_ACTIVE", "height": "99"}
+    ]}
+  ],
+  "pagination": {"total": "3"}
 }
 JSON
   exit 0
@@ -93,15 +126,18 @@ JSON
 fi
 
 if [[ "${args[0]}" == "query" && "${args[1]}" == "staking" && "${args[2]}" == "delegations-to" ]]; then
+  # Single-element pages with a larger pagination.total: this models a real node
+  # answering --page-count-total --page-limit 1, and guards against the regression
+  # where the count came from the (truncated) array length instead of the total.
   case "${args[3]}" in
     lumeravaloper1alpha)
       cat <<'JSON'
-{"delegation_responses": [{}, {}, {}, {}]}
+{"delegation_responses": [{}], "pagination": {"total": "4"}}
 JSON
       ;;
     lumeravaloper1beta)
       cat <<'JSON'
-{"delegation_responses": [{}, {}, {}, {}, {}, {}, {}]}
+{"delegation_responses": [{}], "pagination": {"total": "7"}}
 JSON
       ;;
   esac
@@ -111,13 +147,14 @@ fi
 if [[ "${args[0]}" == "query" && "${args[1]}" == "staking" && "${args[2]}" == "unbonding-delegations-from" ]]; then
   case "${args[3]}" in
     lumeravaloper1alpha)
+      # Empty set: a real node omits pagination.total here; the script must read 0.
       cat <<'JSON'
-{"unbonding_responses": [{}, {}]}
+{"unbonding_responses": [], "pagination": {}}
 JSON
       ;;
     lumeravaloper1beta)
       cat <<'JSON'
-{"unbonding_responses": [{}]}
+{"unbonding_responses": [{}], "pagination": {"total": "1"}}
 JSON
       ;;
   esac
@@ -219,7 +256,7 @@ teardown() {
     and .mode == "evmigration-estimate"
     and .exact == true
     and .max_observed == 33
-    and .suggested_cap == 37
+    and .suggested_cap == 43
     and .validators[0].operator_address == "lumeravaloper1beta"
     and .validators[0].total == 33
   '
@@ -239,7 +276,7 @@ teardown() {
     .mode == "staking-pre-evm"
     and .exact == true
     and .max_observed == 11
-    and .suggested_cap == 13
+    and .suggested_cap == 15
     and .validators[0].operator_address == "lumeravaloper1beta"
     and .validators[0].val_redelegation_count == 3
   '
@@ -259,7 +296,8 @@ teardown() {
   [[ "$output" != *"INFO: scanning redelegations 1/2"* ]]
   [[ "$output" == *"INFO: scanned redelegations 1/2: alpha count=1"* ]]
   [[ "$output" == *"INFO: scanned redelegations 2/2: beta count=2"* ]]
-  [[ "$output" == *"INFO: counting staking records 2/2"* ]]
+  [[ "$output" == *"INFO: counting staking records 1/2: alpha count=7 (deleg=4 unbond=0 redel=3)"* ]]
+  [[ "$output" == *"INFO: counting staking records 2/2: beta count=11 (deleg=7 unbond=1 redel=3)"* ]]
   [[ "$output" == *"mode: staking-pre-evm"* ]]
 }
 
@@ -311,4 +349,39 @@ teardown() {
     and .validators[0].operator_address == "lumeravaloper1beta"
     and (.warnings[0] | contains("not safe"))
   '
+}
+
+@test "stats reports accounts, validators, and supernode states (json)" {
+  run "$SCRIPTS_DIR/chain-helper.sh" stats \
+    --binary "$FAKE_LUMERAD" \
+    --chain-id test-chain \
+    --node tcp://test:26657 \
+    --json
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '
+    .command == "stats"
+    and .accounts.total == 160021
+    and .validators.total == 2
+    and .validators.jailed == 1
+    and .validators.not_jailed == 1
+    and .supernodes.total == 3
+    and .supernodes.by_state == [
+      {"state": "SUPERNODE_STATE_ACTIVE", "count": 2},
+      {"state": "SUPERNODE_STATE_POSTPONED", "count": 1}
+    ]
+  '
+}
+
+@test "stats human output groups supernodes by current (highest-height) state" {
+  run "$SCRIPTS_DIR/chain-helper.sh" stats \
+    --binary "$FAKE_LUMERAD" \
+    --chain-id test-chain \
+    --node tcp://test:26657
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"total: 160021"* ]]
+  [[ "$output" == *"jailed:     1"* ]]
+  [[ "$output" == *"SUPERNODE_STATE_ACTIVE: 2"* ]]
+  [[ "$output" == *"SUPERNODE_STATE_POSTPONED: 1"* ]]
 }

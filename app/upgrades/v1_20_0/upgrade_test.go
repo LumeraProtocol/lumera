@@ -2,6 +2,7 @@ package v1_20_0_test
 
 import (
 	"testing"
+	"time"
 
 	"cosmossdk.io/log"
 	"cosmossdk.io/store/prefix"
@@ -17,6 +18,83 @@ import (
 	upgradev1200 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
 	erc20policytypes "github.com/LumeraProtocol/lumera/x/erc20policy/types"
 )
+
+// upgradeParamsForChain returns AppUpgradeParams wired with the app keepers the
+// v1.20.0 handler needs, for the given chain ID.
+func upgradeParamsForChain(app *lumeraapp.App, chainID string) appParams.AppUpgradeParams {
+	return appParams.AppUpgradeParams{
+		ChainID:           chainID,
+		Logger:            log.NewNopLogger(),
+		ModuleManager:     module.NewManager(),
+		Configurator:      module.NewConfigurator(nil, nil, nil),
+		BankKeeper:        app.BankKeeper,
+		EVMKeeper:         app.EVMKeeper,
+		FeeMarketKeeper:   &app.FeeMarketKeeper,
+		Erc20Keeper:       &app.Erc20Keeper,
+		Erc20StoreKey:     app.GetKey(erc20types.StoreKey),
+		EvmigrationKeeper: &app.EvmigrationKeeper,
+	}
+}
+
+// On devnet the handler derives a finite migration_end_time from the upgrade
+// block time (block time + 2 days) so rehearsals run against a real deadline.
+func TestV1200SetsDevnetMigrationEndTime(t *testing.T) {
+	app := lumeraapp.Setup(t)
+	ctx := app.BaseApp.NewContext(false)
+
+	// Default genesis params seed migration with no deadline.
+	before, err := app.EvmigrationKeeper.Params.Get(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), before.MigrationEndTime)
+
+	want := ctx.BlockTime().Add(2 * 24 * time.Hour).Unix()
+
+	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera-devnet-1"))
+	_, err = handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
+	require.NoError(t, err)
+
+	after, err := app.EvmigrationKeeper.Params.Get(ctx)
+	require.NoError(t, err)
+	require.Equal(t, want, after.MigrationEndTime,
+		"devnet upgrade should set migration_end_time to upgrade block time + 2 days")
+	require.True(t, after.EnableMigration, "enable_migration should remain true (immediate-open)")
+	require.Equal(t, uint64(2500), after.MaxValidatorDelegations,
+		"max_validator_delegations default should be 2500")
+}
+
+// On testnet the handler derives a 7-day migration window from the upgrade
+// block time.
+func TestV1200SetsTestnetMigrationEndTime(t *testing.T) {
+	app := lumeraapp.Setup(t)
+	ctx := app.BaseApp.NewContext(false)
+
+	want := ctx.BlockTime().Add(7 * 24 * time.Hour).Unix()
+
+	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera-testnet-1"))
+	_, err := handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
+	require.NoError(t, err)
+
+	after, err := app.EvmigrationKeeper.Params.Get(ctx)
+	require.NoError(t, err)
+	require.Equal(t, want, after.MigrationEndTime,
+		"testnet upgrade should set migration_end_time to upgrade block time + 7 days")
+}
+
+// Mainnet keeps migration_end_time at the default 0 at upgrade; a specific
+// absolute timestamp is chosen and applied separately near launch.
+func TestV1200LeavesMigrationEndTimeZeroOnMainnet(t *testing.T) {
+	app := lumeraapp.Setup(t)
+	ctx := app.BaseApp.NewContext(false)
+
+	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera-mainnet-1"))
+	_, err := handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
+	require.NoError(t, err)
+
+	after, err := app.EvmigrationKeeper.Params.Get(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), after.MigrationEndTime,
+		"mainnet upgrade must leave migration_end_time at the default 0")
+}
 
 func TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped(t *testing.T) {
 	app := lumeraapp.Setup(t)

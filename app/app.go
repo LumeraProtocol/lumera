@@ -502,6 +502,7 @@ func (app *App) setupUpgrades() {
 		FeeMarketKeeper:       &app.FeeMarketKeeper,
 		Erc20Keeper:           &app.Erc20Keeper,
 		Erc20StoreKey:         app.GetKey(erc20types.StoreKey),
+		EvmigrationKeeper:     &app.EvmigrationKeeper,
 	}
 
 	allUpgrades := upgrades.AllUpgrades(params)

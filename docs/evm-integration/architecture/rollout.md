@@ -71,22 +71,6 @@ This means rollout work is now primarily operational: release qualification, sta
 - [External Block Explorer Integration Plan](../guides/block-explorer.md) — block explorer rollout on testnet and mainnet
 - [CosmWasm Cross-Runtime Bridge — Wasm Precompile & EVM Plugin](../precompiles/wasm-precompile.md) — bidirectional CosmWasm↔EVM bridge behavior and test targets
 
-## Roles and Ownership
-
-The rollout needs named role ownership even if the actual people are assigned later.
-
-| Responsibility | Owner role | Notes |
-| --- | --- | --- |
-| stage go/no-go decision | Release lead | decides whether to promote from RC to devnet, devnet to testnet, and testnet to mainnet |
-| governance proposal prep and timing | Governance owner | owns proposal content, deposit, timing, voting tracking, and contingency resubmission |
-| validator coordination | Validator operations owner | owns validator comms, halt instructions, restart coordination, and readiness tracking |
-| migration rehearsal and Portal flow | Migration owner | owns migration runbooks, Portal flow, Keplr / MetaMask migration tests |
-| RPC / infra / explorer readiness | Infrastructure owner | owns RPC health, OpenRPC, rate limiting, block explorer rollout, and monitoring |
-| wallet and ecosystem partner readiness | Ecosystem owner | owns chain registry, wallet partners, exchanges, custodians, and explorer contacts |
-| public announcements and status updates | Communications owner | owns public announcement copy, cadence, and incident updates |
-| incident command during upgrade day | Incident commander | single coordinator for halt / hold / resume instructions |
-| migration-window support and triage | Support owner | owns inbound support flow, FAQ updates, and escalation during migration window |
-
 ## Communication Channels
 
 Before testnet, Lumera should map each audience to a concrete channel, not just a message.
@@ -120,6 +104,20 @@ These items come from the remaining roadmap work and should be treated as explic
 Before tagging the `v1.20.0` EVM release, the release owner must fill this table with the intended values and attach the RC/devnet evidence showing that those values are present in the first post-upgrade block. Treat any blank decision as a release blocker.
 
 The current code seeds most of these from `config/evm.go`, `app/evm/genesis.go`, and `app/upgrades/v1_20_0/upgrade.go`. That makes them easy to overlook: they may not require a governance parameter proposal, but they still become live network behavior at upgrade height.
+
+#### Parameters That Actually Require a Decision
+
+Most of the detailed tables in the following subsections are **confirm-and-verify only**: their values are hardcoded in `config/evm.go` or seeded deterministically by the `v1_20_0` upgrade handler, so they cannot drift unless the code changes. The EVM chain ID (`76857769`), gas denom (`ulume`), extended denom (`alume`), EVM coin info, the fee-market constants, `block.max_gas`, the ERC20 toggles, and the precompile set all fall into this group — for mainnet they only need a final on-chain check against the values below, not a fresh decision.
+
+The short list that genuinely needs a value chosen before tagging is the `x/evmigration` policy. The recommendations below were tuned against the live `lumera-mainnet-1` chain (height `5,462,371`, queried `2026-06-10`) using `scripts/chain-helper.sh`: **160,021** accounts, **50** bonded validators (cap 50) out of **83** total (9 jailed), a worst-case validator **migration-object count of 1,632** (the largest validator's 1,593 delegations + 29 unbonding delegations + redelegations — exactly what the cap bounds), a 21-day unbonding period, and a 7-day governance voting period. Re-run `scripts/chain-helper.sh max-validator-delegations` and `scripts/chain-helper.sh stats` close to tag time, since these counts grow with the chain.
+
+| Parameter | Code default | Live mainnet signal | Decision |
+| --- | --- | --- | --- |
+| `enable_migration` | `true` (immediate-open) | — | **Keep `true` — immediate-open.** Migration opens as soon as the upgraded chain produces blocks; the upgrade handler leaves `enable_migration=true` with no controlled-open gating. Public messaging, support, and RPC capacity must therefore be live before validators restart. |
+| `migration_end_time` | `0` (no deadline) | 160,021 accounts and 83 validators to migrate | **Auto-set by the `v1.20.0` upgrade handler from the upgrade-block time:** devnet = + **2 days**, testnet = + **7 days** (no hardcoded timestamp). **Mainnet:** the handler leaves it `0`; set a specific absolute Unix timestamp (seconds) — a chosen wall-clock end time, ~**+120 days** past the planned upgrade — closer to launch. Must be non-zero before mainnet while the proof format has no expiry. |
+| `max_validator_delegations` | `2500` (raised from 2000) | worst-case validator migration-object count is **1,632** (`chain-helper.sh` reports `max_observed: 1632`, `suggested_cap: 2122` at the default 30% buffer) | **Shipped default is now `2500`** — clears the worst case (1,632) with ~1.53× headroom; `3000` judged over-provisioned given the short runway. Re-check with `chain-helper.sh` near tag time. |
+| `max_migrations_per_block` | `50` | at 50/block (~5s blocks) the full 160k account base clears in ~11 days of continuous saturation | **Keep `50`.** Adequate for a weeks-long window; only revisit if load tests show RPC or block-production stress. |
+| `max_multisig_sub_keys` | `20` | not enumerable from public state — multisig pubkeys are only revealed on-chain after the group's first tx | **Keep `20`** unless the internal key inventory knows of a larger foundation/treasury multisig; confirm against that inventory rather than chain state. |
 
 #### Chain Identity, Denom, and VM Params
 
@@ -157,11 +155,11 @@ The current code seeds most of these from `config/evm.go`, `app/evm/genesis.go`,
 
 | Parameter / decision | Current code default | Required decision before tag | Why it matters | Verification |
 | --- | --- | --- | --- | --- |
-| `enable_migration` | `true` | decide immediate-open vs controlled-open and ensure first post-upgrade state matches that decision | if `true`, migration can open as soon as the upgraded chain produces blocks | `lumerad q evmigration params` immediately after upgrade |
-| `migration_end_time` | `0` meaning no deadline | set a finite mainnet deadline if the no-expiry proof format remains; otherwise explicitly document why no deadline is acceptable | an unlimited window extends support and proof-replay risk indefinitely | query params and compare the Unix timestamp to the public migration-window announcement |
-| `max_migrations_per_block` | `50` | decide the per-block claim throttle from RC/devnet load tests | too high can stress blocks/RPC; too low can create user backlog | run migration traffic at the proposed limit alongside normal Cosmos/EVM traffic |
-| `max_validator_delegations` | `2000` | calculate mainnet validator maximum and decide a cap with buffer | validator migrations iterate delegations, unbondings, and redelegations; under-sizing blocks large validators, over-sizing increases per-tx work | run `scripts/chain-helper.sh max-validator-delegations --json` once the exact `migration-estimate` query is available, then choose the cap from the observed maximum plus buffer |
-| `max_multisig_sub_keys` | `20` | decide the maximum supported multisig size for launch | larger values increase proof size, gas, and coordinator complexity | rehearse multisig migrations at or near the proposed ceiling and verify ante / keeper rejection above it |
+| `enable_migration` | `true` | **Decided: immediate-open.** Keep `enable_migration=true`; the upgrade handler leaves it enabled so migration opens at the first post-upgrade block | if `true`, migration can open as soon as the upgraded chain produces blocks | `lumerad q evmigration params` immediately after upgrade |
+| `migration_end_time` | `0` meaning no deadline | **Decided:** auto-set by the upgrade handler from upgrade-block time — devnet + 2 days, testnet + 7 days; mainnet left `0` by the handler and given a specific absolute Unix timestamp (~+120 days) chosen near launch | an unlimited window extends support and proof-replay risk indefinitely | query params and compare the Unix timestamp to the public migration-window announcement |
+| `max_migrations_per_block` | `50` | **Decided: keep `50`** — adequate per-block claim throttle; revisit only if RC/devnet load tests show stress | too high can stress blocks/RPC; too low can create user backlog | run migration traffic at the proposed limit alongside normal Cosmos/EVM traffic |
+| `max_validator_delegations` | `2500` | **Decided & shipped: `2500`** (raised from 2000) — clears the live worst case of 1,632 migration objects (`chain-helper.sh` `max_observed: 1632`) with ~1.53× headroom; `3000` judged over-provisioned given the short runway | validator migrations iterate delegations, unbondings, and redelegations; under-sizing blocks large validators, over-sizing increases per-tx work | run `scripts/chain-helper.sh max-validator-delegations --json` (works today in `staking-pre-evm` mode) and confirm the chosen cap exceeds the observed maximum plus buffer |
+| `max_multisig_sub_keys` | `20` | **Decided: keep `20`** — confirm against the internal key inventory rather than chain state | larger values increase proof size, gas, and coordinator complexity | rehearse multisig migrations at or near the proposed ceiling and verify ante / keeper rejection above it |
 
 Tagging should not proceed until the release notes contain the final intended values for every row above, and the RC evidence shows the upgrade handler initializes those values without relying on an after-the-fact governance change.
 
@@ -174,7 +172,9 @@ Before testnet and mainnet, choose one of these activation policies and test tha
 - **Immediate-open policy**: migration is available immediately after the upgrade. This is operationally simpler, but public messaging, support staffing, RPC capacity, and migration monitoring must be live before validators restart.
 - **Controlled-open policy**: migration remains disabled until post-upgrade smoke tests pass. This requires an implementation or governance path that is already effective at upgrade time; a normal post-upgrade parameter proposal is too slow to prevent an initial open window.
 
-Mainnet should not rely on an assumed manual "open the window" step unless the release candidate proves that `enable_migration=false` or the intended `migration_end_time` is already in state at the first post-upgrade block.
+**Decision:** Lumera uses the **immediate-open policy** — `enable_migration=true` at the first post-upgrade block — paired with a finite `migration_end_time` (a specific absolute Unix timestamp in seconds, compared against block time). On **devnet and testnet** the `v1.20.0` upgrade handler sets this automatically from the upgrade-block time (devnet + **2 days**, testnet + **7 days**). On **mainnet** the handler leaves it `0`; a specific absolute timestamp (~**120 days** past the upgrade) is chosen and applied near launch. Because migration opens immediately, public messaging, support staffing, RPC capacity, and migration monitoring must be live before validators restart.
+
+Mainnet should not rely on an assumed manual "open the window" step; the release candidate must prove that `enable_migration=true` and the intended `migration_end_time` are already in state at the first post-upgrade block.
 
 ## Failure Modes and Mitigations
 

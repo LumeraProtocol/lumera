@@ -90,6 +90,34 @@ func TestSubmitTxRejectsUnparseableBroadcastOutput(t *testing.T) {
 	}
 }
 
+func TestLatestHeightParsesMixedStatusOutput(t *testing.T) {
+	out := `Falling back to latest block height:
+{"sync_info":{"latest_block_height":"335475"}}`
+	cli := &ChainCLI{Bin: staticLumerad(t, out, 0), ChainID: "chain", RPC: "tcp://localhost:26657"}
+
+	height, err := cli.LatestHeight()
+	if err != nil {
+		t.Fatalf("LatestHeight error: %v", err)
+	}
+	if height != 335475 {
+		t.Fatalf("LatestHeight = %d, want 335475", height)
+	}
+}
+
+func TestLatestHeightParsesTopLevelBlockHeader(t *testing.T) {
+	out := `Falling back to latest block height:
+{"header":{"version":{"block":"11","app":"0"},"chain_id":"lumera-devnet-1","height":"344943"}}`
+	cli := &ChainCLI{Bin: staticLumerad(t, out, 0), ChainID: "chain", RPC: "tcp://localhost:26657"}
+
+	height, err := cli.LatestHeight()
+	if err != nil {
+		t.Fatalf("LatestHeight error: %v", err)
+	}
+	if height != 344943 {
+		t.Fatalf("LatestHeight = %d, want 344943", height)
+	}
+}
+
 func TestWaitForNextBlockReturnsInitialHeightError(t *testing.T) {
 	cli := &ChainCLI{Bin: staticLumerad(t, "rpc unavailable", 1), ChainID: "chain", RPC: "tcp://localhost:26657"}
 

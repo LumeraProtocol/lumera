@@ -83,6 +83,9 @@ func (c *ChainCLI) LatestHeight() (int64, error) {
 		}
 	}
 	var resp struct {
+		Header *struct {
+			Height string `json:"height"`
+		} `json:"header"`
 		Block *struct {
 			Header struct {
 				Height string `json:"height"`
@@ -97,11 +100,17 @@ func (c *ChainCLI) LatestHeight() (int64, error) {
 			LatestBlockHeight string `json:"latest_block_height"`
 		} `json:"sync_info"`
 	}
-	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+	payload := out
+	if extracted, ok := ExtractJSONPayload(out); ok {
+		payload = extracted
+	}
+	if err := json.Unmarshal([]byte(payload), &resp); err != nil {
 		return 0, fmt.Errorf("parse height: %s: %w", truncate(out, 200), err)
 	}
 	var heightStr string
 	switch {
+	case resp.Header != nil:
+		heightStr = resp.Header.Height
 	case resp.Block != nil:
 		heightStr = resp.Block.Header.Height
 	case resp.SdkBlock != nil:

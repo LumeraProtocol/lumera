@@ -19,7 +19,25 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"gen/tests/common"
 )
+
+// commonMultisig builds a *common.Multisig from the evmigration flag globals so
+// the generic ceremony is shared with gen-activity. Gas is fixed (matches the
+// values used across this tool) so generate-only/offline signing works.
+func commonMultisig() *common.Multisig {
+	cli := &common.ChainCLI{
+		Bin:            *flagBin,
+		ChainID:        *flagChainID,
+		RPC:            *flagRPC,
+		Home:           *flagHome,
+		KeyringBackend: "test",
+		Gas:            *flagGas,
+		GasPrices:      *flagGasPrices,
+	}
+	return common.NewMultisig(cli)
+}
 
 // multisigKeyNames is a fixed set of key names used by this mode. Using
 // well-known names makes reruns and manual inspection easier.
@@ -255,42 +273,11 @@ func ensureMultisigMembers(memberNames []string) error {
 }
 
 func ensureMultisigCompositeKey(multisigKeyName string, members []string, threshold int) (string, error) {
-	if keyExists(multisigKeyName) {
-		log.Printf("  multisig key %s already in keyring, reusing", multisigKeyName)
-		return getAddress(multisigKeyName)
-	}
-
-	// `keys add` is a pure keyring operation; it rejects --node, so skip
-	// buildLumeraArgs here and only append --home when set.
-	//
-	// --nosort keeps members in caller-supplied order. Without it Cosmos SDK
-	// sorts the LegacyAminoPubKey's sub-keys by raw pubkey bytes, which makes
-	// the legacy (cosmos secp256k1) and new (eth_secp256k1) sides land on
-	// different orderings even for matching logical signers (signer-N <->
-	// new-signer-N). That breaks ValidateProofPair's mirror-source rule
-	// (legacy_proof.signer_indices == new_proof.signer_indices) at combine-proof
-	// time. With --nosort on both sides, signer-N consistently lives at
-	// index N-1 on both legacy and new.
-	args := []string{
-		"keys", "add", multisigKeyName,
-		"--multisig", strings.Join(members, ","),
-		"--multisig-threshold", fmt.Sprintf("%d", threshold),
-		"--nosort",
-		"--keyring-backend", "test",
-	}
-	if *flagHome != "" {
-		args = append(args, "--home", *flagHome)
-	}
-	cmd := exec.Command(*flagBin, args...)
-	out, err := cmd.CombinedOutput()
+	addr, err := commonMultisig().CreateMultisigKey(multisigKeyName, members, threshold)
 	if err != nil {
-		return "", fmt.Errorf("keys add multisig %s: %s\n%w", multisigKeyName, string(out), err)
+		return "", err
 	}
-	log.Printf("  created multisig key %s", multisigKeyName)
-	addr, err := getAddress(multisigKeyName)
-	if err != nil {
-		return "", fmt.Errorf("get multisig address %s: %w", multisigKeyName, err)
-	}
+	log.Printf("  multisig key %s -> %s", multisigKeyName, addr)
 	return addr, nil
 }
 
@@ -305,121 +292,12 @@ func registerMultisigPubKey(multisigKeyName, multisigAddr string, members []stri
 		return fmt.Errorf("multisig %s has %d members, need at least %d signers", multisigKeyName, len(members), defaultMultisigThreshold)
 	}
 
-	// Temp files for the unsigned tx and per-member signatures.
 	unsignedFile := tmpFile("multisig-unsigned-*.json")
 	defer os.Remove(unsignedFile)
-
-	sigFiles := make([]string, len(members))
-	for i := range members {
-		sigFiles[i] = tmpFile(fmt.Sprintf("multisig-sig%d-*.json", i+1))
-		defer os.Remove(sigFiles[i]) //nolint:gocritic // intentional deferred cleanup
+	if err := buildUnsignedMultisigBankSendTx(multisigKeyName, multisigAddr, multisigAddr, multisigSelfSendAmt, unsignedFile); err != nil {
+		return err
 	}
-	signedFile := tmpFile("multisig-signed-*.json")
-	defer os.Remove(signedFile)
-
-	// 1. Generate unsigned tx (generate-only).
-	accNum, seq, err := queryAccountNumberAndSequence(multisigAddr)
-	if err != nil {
-		// Account may not exist yet if funding tx hasn't landed — retry once.
-		if waitErr := waitForAccountOnChain(multisigAddr, 30*time.Second); waitErr != nil {
-			return fmt.Errorf("wait for multisig account on-chain: %w", waitErr)
-		}
-		accNum, seq, err = queryAccountNumberAndSequence(multisigAddr)
-		if err != nil {
-			return fmt.Errorf("query account number/sequence for %s: %w", multisigAddr, err)
-		}
-	}
-
-	unsignedArgs := buildLumeraArgs(
-		"tx", "bank", "send",
-		multisigAddr, multisigAddr, multisigSelfSendAmt,
-		"--from", multisigKeyName,
-		"--keyring-backend", "test",
-		"--chain-id", *flagChainID,
-		"--account-number", fmt.Sprintf("%d", accNum),
-		"--sequence", fmt.Sprintf("%d", seq),
-		"--gas", *flagGas,
-		"--gas-prices", *flagGasPrices,
-		"--generate-only",
-		"--output", "json",
-	)
-	cmd := exec.Command(*flagBin, unsignedArgs...)
-	unsignedOut, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("generate unsigned self-send tx: %s\n%w", string(unsignedOut), err)
-	}
-	if err := os.WriteFile(unsignedFile, unsignedOut, 0o600); err != nil {
-		return fmt.Errorf("write unsigned tx to %s: %w", unsignedFile, err)
-	}
-
-	// 2. Each member signs the unsigned tx.
-	for i, member := range members[:defaultMultisigThreshold] {
-		signArgs := buildLumeraArgs(
-			"tx", "sign", unsignedFile,
-			"--from", member,
-			"--multisig", multisigAddr,
-			"--keyring-backend", "test",
-			"--chain-id", *flagChainID,
-			"--account-number", fmt.Sprintf("%d", accNum),
-			"--sequence", fmt.Sprintf("%d", seq),
-			"--sign-mode", "amino-json",
-			"--output", "json",
-		)
-		cmd = exec.Command(*flagBin, signArgs...)
-		sigOut, sigErr := cmd.CombinedOutput()
-		if sigErr != nil {
-			return fmt.Errorf("sign tx with %s: %s\n%w", member, string(sigOut), sigErr)
-		}
-		if err := os.WriteFile(sigFiles[i], sigOut, 0o600); err != nil {
-			return fmt.Errorf("write signature %s to %s: %w", member, sigFiles[i], err)
-		}
-		log.Printf("  signed with %s -> %s", member, sigFiles[i])
-	}
-
-	// 3. Combine signatures via tx multisign.
-	multisignArgs := buildLumeraArgs(
-		"tx", "multisign", unsignedFile, multisigKeyName,
-		sigFiles[0], sigFiles[1],
-		"--keyring-backend", "test",
-		"--chain-id", *flagChainID,
-		"--output", "json",
-	)
-	cmd = exec.Command(*flagBin, multisignArgs...)
-	msignOut, msignErr := cmd.CombinedOutput()
-	if msignErr != nil {
-		return fmt.Errorf("tx multisign: %s\n%w", string(msignOut), msignErr)
-	}
-	if err := os.WriteFile(signedFile, msignOut, 0o600); err != nil {
-		return fmt.Errorf("write signed tx to %s: %w", signedFile, err)
-	}
-
-	// 4. Broadcast the signed tx and wait for inclusion.
-	broadcastArgs := buildLumeraArgs(
-		"tx", "broadcast", signedFile,
-		"--broadcast-mode", "sync",
-		"--output", "json",
-	)
-	cmd = exec.Command(*flagBin, broadcastArgs...)
-	bcastOut, bcastErr := cmd.CombinedOutput()
-	bcastStr := strings.TrimSpace(string(bcastOut))
-	if bcastErr != nil {
-		return fmt.Errorf("broadcast multisig self-send: %s\n%w", bcastStr, bcastErr)
-	}
-
-	// Extract tx hash and wait for inclusion.
-	txHash := extractTxHash(bcastStr)
-	if txHash != "" {
-		code, rawLog, err := waitForTxResult(txHash, 45*time.Second)
-		if err != nil {
-			return fmt.Errorf("wait for self-send tx %s: %w", txHash, err)
-		}
-		if code != 0 {
-			return fmt.Errorf("self-send tx failed code=%d raw_log=%s", code, rawLog)
-		}
-	}
-
-	log.Printf("  multisig self-send confirmed (hash: %s)", txHash)
-	return nil
+	return signAndBroadcastMultisigTx(unsignedFile, multisigKeyName, multisigAddr, members)
 }
 
 // buildUnsignedMultisigBankSendTx generates an unsigned bank-send tx with
@@ -431,34 +309,12 @@ func buildUnsignedMultisigBankSendTx(multisigKeyName, multisigAddr, toAddr, amou
 		if waitErr := waitForAccountOnChain(multisigAddr, 30*time.Second); waitErr != nil {
 			return fmt.Errorf("wait for multisig account on-chain: %w", waitErr)
 		}
-		accNum, seq, err = queryAccountNumberAndSequence(multisigAddr)
-		if err != nil {
+		if accNum, seq, err = queryAccountNumberAndSequence(multisigAddr); err != nil {
 			return fmt.Errorf("query account number/sequence for %s: %w", multisigAddr, err)
 		}
 	}
-
-	unsignedArgs := buildLumeraArgs(
-		"tx", "bank", "send",
-		multisigAddr, toAddr, amount,
-		"--from", multisigKeyName,
-		"--keyring-backend", "test",
-		"--chain-id", *flagChainID,
-		"--account-number", fmt.Sprintf("%d", accNum),
-		"--sequence", fmt.Sprintf("%d", seq),
-		"--gas", *flagGas,
-		"--gas-prices", *flagGasPrices,
-		"--generate-only",
-		"--output", "json",
-	)
-	cmd := exec.Command(*flagBin, unsignedArgs...)
-	unsignedOut, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("generate unsigned multisig bank-send tx: %s\n%w", string(unsignedOut), err)
-	}
-	if err := os.WriteFile(outFile, unsignedOut, 0o600); err != nil {
-		return fmt.Errorf("write unsigned multisig bank-send tx to %s: %w", outFile, err)
-	}
-	return nil
+	m := commonMultisig()
+	return m.BuildUnsignedToFile(outFile, m.GenBankSendArgs(multisigKeyName, multisigAddr, toAddr, amount, accNum, seq))
 }
 
 func buildUnsignedMultisigDelegateTx(multisigKeyName, multisigAddr, validatorAddr, amount, outFile string) error {
@@ -467,114 +323,23 @@ func buildUnsignedMultisigDelegateTx(multisigKeyName, multisigAddr, validatorAdd
 		if waitErr := waitForAccountOnChain(multisigAddr, 30*time.Second); waitErr != nil {
 			return fmt.Errorf("wait for multisig account on-chain: %w", waitErr)
 		}
-		accNum, seq, err = queryAccountNumberAndSequence(multisigAddr)
-		if err != nil {
+		if accNum, seq, err = queryAccountNumberAndSequence(multisigAddr); err != nil {
 			return fmt.Errorf("query account number/sequence for %s: %w", multisigAddr, err)
 		}
 	}
-
-	unsignedArgs := buildLumeraArgs(
-		"tx", "staking", "delegate",
-		validatorAddr, amount,
-		"--from", multisigKeyName,
-		"--keyring-backend", "test",
-		"--chain-id", *flagChainID,
-		"--account-number", fmt.Sprintf("%d", accNum),
-		"--sequence", fmt.Sprintf("%d", seq),
-		"--gas", *flagGas,
-		"--gas-prices", *flagGasPrices,
-		"--generate-only",
-		"--output", "json",
-	)
-	cmd := exec.Command(*flagBin, unsignedArgs...)
-	unsignedOut, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("generate unsigned multisig delegate tx: %s\n%w", string(unsignedOut), err)
-	}
-	if err := os.WriteFile(outFile, unsignedOut, 0o600); err != nil {
-		return fmt.Errorf("write unsigned multisig delegate tx to %s: %w", outFile, err)
-	}
-	return nil
+	m := commonMultisig()
+	return m.BuildUnsignedToFile(outFile, m.GenDelegateArgs(multisigKeyName, validatorAddr, amount, accNum, seq))
 }
 
 func signAndBroadcastMultisigTx(unsignedFile, multisigKeyName, multisigAddr string, members []string) error {
-	if len(members) < defaultMultisigThreshold {
-		return fmt.Errorf("multisig %s has %d members, need at least %d", multisigKeyName, len(members), defaultMultisigThreshold)
-	}
-
 	accNum, seq, err := queryAccountNumberAndSequence(multisigAddr)
 	if err != nil {
 		return fmt.Errorf("query account number/sequence for %s: %w", multisigAddr, err)
 	}
-
-	sigFiles := make([]string, defaultMultisigThreshold)
-	for i := range sigFiles {
-		sigFiles[i] = tmpFile(fmt.Sprintf("multisig-sig%d-*.json", i+1))
-		defer os.Remove(sigFiles[i]) //nolint:gocritic // intentional deferred cleanup
-	}
-	signedFile := tmpFile("multisig-signed-*.json")
-	defer os.Remove(signedFile)
-
-	for i, member := range members[:defaultMultisigThreshold] {
-		signArgs := buildLumeraArgs(
-			"tx", "sign", unsignedFile,
-			"--from", member,
-			"--multisig", multisigAddr,
-			"--keyring-backend", "test",
-			"--chain-id", *flagChainID,
-			"--account-number", fmt.Sprintf("%d", accNum),
-			"--sequence", fmt.Sprintf("%d", seq),
-			"--sign-mode", "amino-json",
-			"--output", "json",
-		)
-		cmd := exec.Command(*flagBin, signArgs...)
-		sigOut, sigErr := cmd.CombinedOutput()
-		if sigErr != nil {
-			return fmt.Errorf("sign tx with %s: %s\n%w", member, string(sigOut), sigErr)
-		}
-		if err := os.WriteFile(sigFiles[i], sigOut, 0o600); err != nil {
-			return fmt.Errorf("write signature %s to %s: %w", member, sigFiles[i], err)
-		}
-	}
-
-	multisignArgs := buildLumeraArgs(
-		"tx", "multisign", unsignedFile, multisigKeyName,
-		sigFiles[0], sigFiles[1],
-		"--keyring-backend", "test",
-		"--chain-id", *flagChainID,
-		"--output", "json",
+	_, err = commonMultisig().SignAndBroadcastFile(
+		unsignedFile, multisigKeyName, multisigAddr, members, defaultMultisigThreshold, accNum, seq,
 	)
-	cmd := exec.Command(*flagBin, multisignArgs...)
-	msignOut, msignErr := cmd.CombinedOutput()
-	if msignErr != nil {
-		return fmt.Errorf("tx multisign: %s\n%w", string(msignOut), msignErr)
-	}
-	if err := os.WriteFile(signedFile, msignOut, 0o600); err != nil {
-		return fmt.Errorf("write signed tx to %s: %w", signedFile, err)
-	}
-
-	broadcastArgs := buildLumeraArgs(
-		"tx", "broadcast", signedFile,
-		"--broadcast-mode", "sync",
-		"--output", "json",
-	)
-	cmd = exec.Command(*flagBin, broadcastArgs...)
-	bcastOut, bcastErr := cmd.CombinedOutput()
-	bcastStr := strings.TrimSpace(string(bcastOut))
-	if bcastErr != nil {
-		return fmt.Errorf("broadcast multisig tx: %s\n%w", bcastStr, bcastErr)
-	}
-	txHash := extractTxHash(bcastStr)
-	if txHash != "" {
-		code, rawLog, err := waitForTxResult(txHash, 45*time.Second)
-		if err != nil {
-			return fmt.Errorf("wait for multisig tx %s: %w", txHash, err)
-		}
-		if code != 0 {
-			return fmt.Errorf("multisig tx failed code=%d raw_log=%s", code, rawLog)
-		}
-	}
-	return nil
+	return err
 }
 
 // createNewEVMKey creates (or reuses) the eth_secp256k1 destination key.

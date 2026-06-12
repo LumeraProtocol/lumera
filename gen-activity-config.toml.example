@@ -16,6 +16,13 @@ parallelism = 5
 funding-batch-size = 10
 actions = true
 
+# Optional account-mix knobs (default 0 / off). Usually passed as CLI flags, but
+# can be predefined here or per-chain:
+# num-multisig23-accounts = 0        # number of 2-of-3 multisig accounts
+# num-multisig35-accounts = 0        # number of 3-of-5 multisig accounts
+# vesting-percent = 0                # % of regular accounts made continuous/delayed vesting (0-100)
+# num-permanent-locked-accounts = 0  # dedicated PermanentLocked accounts
+
 [chains.devnet]
 rpc = "tcp://localhost:26657"
 grpc = "localhost:9090"

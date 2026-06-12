@@ -77,6 +77,9 @@ func (c *Config) Validate() error {
 	if c.AccountsPath == "" {
 		return fmt.Errorf("-accounts is required")
 	}
+	if c.AddAccounts && c.ActivityExisting {
+		return fmt.Errorf("-add-accounts and -activity-existing are mutually exclusive")
+	}
 	if c.NumAccounts < 0 {
 		return fmt.Errorf("-num-accounts must be >= 0, got %d", c.NumAccounts)
 	}

@@ -11,9 +11,10 @@ generated account metadata and activity in a rerunnable JSON registry.
 ## Non-Goals
 
 - Do not depend on the controlled Docker devnet status directories.
-- Do not create EVM migration-specific fixtures such as permanent-locked
-  accounts, multisig migration accounts, migration records, or pre/post-upgrade
-  modes.
+- Do not create EVM migration-specific records or pre/post-upgrade modes.
+  Generic multisig accounts and vesting/permanent-locked account types are now
+  supported as devnet activity fixtures, but they stay in the gen-activity
+  registry schema rather than reusing evmigration's migration registry envelope.
 - Do not require devnet chain resets between runs.
 - Do not make action generation fatal by default when supernodes are
   temporarily unavailable.
@@ -67,10 +68,20 @@ tests-gen-activity \
 
 Additional flags:
 
+- `-config=gen-activity-config.toml`: optional TOML config file.
+- `-chain=devnet`: named chain section to use from the config file.
+- `-wizard=false` / `-w=false`: run the interactive wizard; this is also the
+  default when no flags are passed.
 - `-keyring-backend=test`: local funder keyring backend.
-- `-add-accounts=true`: add `-num-accounts` new users to an existing registry.
+- `-add-accounts=true`: add `-num-accounts` new regular users to an existing
+  registry.
 - `-activity-existing=true`: generate more activity for accounts already in the
   registry.
+- `-num-multisig23-accounts=0`: create 2-of-3 multisig accounts.
+- `-num-multisig35-accounts=0`: create 3-of-5 multisig accounts.
+- `-vesting-percent=0`: percentage of newly generated regular accounts to
+  create as continuous or delayed vesting accounts.
+- `-num-permanent-locked-accounts=0`: create dedicated PermanentLocked accounts.
 - `-actions=true`: include CASCADE action activity, enabled by default.
 - `-require-actions=false`: fail the run if action activity cannot be created.
 - `-max-actions-per-run=3`: cap action uploads/registrations per run.

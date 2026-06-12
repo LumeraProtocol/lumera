@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 const sampleTOML = `
@@ -91,6 +92,39 @@ func TestLoadFileConfigRejectsUnknownKey(t *testing.T) {
 	_, err := LoadFileConfig(writeTempTOML(t, "[common]\nbogus-key = 1\n"))
 	if err == nil {
 		t.Error("expected error for unknown TOML key (strict decoding)")
+	}
+}
+
+func TestApplyFileConfigSupportsRuntimeFlagKeys(t *testing.T) {
+	fc, err := LoadFileConfig(writeTempTOML(t, `
+[common]
+add-accounts = true
+activity-existing = true
+require-actions = true
+max-actions-per-run = 2
+action-states = "pending"
+action-readiness-timeout = "30s"
+dry-run = true
+`))
+	if err != nil {
+		t.Fatalf("LoadFileConfig: %v", err)
+	}
+
+	c := &Config{}
+	if err := ApplyFileConfig(c, fc, "", map[string]bool{}); err != nil {
+		t.Fatalf("ApplyFileConfig: %v", err)
+	}
+	if !c.AddAccounts || !c.ActivityExisting || !c.RequireActions || !c.DryRun {
+		t.Errorf("boolean runtime flags not applied: %+v", c)
+	}
+	if c.MaxActionsPerRun != 2 {
+		t.Errorf("MaxActionsPerRun = %d, want 2", c.MaxActionsPerRun)
+	}
+	if c.ActionStates != "pending" {
+		t.Errorf("ActionStates = %q, want pending", c.ActionStates)
+	}
+	if c.ActionReadinessTimeout != 30*time.Second {
+		t.Errorf("ActionReadinessTimeout = %s, want 30s", c.ActionReadinessTimeout)
 	}
 }
 

@@ -405,9 +405,11 @@ func reconcile(reg *ActivityRegistry, cfg *Config, keyStyle common.KeyStyle) {
 	reg.KeyStyle = keyStyle.Name()
 }
 
-// plannedNewAccountCount determines how many new accounts to allocate. On a
-// fresh registry it fills up to -num-accounts; -add-accounts always adds
-// -num-accounts more; -activity-existing alone adds none.
+// plannedNewAccountCount determines how many new regular accounts to allocate.
+// On a fresh registry it fills up to -num-accounts; -add-accounts always adds
+// -num-accounts more; -activity-existing alone adds none. Dedicated multisig
+// composites and permanent-locked fixtures have their own knobs, so they do not
+// satisfy the regular account target.
 func plannedNewAccountCount(cfg *Config, reg *ActivityRegistry) int {
 	if cfg.AddAccounts {
 		return cfg.NumAccounts
@@ -415,10 +417,24 @@ func plannedNewAccountCount(cfg *Config, reg *ActivityRegistry) int {
 	if cfg.ActivityExisting {
 		return 0
 	}
-	if deficit := cfg.NumAccounts - len(reg.Accounts); deficit > 0 {
+	if deficit := cfg.NumAccounts - regularAccountCount(reg); deficit > 0 {
 		return deficit
 	}
 	return 0
+}
+
+func regularAccountCount(reg *ActivityRegistry) int {
+	count := 0
+	for _, rec := range reg.Accounts {
+		if rec.Multisig != nil {
+			continue
+		}
+		if rec.Vesting != nil && rec.Vesting.Type == string(common.VestingPermanentLocked) {
+			continue
+		}
+		count++
+	}
+	return count
 }
 
 func printPlan(cfg *Config, reg *ActivityRegistry, plannedNames []string) {

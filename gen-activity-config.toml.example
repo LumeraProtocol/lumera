@@ -15,6 +15,13 @@ max-account-amount = "10000000ulume"
 parallelism = 5
 funding-batch-size = 10
 actions = true
+require-actions = false
+max-actions-per-run = 3
+action-states = "pending,done,approved"
+action-readiness-timeout = "180s"
+add-accounts = false
+activity-existing = false
+dry-run = false
 
 # Optional account-mix knobs (default 0 / off). Usually passed as CLI flags, but
 # can be predefined here or per-chain:

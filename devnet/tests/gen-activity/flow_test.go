@@ -49,6 +49,23 @@ func TestPlannedNewAccountCount(t *testing.T) {
 			t.Errorf("got %d, want 0", got)
 		}
 	})
+
+	t.Run("multisig and dedicated permanent locked accounts do not satisfy regular account target", func(t *testing.T) {
+		reg := withAccounts(4)
+		reg.UpsertAccount(&AccountRecord{
+			AccountIdentity: common.AccountIdentity{Name: "gen-msig23-0001", Address: "msig"},
+			Multisig:        &MultisigInfo{Threshold: 2, Signers: 3},
+		})
+		reg.UpsertAccount(&AccountRecord{
+			AccountIdentity: common.AccountIdentity{Name: "gen-plock-0001", Address: "plock"},
+			Vesting:         &VestingInfo{Type: string(common.VestingPermanentLocked)},
+		})
+
+		cfg := &Config{NumAccounts: 5}
+		if got := plannedNewAccountCount(cfg, reg); got != 1 {
+			t.Errorf("got %d, want 1", got)
+		}
+	})
 }
 
 func TestReconcilePreservesAccountKeyStyle(t *testing.T) {

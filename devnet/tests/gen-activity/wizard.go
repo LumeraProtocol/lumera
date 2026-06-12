@@ -209,8 +209,12 @@ func runWizard(cfg *Config, fc *FileConfig, p prompter, runner func(*Config) err
 		cfg.Chain = chosen
 		// Re-seed defaults from the chosen chain (wizard is interactive: the
 		// chain's values become the working defaults the user can then edit).
-		applyLayer(cfg, fc.Common, nil)
-		applyLayer(cfg, fc.Chains[chosen], nil)
+		if err := applyLayer(cfg, fc.Common, nil); err != nil {
+			return err
+		}
+		if err := applyLayer(cfg, fc.Chains[chosen], nil); err != nil {
+			return err
+		}
 	} else {
 		// Manual entry when there is no config file / no chains defined.
 		if err := promptManualChain(cfg, p); err != nil {

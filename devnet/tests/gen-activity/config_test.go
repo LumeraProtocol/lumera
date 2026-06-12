@@ -101,6 +101,15 @@ func TestConfigValidate(t *testing.T) {
 			t.Error("expected error for negative num-accounts")
 		}
 	})
+
+	t.Run("add-accounts and activity-existing are mutually exclusive", func(t *testing.T) {
+		c := validConfig()
+		c.AddAccounts = true
+		c.ActivityExisting = true
+		if err := c.Validate(); err == nil {
+			t.Error("expected error when both add-accounts and activity-existing are set")
+		}
+	})
 }
 
 func TestConfigValidateVesting(t *testing.T) {

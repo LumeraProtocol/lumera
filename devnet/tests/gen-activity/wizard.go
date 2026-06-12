@@ -20,17 +20,19 @@ type prompter interface {
 
 // Setting keys: stable identifiers for editable settings.
 const (
-	settingFundingKey    = "funding-key"
-	settingMode          = "mode"
-	settingNumAccounts   = "num-accounts"
-	settingNumMultisig23 = "num-multisig23-accounts"
-	settingNumMultisig35 = "num-multisig35-accounts"
-	settingAccountsPath  = "accounts"
-	settingParallelism   = "parallelism"
-	settingActions       = "actions"
-	settingFundingBatch  = "funding-batch-size"
-	settingMaxAmount     = "max-account-amount"
-	settingDryRun        = "dry-run"
+	settingFundingKey     = "funding-key"
+	settingMode           = "mode"
+	settingNumAccounts    = "num-accounts"
+	settingNumMultisig23  = "num-multisig23-accounts"
+	settingNumMultisig35  = "num-multisig35-accounts"
+	settingAccountsPath   = "accounts"
+	settingParallelism    = "parallelism"
+	settingActions        = "actions"
+	settingFundingBatch   = "funding-batch-size"
+	settingMaxAmount      = "max-account-amount"
+	settingDryRun         = "dry-run"
+	settingVestingPercent = "vesting-percent"
+	settingNumPermLocked  = "num-permanent-locked-accounts"
 )
 
 // Menu sentinels.
@@ -52,6 +54,8 @@ var editableSettings = []string{
 	settingFundingBatch,
 	settingMaxAmount,
 	settingDryRun,
+	settingVestingPercent,
+	settingNumPermLocked,
 }
 
 // settingValue returns the current value of a setting as a display string.
@@ -79,6 +83,10 @@ func settingValue(c *Config, key string) string {
 		return c.MaxAccountAmount
 	case settingDryRun:
 		return strconv.FormatBool(c.DryRun)
+	case settingVestingPercent:
+		return strconv.Itoa(c.VestingPercent)
+	case settingNumPermLocked:
+		return strconv.Itoa(c.NumPermanentLocked)
 	default:
 		return ""
 	}
@@ -173,6 +181,10 @@ func editSetting(c *Config, key string, p prompter) error {
 		return editInt(key, "Parallelism", &c.Parallelism, p)
 	case settingFundingBatch:
 		return editInt(key, "Funding batch size", &c.FundingBatchSize, p)
+	case settingVestingPercent:
+		return editInt(key, "Vesting percent (0-100)", &c.VestingPercent, p)
+	case settingNumPermLocked:
+		return editInt(key, "Number of permanent-locked accounts", &c.NumPermanentLocked, p)
 	default:
 		return fmt.Errorf("unknown setting %q", key)
 	}

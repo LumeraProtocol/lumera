@@ -198,3 +198,38 @@ func TestRunWizardQuitDoesNotRun(t *testing.T) {
 		t.Error("runner must not be called when user quits")
 	}
 }
+
+func TestEditSettingVesting(t *testing.T) {
+	c := &Config{}
+	p := &fakePrompter{inputs: map[string]string{
+		"vesting-percent":               "25",
+		"num-permanent-locked-accounts": "3",
+	}}
+	if err := editSetting(c, settingVestingPercent, p); err != nil {
+		t.Fatalf("edit vesting-percent: %v", err)
+	}
+	if c.VestingPercent != 25 {
+		t.Errorf("VestingPercent = %d, want 25", c.VestingPercent)
+	}
+	if err := editSetting(c, settingNumPermLocked, p); err != nil {
+		t.Fatalf("edit num-permanent-locked: %v", err)
+	}
+	if c.NumPermanentLocked != 3 {
+		t.Errorf("NumPermanentLocked = %d, want 3", c.NumPermanentLocked)
+	}
+}
+
+func TestMenuItemsIncludeVesting(t *testing.T) {
+	items := menuItems(&Config{})
+	for _, want := range []string{settingVestingPercent, settingNumPermLocked} {
+		found := false
+		for _, it := range items {
+			if menuKeyFromItem(it) == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("menu missing setting %q", want)
+		}
+	}
+}

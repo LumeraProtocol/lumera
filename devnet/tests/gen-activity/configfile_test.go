@@ -68,6 +68,25 @@ func TestLoadFileConfigParsesSections(t *testing.T) {
 	}
 }
 
+// TestLoadFileConfigPointerDistinguishesZeroFromAbsent guards the load-bearing
+// pointer-field behavior the config layering relies on: a key explicitly set to
+// its zero value must yield a non-nil pointer, while an absent key stays nil.
+func TestLoadFileConfigPointerDistinguishesZeroFromAbsent(t *testing.T) {
+	fc, err := LoadFileConfig(writeTempTOML(t, "[common]\nparallelism = 0\n"))
+	if err != nil {
+		t.Fatalf("LoadFileConfig: %v", err)
+	}
+	if fc.Common.Parallelism == nil {
+		t.Fatal("explicit parallelism=0 must yield a non-nil pointer (not absent)")
+	}
+	if *fc.Common.Parallelism != 0 {
+		t.Errorf("parallelism = %d, want 0", *fc.Common.Parallelism)
+	}
+	if fc.Common.Home != nil {
+		t.Errorf("absent home must stay nil, got %q", *fc.Common.Home)
+	}
+}
+
 func TestLoadFileConfigRejectsUnknownKey(t *testing.T) {
 	_, err := LoadFileConfig(writeTempTOML(t, "[common]\nbogus-key = 1\n"))
 	if err == nil {

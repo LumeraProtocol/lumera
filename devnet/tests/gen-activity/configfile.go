@@ -69,6 +69,9 @@ func strictUnmarshal(data []byte, v any) error {
 // ChainNames returns the configured chain names in sorted order (stable wizard
 // menu ordering).
 func (fc *FileConfig) ChainNames() []string {
+	if fc == nil {
+		return nil
+	}
 	names := make([]string, 0, len(fc.Chains))
 	for name := range fc.Chains {
 		names = append(names, name)

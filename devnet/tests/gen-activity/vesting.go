@@ -77,8 +77,6 @@ func splitFundingTargets(reg *ActivityRegistry) (bank, vesting []*AccountRecord)
 // appropriate create-* tx (funding the locked amount), then tops it up with a
 // small liquid amount so it can pay gas. Marks Funded on success. Failures are
 // logged and skipped (never fatal). Returns the count funded.
-//
-//nolint:unused // wired into run() in a later task
 func fundVestingAccounts(cli *common.ChainCLI, funderKey, funderAddr string, targets []*AccountRecord, liquidTopUp string) int {
 	funded := 0
 	for _, rec := range targets {
@@ -105,8 +103,6 @@ func fundVestingAccounts(cli *common.ChainCLI, funderKey, funderAddr string, tar
 
 // createVestingOnChain dispatches the correct create-* tx for the account's
 // vesting type.
-//
-//nolint:unused // called by fundVestingAccounts (itself wired into run() later)
 func createVestingOnChain(cli *common.ChainCLI, funderKey string, rec *AccountRecord) error {
 	switch rec.Vesting.Type {
 	case string(common.VestingContinuous):
@@ -128,8 +124,6 @@ func createVestingOnChain(cli *common.ChainCLI, funderKey string, rec *AccountRe
 // them into the registry, and returns the new records. Keys are created with the
 // detected key style; the accounts are NOT yet on-chain (the funding phase
 // creates them via create-permanent-locked-account). Rerun-safe.
-//
-//nolint:unused // wired into run() in a later task
 func generatePermanentLockedAccounts(cli *common.ChainCLI, reg *ActivityRegistry, accountPrefix string, count int, keyStyle common.KeyStyle, lockedAmount, now string) []*AccountRecord {
 	if count <= 0 {
 		return nil

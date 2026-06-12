@@ -20,6 +20,10 @@ import (
 
 const defaultEVMCutoverVer = "v1.20.0"
 
+// vestingGasTopUp is the small liquid balance sent to each vesting/locked
+// account so it can pay transaction fees (locked balances cannot cover gas).
+const vestingGasTopUp = "1000000ulume"
+
 const usageDescription = "tests-gen-activity generates realistic account activity against a live Lumera devnet chain."
 
 func main() {
@@ -185,15 +189,40 @@ func run(cfg *Config) error {
 		log.Printf("generated %d new multisig account(s)", len(newMultisig))
 	}
 
-	// Step 9: fund unfunded accounts via the single-funder batcher.
+	// Designate a random share of new regular accounts as vesting, and generate
+	// dedicated permanent-locked accounts. Tagged BEFORE funding so the funding
+	// split routes them to the vesting funder (vesting/locked accounts must be
+	// created at funding time).
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	if !cfg.ActivityExisting {
+		lockedAmount := common.Coin{Amount: randomFundingAmount(cfg.maxAmount.Amount, rng), Denom: common.ChainDenom}.String()
+		if sel := planVesting(newRecs, cfg.VestingPercent, lockedAmount, rng, time.Now().Unix()); len(sel) > 0 {
+			log.Printf("designated %d/%d new account(s) as vesting", len(sel), len(newRecs))
+		}
+		if cfg.NumPermanentLocked > 0 {
+			plocked := generatePermanentLockedAccounts(cli, reg, cfg.AccountPrefix, cfg.NumPermanentLocked, keyStyle, lockedAmount, time.Now().UTC().Format(time.RFC3339))
+			log.Printf("generated %d permanent-locked account(s)", len(plocked))
+		}
+		if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			return fmt.Errorf("save registry after vesting designation: %w", err)
+		}
+	}
+
+	// Step 9: fund unfunded accounts via the single-funder batcher.
 	chain := &cliFundingChain{cli: cli, funderKey: cfg.FundingKey, funderAddr: funderAddr, blockWait: 30 * time.Second}
-	targets := unfundedTargets(reg)
+	bankTargets, vestingTargets := splitFundingTargets(reg)
 	amountFor := func(*AccountRecord) string {
 		return common.Coin{Amount: randomFundingAmount(cfg.maxAmount.Amount, rng), Denom: common.ChainDenom}.String()
 	}
-	funded, fundErr := FundAccounts(chain, targets, amountFor, cfg.FundingBatchSize, 3)
-	log.Printf("funded %d/%d account(s)", funded, len(targets))
+	funded, fundErr := FundAccounts(chain, bankTargets, amountFor, cfg.FundingBatchSize, 3)
+	log.Printf("funded %d/%d bank account(s)", funded, len(bankTargets))
+
+	// Vesting/locked accounts are created-and-funded via create-* txs + a liquid
+	// top-up so they can pay gas.
+	if len(vestingTargets) > 0 {
+		vfunded := fundVestingAccounts(cli, cfg.FundingKey, funderAddr, vestingTargets, vestingGasTopUp)
+		log.Printf("funded %d/%d vesting/locked account(s)", vfunded, len(vestingTargets))
+	}
 
 	// Step 11: persist after funding regardless of partial failure.
 	if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {

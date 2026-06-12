@@ -14,21 +14,21 @@ import (
 // from an explicit zero value; nil means "not set in this section". Keys mirror
 // the CLI flag names so config and flags map one-to-one.
 type ChainSection struct {
-	Bin              *string `toml:"bin"`
-	RPC              *string `toml:"rpc"`
-	GRPC             *string `toml:"grpc"`
-	ChainID          *string `toml:"chain-id"`
-	Home             *string `toml:"home"`
-	KeyringBackend   *string `toml:"keyring-backend"`
-	EVMCutoverVer    *string `toml:"evm-cutover-version"`
-	FundingKey       *string `toml:"funding-key"`
-	AccountsPath     *string `toml:"accounts"`
-	NumAccounts      *int    `toml:"num-accounts"`
-	MaxAccountAmount *string `toml:"max-account-amount"`
-	AccountPrefix    *string `toml:"account-prefix"`
-	Actions          *bool   `toml:"actions"`
-	FundingBatchSize *int    `toml:"funding-batch-size"`
-	Parallelism      *int    `toml:"parallelism"`
+	Bin                *string `toml:"bin"`
+	RPC                *string `toml:"rpc"`
+	GRPC               *string `toml:"grpc"`
+	ChainID            *string `toml:"chain-id"`
+	Home               *string `toml:"home"`
+	KeyringBackend     *string `toml:"keyring-backend"`
+	EVMCutoverVer      *string `toml:"evm-cutover-version"`
+	FundingKey         *string `toml:"funding-key"`
+	AccountsPath       *string `toml:"accounts"`
+	NumAccounts        *int    `toml:"num-accounts"`
+	MaxAccountAmount   *string `toml:"max-account-amount"`
+	AccountPrefix      *string `toml:"account-prefix"`
+	Actions            *bool   `toml:"actions"`
+	FundingBatchSize   *int    `toml:"funding-batch-size"`
+	Parallelism        *int    `toml:"parallelism"`
 	NumMultisig23      *int    `toml:"num-multisig23-accounts"`
 	NumMultisig35      *int    `toml:"num-multisig35-accounts"`
 	VestingPercent     *int    `toml:"vesting-percent"`

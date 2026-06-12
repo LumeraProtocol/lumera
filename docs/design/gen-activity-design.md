@@ -365,6 +365,22 @@ regular single-sig activity mix (they cannot sign a single-sig `--from` tx). The
 generic ceremony lives in `devnet/tests/common` (`multisig.go`) and is shared
 with the evmigration tool.
 
+## Vesting accounts
+
+`-vesting-percent N` (0–100) randomly designates that share of the run's regular
+generated accounts as **vesting** accounts; each is randomly continuous or
+delayed (cliff) with an end time in now + [1h, 30d]. `-num-permanent-locked-accounts N`
+creates N dedicated **PermanentLocked** accounts (`<prefix>-plock-NNNN`).
+
+Because Cosmos-SDK rejects creating a vesting/locked account at an address that
+already exists, these accounts are created **at funding time** via
+`tx vesting create-vesting-account` / `create-permanent-locked-account` (funding
+the locked amount), then topped up with a small liquid balance so they can pay
+gas. They then participate in the normal activity mix (delegation can use locked
+coins; sends draw on the liquid top-up). Records carry `AccountRecord.Vesting`
+(type, end time, locked amount) under registry schema v2. The create helpers live
+in `devnet/tests/common/vesting.go`.
+
 ## Open Implementation Notes
 
 - Prefer moving common primitives in small slices so evmigration remains

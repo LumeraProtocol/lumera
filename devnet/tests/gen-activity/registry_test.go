@@ -156,6 +156,30 @@ func TestMultisigRecordRoundTrip(t *testing.T) {
 	}
 }
 
+func TestVestingRecordRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "accounts.json")
+	reg := NewRegistry("lumera-devnet-1", "faucet", "", "legacy", "2026-06-12T00:00:00Z")
+	reg.UpsertAccount(&AccountRecord{
+		AccountIdentity: common.AccountIdentity{Name: "gen-0003", Address: "lumera1vest"},
+		Vesting:         &VestingInfo{Type: "continuous", EndTime: 1800000000, LockedAmount: "5000000ulume"},
+		Funded:          true,
+	})
+	if err := reg.Save(path, "2026-06-12T00:00:00Z"); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	got, err := LoadRegistry(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got.Accounts[0].Vesting == nil || got.Accounts[0].Vesting.Type != "continuous" {
+		t.Fatalf("vesting info not persisted: %+v", got.Accounts[0].Vesting)
+	}
+	if got.Accounts[0].Vesting.EndTime != 1800000000 {
+		t.Errorf("vesting end-time = %d, want 1800000000", got.Accounts[0].Vesting.EndTime)
+	}
+}
+
 func TestAllocateNamesPerKindContinuesIndex(t *testing.T) {
 	reg := NewRegistry("c", "f", "", "legacy", "t")
 	reg.Accounts = []*AccountRecord{

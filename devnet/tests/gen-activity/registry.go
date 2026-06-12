@@ -21,6 +21,15 @@ type MultisigInfo struct {
 	Signers     int      `json:"signers"`
 }
 
+// VestingInfo describes a vesting or permanent-locked account. Type is one of
+// the common.VestingType values ("continuous", "delayed", "permanent_locked").
+// EndTime is the unix unlock time (0 for permanent_locked).
+type VestingInfo struct {
+	Type         string `json:"type"`
+	EndTime      int64  `json:"end_time,omitempty"`
+	LockedAmount string `json:"locked_amount"`
+}
+
 // AccountRecord is a gen-activity account: the shared identity and activity log
 // plus funding/timestamp metadata owned by this tool.
 type AccountRecord struct {
@@ -32,6 +41,7 @@ type AccountRecord struct {
 	CreatedAt  string        `json:"created_at,omitempty"`
 	UpdatedAt  string        `json:"updated_at,omitempty"`
 	Multisig   *MultisigInfo `json:"multisig,omitempty"`
+	Vesting    *VestingInfo  `json:"vesting,omitempty"`
 }
 
 // ActivityRegistry is the gen-activity-owned top-level registry envelope. It is

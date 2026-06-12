@@ -202,9 +202,9 @@ type MultisigInfo struct {
 // AccountRecord gains: Multisig *MultisigInfo `json:"multisig,omitempty"`
 ```
 
-`schemaVersion` bumps to 2. v1 files still load: a record with a nil `Multisig`
-is a regular account, so v1 and v2 files are forward/backward compatible without
-a migration step. The loader accepts schema_version 1 or 2.
+`schemaVersion` bumps to 2 and the loader expects 2 — no backward compatibility
+with v1 registry files is required (existing `accounts.json` files can be
+regenerated). A record with a nil `Multisig` is simply a regular account.
 
 **Naming.** Composite keys: `<prefix>-msig23-NNNN` / `<prefix>-msig35-NNNN`;
 member keys `<composite>-signer-<i>`. `AllocateNames` is generalized to allocate
@@ -241,13 +241,18 @@ Unit tests (no live chain, no TTY):
 - Common multisig helpers: argument construction and ceremony orchestration
   against a fake runner (assert `--nosort`, `--multisig`, `amino-json`, first-K
   signature files).
-- Registry: schema-v2 round-trip and v1 backward-compatible load; `MultisigInfo`
-  serialization; multisig name allocation continuing past existing indices.
+- Registry: schema-v2 round-trip (loader expects v2; no v1 compat required);
+  `MultisigInfo` serialization; multisig name allocation continuing past
+  existing indices.
 - evmigration: existing unit tests stay green after the refactor.
 
+Post-refactor verification of the evmigration tools: after delegating the
+generic ceremony to `common`, run the evmigration unit tests and exercise the
+`multisig` / `multisig-vesting` / `multisig-validator` modes (devnet/integration)
+to confirm nothing is broken.
+
 Live/devnet exercise (manual or existing harness): a bare-config run that
-creates, funds, and exercises 2-of-3 and 3-of-5 accounts; the evmigration
-`multisig` modes still pass end-to-end.
+creates, funds, and exercises 2-of-3 and 3-of-5 accounts.
 
 ## 5. Dependencies, docs, build
 

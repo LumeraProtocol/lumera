@@ -106,19 +106,23 @@ func buildActivityPlans(accounts []*AccountRecord, validators []string, rng *ran
 	return plans
 }
 
+// activityTargets returns the funded accounts that take part in the regular
+// single-sig activity mix. Multisig composites are excluded: they cannot sign an
+// ordinary single-sig --from tx and have their own dedicated exercise path
+// (exerciseMultisigAccounts), so including them here would only produce
+// guaranteed-failing delegate/bank-send/action attempts.
 func activityTargets(reg *ActivityRegistry, newRecords []*AccountRecord, includeExisting bool) []*AccountRecord {
+	var out []*AccountRecord
 	if includeExisting {
-		var out []*AccountRecord
 		for _, rec := range reg.Accounts {
-			if rec.Funded {
+			if rec.Funded && rec.Multisig == nil {
 				out = append(out, rec)
 			}
 		}
 		return out
 	}
-	var out []*AccountRecord
 	for _, rec := range newRecords {
-		if rec.Funded {
+		if rec.Funded && rec.Multisig == nil {
 			out = append(out, rec)
 		}
 	}

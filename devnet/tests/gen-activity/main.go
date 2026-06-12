@@ -173,6 +173,16 @@ func run(cfg *Config) error {
 	}
 	log.Printf("generated %d new account(s); registry saved", len(newRecs))
 
+	// Generate multisig accounts (2-of-3 / 3-of-5) alongside regular accounts.
+	var newMultisig []*AccountRecord
+	if specs := multisigPlan(cfg.NumMultisig23, cfg.NumMultisig35); len(specs) > 0 && !cfg.ActivityExisting {
+		newMultisig = generateMultisigAccounts(cli, reg, cfg.AccountPrefix, specs, keyStyle)
+		if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			return fmt.Errorf("save registry after multisig key generation: %w", err)
+		}
+		log.Printf("generated %d new multisig account(s)", len(newMultisig))
+	}
+
 	// Step 9: fund unfunded accounts via the single-funder batcher.
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	chain := &cliFundingChain{cli: cli, funderKey: cfg.FundingKey, funderAddr: funderAddr, blockWait: 30 * time.Second}
@@ -189,6 +199,13 @@ func run(cfg *Config) error {
 	}
 	if fundErr != nil {
 		return fmt.Errorf("funding phase: %w", fundErr)
+	}
+
+	// Register multisig pubkeys on-chain and exercise each with one multisign
+	// bank-send to a peer. Non-fatal: a failure logs and continues.
+	exerciseMultisigAccounts(cli, reg, newMultisig, cfg)
+	if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return fmt.Errorf("save registry after multisig exercise: %w", err)
 	}
 
 	// Step 10: per-account activity mix. Only funded accounts can transact, and

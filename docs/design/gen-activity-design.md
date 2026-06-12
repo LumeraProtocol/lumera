@@ -324,6 +324,27 @@ Integration smoke tests should cover:
 `devnet-tests-build` should build `tests-gen-activity` alongside
 `tests_evmigration`.
 
+## Config file, chain selection, and wizard
+
+`gen-activity` reads an optional `gen-activity-config.toml` (path via `-config`,
+default `gen-activity-config.toml` in the working directory). It has a shared
+`[common]` section and any number of `[chains.<name>]` sections; select one with
+`-chain <name>`. TOML keys mirror the CLI flag names.
+
+**Precedence** (low to high): built-in defaults → `[common]` → `[chains.<name>]`
+→ explicitly-set CLI flags. A flag passed on the command line always wins over
+the config file (implemented via `flag.Visit`).
+
+**Mode selection:**
+
+- No flags at all → the interactive **wizard** (arrow-key chain picker + settings
+  menu, powered by survey/v2).
+- Any flag passed → non-interactive command-line mode (unchanged behavior).
+- `-w` / `-wizard` → force the wizard even with flags present (those flags
+  pre-seed the wizard defaults).
+
+See `gen-activity-config.toml.example` for a documented template.
+
 ## Open Implementation Notes
 
 - Prefer moving common primitives in small slices so evmigration remains

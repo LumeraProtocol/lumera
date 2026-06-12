@@ -11,6 +11,8 @@ All targets are declared in `Makefile.devnet` and exposed through the root `Make
 | `make devnet-build-172` | Build using the `devnet/bin-v1.7.2` bundle and default configs to reproduce the v1.7.2 network. |
 | `make devnet-build-191` | Build using the `devnet/bin-v1.9.1` bundle. |
 | `make devnet-build-1111` | Build using the `devnet/bin-v1.11.1` bundle. |
+| `make devnet-stage-external-version VERSION=v1.12.0` | Stage a devnet locally from `devnet/bin-<VERSION>/` and an external genesis. Skips local Docker image build, disables Hermes through a staged config copy, and does not require a claims CSV unless `EXTERNAL_CLAIMS_FILE` is provided. |
+| `make devnet-new-remote-version VERSION=v1.12.0` | Stage locally from downloaded binaries, sync runtime files to `REMOTE_DEVNET_HOST`, and start the devnet there with Docker Compose. |
 | `make devnet-tests-build` | Build devnet test binaries (`tests_validator`, `tests_hermes`, `tests_evmigration`) into `devnet/bin/`. |
 | `make devnet-tests-lep6` | Run the LEP-6 storage-truth chain-side e2e tests against a running devnet. Requires `make devnet-up-detach`; uses existing registered supernodes or bootstraps validator-owned supernodes from key-resolvable devnet validator accounts when fewer than three are registered. |
 
@@ -90,10 +92,16 @@ Parallel variants (`devnet-evmigrationp-*`) run the same operations but use conc
 | --- | --- | --- |
 | `DEVNET_BIN_DIR` | `devnet/bin` | Directory containing binaries to copy into the devnet |
 | `DEVNET_BUILD_LUMERA` | `1` | Set to `0` to skip building lumerad during `devnet-build` |
+| `DEVNET_BUILD_TESTS` | `1` | Set to `0` to skip building devnet test helper binaries during `devnet-build` |
+| `DEVNET_DOCKER_BUILD` | `1` | Set to `0` to stage config and compose files without running `docker compose build` |
 | `CONFIG_JSON` | `devnet/default-config/config.json` | Path to chain config |
 | `VALIDATORS_JSON` | `devnet/default-config/validators.json` | Path to validator specs |
 | `EXTERNAL_GENESIS_FILE` | (none) | Path to pre-existing genesis to extend |
-| `EXTERNAL_CLAIMS_FILE` | (none) | Path to claims CSV |
+| `EXTERNAL_CLAIMS_FILE` | (none) | Optional path to claims CSV. If unset, no `claims.csv` is staged. |
+| `REMOTE_DEVNET_HOST` | `lumera-devnet` | SSH host used by `devnet-new-remote-version` |
+| `REMOTE_DEVNET_DIR` | `lumera-devnet` | Remote directory that receives the Docker Compose runtime files |
+| `REMOTE_DEVNET_STAGE_DIR` | `build/devnet-remote-stage/lumera-devnet-1` | Local workspace-owned staging directory used before syncing to the remote host |
+| `REMOTE_EXTERNAL_GENESIS_FILE` | `~/external-genesis/lumera-devnet-1/genesis.json` | Default external genesis used by `devnet-stage-external-version` when `EXTERNAL_GENESIS_FILE` is unset |
 | `NOCACHE` | (unset) | Set to `1` to force Docker rebuild without cache |
 
 ## Typical workflows

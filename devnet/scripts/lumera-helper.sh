@@ -190,11 +190,7 @@ start_local_lumera_if_needed() {
 	archive_log_file "${VALIDATOR_LOG}"
 
 	claims_local="${DAEMON_HOME}/config/claims.csv"
-	if [ -f "${claims_local}" ] &&
-		"${DAEMON}" start --help 2>&1 | grep -q 'skip-claims-check' &&
-		"${DAEMON}" start --help 2>&1 | grep -q 'claims-path'; then
-		extra_start_flags="--skip-claims-check=false --claims-path=${claims_local}"
-	fi
+	extra_start_flags="$(lumerad_claims_start_flags "${DAEMON}" "${claims_local}")"
 
 	echo "INFO: starting ${DAEMON}; logging to ${VALIDATOR_LOG}"
 	# shellcheck disable=SC2086

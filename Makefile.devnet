@@ -1,7 +1,7 @@
 .PHONY: devnet-build devnet-tests-build _devnet-stage-migration-scripts devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start devnet-evm-upgrade
 .PHONY: devnet-build-default _devnet-select-default-genesis devnet-refresh-bin devnet-update-binaries devnet-update-binaries-default devnet-update-scripts
-.PHONY: devnet-build-version devnet-new-version devnet-upgrade-version
-.PHONY: _check-devnet-version-bin _check-devnet-build-version-cfg
+.PHONY: devnet-build-version devnet-new-version devnet-upgrade-version devnet-stage-external-version devnet-new-remote-version
+.PHONY: _check-devnet-version-bin _check-devnet-build-version-cfg _check-devnet-external-version-cfg
 .PHONY: devnet-download-binaries
 .PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-estimate devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-verify devnet-evmigration-cleanup
 .PHONY: devnet-evmigrationp-prepare devnet-evmigrationp-estimate devnet-evmigrationp-migrate devnet-evmigrationp-migrate-validator devnet-evmigrationp-migrate-all devnet-evmigrationp-verify devnet-evmigrationp-cleanup
@@ -23,6 +23,10 @@
 #   make devnet-new-version       VERSION=v1.12.0   # clean + build-version + up
 #   make devnet-upgrade-version   VERSION=v1.12.0   # update running devnet to those binaries
 #
+# -- Remote execution from downloaded binaries -----------------
+#   make devnet-stage-external-version VERSION=v1.12.0   # local staging only, no Docker build, Hermes disabled
+#   make devnet-new-remote-version VERSION=v1.12.0       # stage locally, run on REMOTE_DEVNET_HOST
+#
 # -- Lifecycle (on an already-built devnet) --------------------
 #   make devnet-up                                  # start containers (foreground)
 #   make devnet-up-detach                           # start containers (background)
@@ -42,8 +46,8 @@
 #
 # -- External genesis / claims (override inputs to devnet-build) --
 #   make devnet-build \
-#       EXTERNAL_CLAIMS_FILE=~/claims.csv \
 #       EXTERNAL_GENESIS_FILE=~/genesis.json
+#   # Optional: EXTERNAL_CLAIMS_FILE=~/claims.csv
 #   # Optional: CONFIG_JSON=path/to/config.json VALIDATORS_JSON=path/to/validators.json
 #
 # -- Container maintenance -------------------------------------
@@ -76,6 +80,8 @@ CLAIMS_FILE := $(SHARED_CONFIG_DIR)/claims.csv
 COMPOSE_FILE := devnet/docker-compose.yml
 
 DEVNET_BUILD_LUMERA ?= 1      # 1 = build lumerad for devnet setup, 0 = skip
+DEVNET_BUILD_TESTS ?= 1       # 1 = build devnet test helper binaries, 0 = use existing/skip
+DEVNET_DOCKER_BUILD ?= 1      # 1 = build Docker images after staging, 0 = only stage runtime files
 # directory to take lumerad/supernode/lumera-uploader/sncli binaries from
 DEVNET_BIN_DIR ?= devnet/bin
 DEVNET_BIN_DIR_ABS := $(abspath $(DEVNET_BIN_DIR))
@@ -91,6 +97,14 @@ DEFAULT_CLAIMS_FILE := devnet/default-config/claims.csv
 ORIG_GENESIS_FILE := devnet/default-config/devnet-genesis-orig.json
 EVM_CUTOVER_VERSION ?= v1.20.0
 DEVNET_UPGRADE_RELEASE ?= auto
+REMOTE_DEVNET_HOST ?= lumera-devnet
+REMOTE_DEVNET_DIR ?= lumera-devnet
+REMOTE_DEVNET_SSH ?= ssh
+REMOTE_DEVNET_RSYNC ?= rsync -az
+REMOTE_EXTERNAL_GENESIS_FILE ?= $(HOME)/external-genesis/lumera-devnet-1/genesis.json
+REMOTE_DEVNET_STAGE_DIR ?= $(abspath build/devnet-remote-stage/lumera-devnet-1)
+REMOTE_CONFIG_JSON ?= $(REMOTE_DEVNET_STAGE_DIR)/config-no-hermes.json
+DEVNET_EXTERNAL_GENESIS_FILE = $(or $(EXTERNAL_GENESIS_FILE),$(REMOTE_EXTERNAL_GENESIS_FILE))
 
 devnet-tests-build:
 	@mkdir -p "${DEVNET_BIN_DIR_ABS}"
@@ -139,46 +153,68 @@ devnet-build:
 	if [ -n "$(EXTERNAL_CLAIMS_FILE)" ] && [ -f "$(EXTERNAL_CLAIMS_FILE)" ]; then \
 		cp -f "$(EXTERNAL_CLAIMS_FILE)" "$(CLAIMS_FILE)"; \
 		echo "Using claims file $(EXTERNAL_CLAIMS_FILE)"; \
-		EXTERNAL_GENESIS_FILE=$${EXTERNAL_GENESIS_FILE}; \
-		mkdir -p "${DEVNET_BIN_DIR}"; \
-		if [ "$(DEVNET_BUILD_LUMERA)" -eq "1" ]; then \
-			$(MAKE) build; \
-			if [ ! -f "${BUILD_DIR}/lumerad" ]; then \
-				echo "Cannot find lumerad binary [${BUILD_DIR}/lumerad]"; \
-				exit 1; \
-			fi; \
-			echo "Copying [${BUILD_DIR}/lumerad] to [${DEVNET_BIN_DIR}] directory..."; \
-			cp -f ${BUILD_DIR}/lumerad "${DEVNET_BIN_DIR}"; \
-			go get github.com/CosmWasm/wasmvm/$(WASMVM_VERSION); \
-			find $$(go env GOPATH)/pkg/mod/github.com/!cosm!wasm/wasmvm/$(WASMVM_VERSION) -name "libwasmvm.x86_64.so" -exec cp -f {} ${DEVNET_BIN_DIR}/libwasmvm.x86_64.so \; ; \
-		else \
-			echo "Using existing lumera binaries from ${DEVNET_BIN_DIR}..."; \
-		fi; \
-		if [ ! -f "${DEVNET_BIN_DIR}/lumerad" ]; then \
-			echo "${DEVNET_BIN_DIR}/lumerad binary not found..."; \
-			exit 1; \
-		fi; \
-		if [ ! -f "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so" ]; then \
-			echo "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so library not found..."; \
-			exit 1; \
-		fi; \
-		$(MAKE) devnet-tests-build DEVNET_BIN_DIR="${DEVNET_BIN_DIR}"; \
-        cp -f "${DEVNET_BIN_DIR}/lumerad" "${SHARED_RELEASE_DIR}/"; \
-        cp -f "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so" "${SHARED_RELEASE_DIR}/"; \
-		$(MAKE) _devnet-stage-migration-scripts; \
-		cd devnet && \
-		${GO} mod tidy && \
-		CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
-		VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
-		./scripts/configure.sh --bin-dir "${DEVNET_BIN_DIR}" &&\
-		DEVNET_BIN_DIR="${DEVNET_BIN_DIR_ABS}" \
-		${GO} run . && \
-		START_MODE=bootstrap docker compose build && \
-		echo "Initialization complete. Ready to start nodes."; \
 	else \
-		echo "No external claims file provided or file not found."; \
+		if [ -n "$(EXTERNAL_CLAIMS_FILE)" ]; then \
+			echo "External claims file not found: $(EXTERNAL_CLAIMS_FILE)"; \
+			exit 1; \
+		fi; \
+		rm -f "$(CLAIMS_FILE)"; \
+		echo "No external claims file provided; claims.csv will not be staged."; \
+	fi; \
+	EXTERNAL_GENESIS_FILE=$${EXTERNAL_GENESIS_FILE}; \
+	mkdir -p "${DEVNET_BIN_DIR}"; \
+	if [ "$(DEVNET_BUILD_LUMERA)" -eq "1" ]; then \
+		$(MAKE) build; \
+		if [ ! -f "${BUILD_DIR}/lumerad" ]; then \
+			echo "Cannot find lumerad binary [${BUILD_DIR}/lumerad]"; \
+			exit 1; \
+		fi; \
+		echo "Copying [${BUILD_DIR}/lumerad] to [${DEVNET_BIN_DIR}] directory..."; \
+		cp -f ${BUILD_DIR}/lumerad "${DEVNET_BIN_DIR}"; \
+		go get github.com/CosmWasm/wasmvm/$(WASMVM_VERSION); \
+		find $$(go env GOPATH)/pkg/mod/github.com/!cosm!wasm/wasmvm/$(WASMVM_VERSION) -name "libwasmvm.x86_64.so" -exec cp -f {} ${DEVNET_BIN_DIR}/libwasmvm.x86_64.so \; ; \
+	else \
+		echo "Using existing lumera binaries from ${DEVNET_BIN_DIR}..."; \
+	fi; \
+	if [ ! -f "${DEVNET_BIN_DIR}/lumerad" ]; then \
+		echo "${DEVNET_BIN_DIR}/lumerad binary not found..."; \
 		exit 1; \
-	fi
+	fi; \
+	if [ ! -f "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so" ]; then \
+		echo "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so library not found..."; \
+		exit 1; \
+	fi; \
+	if [ "$${EXTERNAL_GENESIS_FILE}" = "1" ] && [ ! -f "$(CLAIMS_FILE)" ]; then \
+		CLAIM_TOTAL="$$(jq -r 'try (.app_state.claim.total_claimable_amount // "0") catch "0"' "$(EXTERNAL_GENESIS)")"; \
+		if [ "$${CLAIM_TOTAL}" != "0" ] && [ "$${CLAIM_TOTAL}" != "null" ] && ! "${DEVNET_BIN_DIR}/lumerad" start --help 2>&1 | grep -q -- '--skip-claims-check'; then \
+			echo "External genesis has claim.total_claimable_amount=$${CLAIM_TOTAL}, but no claims CSV was provided and ${DEVNET_BIN_DIR}/lumerad cannot skip claims loading."; \
+			echo "Set app_state.claim.total_claimable_amount to 0 for a no-claims devnet or provide EXTERNAL_CLAIMS_FILE."; \
+			exit 1; \
+		fi; \
+	fi; \
+	if [ "$(DEVNET_BUILD_TESTS)" = "1" ]; then \
+		$(MAKE) devnet-tests-build DEVNET_BIN_DIR="${DEVNET_BIN_DIR}"; \
+	else \
+		echo "Skipping devnet test binary build (DEVNET_BUILD_TESTS=0)."; \
+	fi; \
+	cp -f "${DEVNET_BIN_DIR}/lumerad" "${SHARED_RELEASE_DIR}/"; \
+	cp -f "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so" "${SHARED_RELEASE_DIR}/"; \
+	$(MAKE) _devnet-stage-migration-scripts; \
+	cd devnet && \
+	${GO} mod tidy && \
+	CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
+	VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
+	DEVNET_SHARED_DIR="$(SHARED_DIR)" \
+	./scripts/configure.sh --bin-dir "${DEVNET_BIN_DIR}" &&\
+	DEVNET_SHARED_DIR="$(SHARED_DIR)" \
+	DEVNET_BIN_DIR="${DEVNET_BIN_DIR_ABS}" \
+	${GO} run . && \
+	if [ "$(DEVNET_DOCKER_BUILD)" = "1" ]; then \
+		START_MODE=bootstrap docker compose build; \
+	else \
+		echo "Skipping local docker compose build (DEVNET_DOCKER_BUILD=0)."; \
+	fi && \
+	echo "Initialization complete. Ready to start nodes."
 
 devnet-build-default:
 	@GENESIS_FILE="$$( $(MAKE) --no-print-directory _devnet-select-default-genesis )"; \
@@ -202,6 +238,64 @@ devnet-build-version: _check-devnet-build-version-cfg
 		EXTERNAL_GENESIS_FILE="$$(realpath "$$GENESIS_FILE")" \
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
+# Stage a devnet runtime from an external genesis and pre-downloaded versioned
+# binaries. This is intended for remote execution workflows: it generates the
+# compose file and /tmp/<chain-id>/shared locally without building Docker images.
+# Usage: make devnet-stage-external-version VERSION=v1.12.0
+# Optional: EXTERNAL_GENESIS_FILE=/path/to/genesis.json EXTERNAL_CLAIMS_FILE=/path/to/claims.csv
+devnet-stage-external-version: _check-devnet-external-version-cfg
+	@rm -rf "$(REMOTE_DEVNET_STAGE_DIR)"
+	@mkdir -p "$(REMOTE_DEVNET_STAGE_DIR)"
+	@jq '.hermes.enabled = false' devnet/config/config.json > "$(REMOTE_CONFIG_JSON)"
+	@$(MAKE) devnet-build \
+		DEVNET_DIR="$(REMOTE_DEVNET_STAGE_DIR)" \
+		DEVNET_BUILD_LUMERA=0 \
+		DEVNET_BUILD_TESTS=0 \
+		DEVNET_DOCKER_BUILD=0 \
+		DEVNET_BIN_DIR=devnet/bin-$(VERSION) \
+		CONFIG_JSON="$(REMOTE_CONFIG_JSON)" \
+		EXTERNAL_GENESIS_FILE="$$(realpath "$(DEVNET_EXTERNAL_GENESIS_FILE)")" \
+		$(if $(EXTERNAL_CLAIMS_FILE),EXTERNAL_CLAIMS_FILE="$$(realpath "$(EXTERNAL_CLAIMS_FILE)")",)
+
+# Build/stage locally from downloaded binaries, then run the Dockerized devnet
+# on a remote host. The remote host only needs ssh access plus Docker Compose.
+# Usage: make devnet-new-remote-version VERSION=v1.12.0
+devnet-new-remote-version: devnet-stage-external-version
+	@$(REMOTE_DEVNET_SSH) $(REMOTE_DEVNET_HOST) 'set -e; \
+		command -v docker >/dev/null; \
+		docker compose version >/dev/null; \
+		mkdir -p $(REMOTE_DEVNET_DIR)/devnet; \
+		if [ -f $(REMOTE_DEVNET_DIR)/devnet/docker-compose.yml ]; then \
+			cd $(REMOTE_DEVNET_DIR)/devnet && docker compose down --remove-orphans || true; \
+		fi; \
+		if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then \
+			sudo rm -rf $(DEVNET_DIR); \
+		elif rm -rf $(DEVNET_DIR) 2>/tmp/lumera-devnet-rm.err; then \
+			:; \
+		elif command -v docker >/dev/null 2>&1; then \
+			docker run --rm -v /tmp:/host-tmp busybox:1.36 sh -c "rm -rf /host-tmp/$$(basename $(DEVNET_DIR))" || { cat /tmp/lumera-devnet-rm.err >&2; rm -f /tmp/lumera-devnet-rm.err; exit 1; }; \
+		else \
+			cat /tmp/lumera-devnet-rm.err >&2; \
+			rm -f /tmp/lumera-devnet-rm.err; \
+			exit 1; \
+		fi; \
+		rm -f /tmp/lumera-devnet-rm.err; \
+		mkdir -p $(REMOTE_DEVNET_DIR)/devnet $(SHARED_DIR)'
+	@$(REMOTE_DEVNET_RSYNC) --delete \
+		devnet/docker-compose.yml \
+		devnet/dockerfile \
+		devnet/scripts \
+		devnet/hermes \
+		$(REMOTE_DEVNET_HOST):$(REMOTE_DEVNET_DIR)/devnet/
+	@$(REMOTE_DEVNET_RSYNC) --delete \
+		$(REMOTE_DEVNET_STAGE_DIR)/shared/ \
+		$(REMOTE_DEVNET_HOST):$(SHARED_DIR)/
+	@$(REMOTE_DEVNET_SSH) $(REMOTE_DEVNET_HOST) 'set -e; \
+		cd $(REMOTE_DEVNET_DIR)/devnet; \
+		docker compose build; \
+		START_MODE=auto docker compose up -d --remove-orphans; \
+		docker compose ps'
+
 _check-devnet-version-bin:
 	@if [ -z "$(VERSION)" ]; then \
 		echo "VERSION is required (e.g. VERSION=v1.12.0)"; \
@@ -217,6 +311,17 @@ _check-devnet-build-version-cfg: _check-devnet-version-bin
 	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $(DEFAULT_GENESIS_FILE)"; exit 1)
 	@[ -f "$$(realpath $(DEFAULT_GENESIS_EVM_FILE))" ] || (echo "Missing DEFAULT_GENESIS_EVM_FILE: $(DEFAULT_GENESIS_EVM_FILE)"; exit 1)
 	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $(DEFAULT_CLAIMS_FILE)"; exit 1)
+
+_check-devnet-external-version-cfg: _check-devnet-version-bin
+	@if [ -z "$(DEVNET_EXTERNAL_GENESIS_FILE)" ]; then \
+		echo "EXTERNAL_GENESIS_FILE is required (default: $(REMOTE_EXTERNAL_GENESIS_FILE))"; \
+		exit 1; \
+	fi
+	@[ -f "$$(realpath "$(DEVNET_EXTERNAL_GENESIS_FILE)")" ] || (echo "Missing EXTERNAL_GENESIS_FILE: $(DEVNET_EXTERNAL_GENESIS_FILE)"; exit 1)
+	@if [ -n "$(EXTERNAL_CLAIMS_FILE)" ] && [ ! -f "$(EXTERNAL_CLAIMS_FILE)" ]; then \
+		echo "Missing EXTERNAL_CLAIMS_FILE: $(EXTERNAL_CLAIMS_FILE)"; \
+		exit 1; \
+	fi
 
 .PHONY: devnet-build-1111 devnet-build-1120
 devnet-build-1111:

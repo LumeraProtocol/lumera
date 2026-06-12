@@ -24,6 +24,8 @@ LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
 LUMERA_RPC_ADDR="${LUMERA_RPC_ADDR:-http://localhost:${LUMERA_RPC_PORT}}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/common.sh"
 STOP_SCRIPT="${STOP_SCRIPT:-${SCRIPT_DIR}/stop.sh}"
 
 log() {
@@ -88,10 +90,7 @@ start_lumera() {
 	mkdir -p "$(dirname "${VALIDATOR_LOG}")" "${DAEMON_HOME}/config"
 
 	CLAIMS_LOCAL="${DAEMON_HOME}/config/claims.csv"
-	EXTRA_START_FLAGS=""
-	if [ -f "${CLAIMS_LOCAL}" ] && "${DAEMON}" start --help 2>&1 | grep -q 'skip-claims-check' && "${DAEMON}" start --help 2>&1 | grep -q 'claims-path'; then
-		EXTRA_START_FLAGS="--skip-claims-check=false --claims-path=${CLAIMS_LOCAL}"
-	fi
+	EXTRA_START_FLAGS="$(lumerad_claims_start_flags "${DAEMON}" "${CLAIMS_LOCAL}")"
 	log "Starting ${DAEMON}..."
 	# shellcheck disable=SC2086
 	"${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &

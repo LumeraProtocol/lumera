@@ -32,6 +32,25 @@ func TestHelpUsageIncludesDescription(t *testing.T) {
 	}
 }
 
+func TestConfigureFlagsRegistersNewFlags(t *testing.T) {
+	var cfg Config
+	fs := flag.NewFlagSet("tests-gen-activity", flag.ContinueOnError)
+	configureFlags(fs, &cfg)
+
+	for _, name := range []string{
+		"config", "chain", "wizard", "w",
+		"num-multisig23-accounts", "num-multisig35-accounts",
+	} {
+		if fs.Lookup(name) == nil {
+			t.Errorf("flag -%s not registered", name)
+		}
+	}
+
+	if got := fs.Lookup("config").DefValue; got != "gen-activity-config.toml" {
+		t.Errorf("-config default = %q, want gen-activity-config.toml", got)
+	}
+}
+
 func TestDetectKeyStyleFallsBackToLegacy(t *testing.T) {
 	got := detectKeyStyle(filepath.Join(t.TempDir(), "missing-lumerad"), "v1.11.0")
 	if got != common.KeyStyleLegacy {

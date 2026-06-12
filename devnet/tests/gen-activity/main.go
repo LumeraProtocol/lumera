@@ -49,6 +49,10 @@ func configureFlags(fs *flag.FlagSet, c *Config) {
 	}
 
 	fs.StringVar(&c.Bin, "bin", "lumerad", "lumerad binary path")
+	fs.StringVar(&c.ConfigPath, "config", "gen-activity-config.toml", "path to gen-activity TOML config file (optional)")
+	fs.StringVar(&c.Chain, "chain", "", "named chain section from the config file (e.g. devnet, testnet, mainnet)")
+	fs.BoolVar(&c.Wizard, "wizard", false, "run the interactive wizard (also the default when no flags are passed)")
+	fs.BoolVar(&c.Wizard, "w", false, "shorthand for -wizard")
 	fs.StringVar(&c.RPC, "rpc", "tcp://localhost:26657", "CometBFT RPC endpoint")
 	fs.StringVar(&c.GRPC, "grpc", "localhost:9090", "gRPC endpoint")
 	fs.StringVar(&c.ChainID, "chain-id", "", "chain ID (required)")
@@ -58,6 +62,8 @@ func configureFlags(fs *flag.FlagSet, c *Config) {
 	fs.StringVar(&c.FundingKey, "funding-key", "", "funder key name in the local keyring (required)")
 	fs.StringVar(&c.AccountsPath, "accounts", "devnet/tests/gen-activity/accounts.json", "registry file path")
 	fs.IntVar(&c.NumAccounts, "num-accounts", 10, "number of accounts to generate")
+	fs.IntVar(&c.NumMultisig23, "num-multisig23-accounts", 0, "number of 2-of-3 multisig accounts to generate")
+	fs.IntVar(&c.NumMultisig35, "num-multisig35-accounts", 0, "number of 3-of-5 multisig accounts to generate")
 	fs.StringVar(&c.MaxAccountAmount, "max-account-amount", "10000000ulume", "upper bound for per-account funding")
 	fs.StringVar(&c.AccountPrefix, "account-prefix", "gen", "name prefix for generated accounts")
 	fs.BoolVar(&c.AddAccounts, "add-accounts", false, "add -num-accounts new users to an existing registry")

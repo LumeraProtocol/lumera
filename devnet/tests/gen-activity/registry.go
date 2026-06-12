@@ -8,8 +8,18 @@ import (
 	"gen/tests/common"
 )
 
-// schemaVersion identifies the gen-activity registry layout.
-const schemaVersion = 1
+// schemaVersion identifies the gen-activity registry layout. v2 adds multisig
+// account records (AccountRecord.Multisig). v1 files are not supported and must
+// be regenerated.
+const schemaVersion = 2
+
+// MultisigInfo describes a generated K-of-N multisig account: its member key
+// names, signing threshold (K), and total signer count (N).
+type MultisigInfo struct {
+	MemberNames []string `json:"member_names"`
+	Threshold   int      `json:"threshold"`
+	Signers     int      `json:"signers"`
+}
 
 // AccountRecord is a gen-activity account: the shared identity and activity log
 // plus funding/timestamp metadata owned by this tool.
@@ -17,10 +27,11 @@ type AccountRecord struct {
 	common.AccountIdentity
 	common.ActivityLog
 
-	HasBalance bool   `json:"has_balance,omitempty"`
-	Funded     bool   `json:"funded,omitempty"`
-	CreatedAt  string `json:"created_at,omitempty"`
-	UpdatedAt  string `json:"updated_at,omitempty"`
+	HasBalance bool          `json:"has_balance,omitempty"`
+	Funded     bool          `json:"funded,omitempty"`
+	CreatedAt  string        `json:"created_at,omitempty"`
+	UpdatedAt  string        `json:"updated_at,omitempty"`
+	Multisig   *MultisigInfo `json:"multisig,omitempty"`
 }
 
 // ActivityRegistry is the gen-activity-owned top-level registry envelope. It is

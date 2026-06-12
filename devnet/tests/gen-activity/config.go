@@ -19,6 +19,11 @@ type Config struct {
 	KeyringBackend string
 	EVMCutoverVer  string
 
+	// Config file + chain selection + mode.
+	ConfigPath string
+	Chain      string
+	Wizard     bool
+
 	// Funding signer.
 	FundingKey string
 
@@ -27,6 +32,11 @@ type Config struct {
 	NumAccounts      int
 	MaxAccountAmount string
 	AccountPrefix    string
+
+	// Multisig account generation. Behavior implemented in the multisig plan;
+	// validated here so the flag/wizard surface is complete.
+	NumMultisig23 int // 2-of-3 multisig accounts
+	NumMultisig35 int // 3-of-5 multisig accounts
 
 	// Rerun modes.
 	AddAccounts      bool
@@ -75,6 +85,12 @@ func (c *Config) Validate() error {
 	}
 	if c.MaxActionsPerRun < 0 {
 		return fmt.Errorf("-max-actions-per-run must be >= 0, got %d", c.MaxActionsPerRun)
+	}
+	if c.NumMultisig23 < 0 {
+		return fmt.Errorf("-num-multisig23-accounts must be >= 0, got %d", c.NumMultisig23)
+	}
+	if c.NumMultisig35 < 0 {
+		return fmt.Errorf("-num-multisig35-accounts must be >= 0, got %d", c.NumMultisig35)
 	}
 
 	coin, err := common.ValidateMaxAccountAmount(c.MaxAccountAmount)

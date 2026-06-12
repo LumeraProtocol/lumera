@@ -102,3 +102,30 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 }
+
+func TestConfigValidateMultisigCounts(t *testing.T) {
+	t.Run("zero multisig counts pass", func(t *testing.T) {
+		c := validConfig()
+		c.NumMultisig23 = 0
+		c.NumMultisig35 = 0
+		if err := c.Validate(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("negative num-multisig23 fails", func(t *testing.T) {
+		c := validConfig()
+		c.NumMultisig23 = -1
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for negative num-multisig23-accounts")
+		}
+	})
+
+	t.Run("negative num-multisig35 fails", func(t *testing.T) {
+		c := validConfig()
+		c.NumMultisig35 = -2
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for negative num-multisig35-accounts")
+		}
+	})
+}

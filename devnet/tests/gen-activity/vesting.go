@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"math/rand"
+	"time"
 
 	"gen/tests/common"
 )
@@ -50,6 +53,73 @@ func newPermanentLockedInfo(lockedAmount string) *VestingInfo {
 	return &VestingInfo{
 		Type:         string(common.VestingPermanentLocked),
 		LockedAmount: lockedAmount,
+	}
+}
+
+// splitFundingTargets divides unfunded accounts into those funded by the normal
+// batched bank-send (regular + multisig composites) and those funded by a
+// vesting create tx (any account carrying VestingInfo).
+func splitFundingTargets(reg *ActivityRegistry) (bank, vesting []*AccountRecord) {
+	for _, rec := range reg.Accounts {
+		if rec.Funded {
+			continue
+		}
+		if rec.Vesting != nil {
+			vesting = append(vesting, rec)
+		} else {
+			bank = append(bank, rec)
+		}
+	}
+	return bank, vesting
+}
+
+// fundVestingAccounts creates each vesting/locked account on-chain via the
+// appropriate create-* tx (funding the locked amount), then tops it up with a
+// small liquid amount so it can pay gas. Marks Funded on success. Failures are
+// logged and skipped (never fatal). Returns the count funded.
+//
+//nolint:unused // wired into run() in a later task
+func fundVestingAccounts(cli *common.ChainCLI, funderKey, funderAddr string, targets []*AccountRecord, liquidTopUp string) int {
+	funded := 0
+	for _, rec := range targets {
+		if rec.Vesting == nil {
+			continue
+		}
+		if err := createVestingOnChain(cli, funderKey, rec); err != nil {
+			log.Printf("  WARN: create vesting account %s: %v", rec.Name, err)
+			continue
+		}
+		// Liquid top-up so the locked account can pay fees / make small sends.
+		if _, err := cli.SubmitTx("tx", "bank", "send", funderAddr, rec.Address, liquidTopUp, "--from", funderKey); err != nil {
+			log.Printf("  WARN: top up vesting account %s: %v", rec.Name, err)
+			// Account exists and is locked; mark funded so it is recorded, but it
+			// may be unable to pay gas. Still counts as created.
+		}
+		rec.Funded = true
+		rec.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+		funded++
+		log.Printf("  funded %s vesting account %s (%s)", rec.Vesting.Type, rec.Name, rec.Address)
+	}
+	return funded
+}
+
+// createVestingOnChain dispatches the correct create-* tx for the account's
+// vesting type.
+//
+//nolint:unused // called by fundVestingAccounts (itself wired into run() later)
+func createVestingOnChain(cli *common.ChainCLI, funderKey string, rec *AccountRecord) error {
+	switch rec.Vesting.Type {
+	case string(common.VestingContinuous):
+		_, err := cli.CreateVestingAccount(funderKey, rec.Address, rec.Vesting.LockedAmount, rec.Vesting.EndTime, false)
+		return err
+	case string(common.VestingDelayed):
+		_, err := cli.CreateVestingAccount(funderKey, rec.Address, rec.Vesting.LockedAmount, rec.Vesting.EndTime, true)
+		return err
+	case string(common.VestingPermanentLocked):
+		_, err := cli.CreatePermanentLockedAccount(funderKey, rec.Address, rec.Vesting.LockedAmount)
+		return err
+	default:
+		return fmt.Errorf("unknown vesting type %q for %s", rec.Vesting.Type, rec.Name)
 	}
 }
 

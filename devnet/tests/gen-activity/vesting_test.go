@@ -60,3 +60,31 @@ func TestNewPermanentLockedInfo(t *testing.T) {
 		t.Errorf("locked amount = %q, want 5000000ulume", info.LockedAmount)
 	}
 }
+
+func TestSplitFundingTargets(t *testing.T) {
+	reg := NewRegistry("c", "f", "", "legacy", "t")
+	reg.Accounts = []*AccountRecord{
+		{AccountIdentity: common.AccountIdentity{Name: "regular"}},                                                // bank
+		{AccountIdentity: common.AccountIdentity{Name: "msig"}, Multisig: &MultisigInfo{Threshold: 2}},            // bank (composite funded from funder)
+		{AccountIdentity: common.AccountIdentity{Name: "vest"}, Vesting: &VestingInfo{Type: "continuous"}},        // vesting
+		{AccountIdentity: common.AccountIdentity{Name: "plock"}, Vesting: &VestingInfo{Type: "permanent_locked"}}, // vesting
+		{AccountIdentity: common.AccountIdentity{Name: "already"}, Funded: true},                                  // skipped
+	}
+	bank, vesting := splitFundingTargets(reg)
+
+	names := func(recs []*AccountRecord) []string {
+		var out []string
+		for _, r := range recs {
+			out = append(out, r.Name)
+		}
+		return out
+	}
+	gotBank := names(bank)
+	if len(gotBank) != 2 || gotBank[0] != "regular" || gotBank[1] != "msig" {
+		t.Errorf("bank targets = %v, want [regular msig]", gotBank)
+	}
+	gotVest := names(vesting)
+	if len(gotVest) != 2 || gotVest[0] != "vest" || gotVest[1] != "plock" {
+		t.Errorf("vesting targets = %v, want [vest plock]", gotVest)
+	}
+}

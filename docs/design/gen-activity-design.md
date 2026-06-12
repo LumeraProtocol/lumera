@@ -345,6 +345,26 @@ the config file (implemented via `flag.Visit`).
 
 See `gen-activity-config.toml.example` for a documented template.
 
+## Multisig accounts
+
+`-num-multisig23-accounts` and `-num-multisig35-accounts` generate K-of-N
+multisig accounts (2-of-3 and 3-of-5). For each, gen-activity:
+
+1. Creates N member keys (`<composite>-signer-<i>`) using the detected key style
+   and a composite key via `keys add --multisig --nosort` (shared
+   `common.Multisig.CreateMultisigKey`).
+2. Funds the composite from the funder (multisig composites are ordinary funding
+   targets).
+3. Publishes the composite pubkey on-chain via a 1-ulume self-send.
+4. Exercises the account with one multisign bank-send to a regular peer
+   (`sign × K → multisign → broadcast`), recorded in the registry.
+
+Records are stored as `AccountRecord.Multisig` (member names, threshold,
+signers) under registry schema v2. Multisig composites are excluded from the
+regular single-sig activity mix (they cannot sign a single-sig `--from` tx). The
+generic ceremony lives in `devnet/tests/common` (`multisig.go`) and is shared
+with the evmigration tool.
+
 ## Open Implementation Notes
 
 - Prefer moving common primitives in small slices so evmigration remains

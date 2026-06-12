@@ -138,18 +138,6 @@ func ensureNewMultisigFixture() (compositeAddr string, subKeyNames []string, err
 	return addr, subKeys, nil
 }
 
-// getLegacyMultisigKeys returns the 3 legacy sub-key names and the composite
-// key name for the default multisig fixture (suitable for CLI invocations).
-func getLegacyMultisigKeys() (subKeys []string, compositeName string) {
-	return []string{multisigSigner1Name, multisigSigner2Name, multisigSigner3Name}, multisigAccountName
-}
-
-// getNewMultisigKeys returns the 3 new-side eth sub-key names and the new
-// composite key name for the default multisig fixture.
-func getNewMultisigKeys() (subKeys []string, compositeName string) {
-	return []string{multisigNewSigner1Name, multisigNewSigner2Name, multisigNewSigner3Name}, multisigNewCompositeName
-}
-
 // RunMultisigMigration is the main entry point for the "multisig" mode. It
 // orchestrates the full flow end-to-end and returns an error if any step fails.
 func RunMultisigMigration() error {
@@ -293,7 +281,7 @@ func registerMultisigPubKey(multisigKeyName, multisigAddr string, members []stri
 	}
 
 	unsignedFile := tmpFile("multisig-unsigned-*.json")
-	defer os.Remove(unsignedFile)
+	defer func() { _ = os.Remove(unsignedFile) }()
 	if err := buildUnsignedMultisigBankSendTx(multisigKeyName, multisigAddr, multisigAddr, multisigSelfSendAmt, unsignedFile); err != nil {
 		return err
 	}
@@ -377,23 +365,23 @@ func createOrReuseFreshEVMKey(keyName string) (AccountRecord, error) {
 // introduced by Tasks 14/15/17:
 //
 //  1. generate-proof-payload --legacy <legacyAddr>
-//       --new-sub-pub-keys <comma-list of new-side eth sub-key names>
-//       --new-threshold <K> --kind <kind> --out proof.json
+//     --new-sub-pub-keys <comma-list of new-side eth sub-key names>
+//     --new-threshold <K> --kind <kind> --out proof.json
 //  2. sign-proof proof.json --from <legacy-sub[0]> --new-key <new-sub[0]>
 //  3. sign-proof proof.json --from <legacy-sub[2]> --new-key <new-sub[2]>
 //     (indices 0 and 2 satisfy a 2-of-3 threshold on both sides).
 //  4. combine-proof proof.json --out tx.json
 //  5. submit-proof tx.json --chain-id <id>
 //     (no --from: migration txs are unsigned at the Cosmos layer; authorization
-//      is embedded in the legacy/new proofs.)
+//     is embedded in the legacy/new proofs.)
 func runFourStepMigrationMultisig(
 	kind, legacyAddr string, legacyMembers []string,
 	newCompositeAddr string, newSubKeyNames []string, newThreshold int,
 ) error {
 	proofFile := tmpFile("multisig-proof-*.json")
-	defer os.Remove(proofFile)
+	defer func() { _ = os.Remove(proofFile) }()
 	txFile := tmpFile("multisig-tx-*.json")
-	defer os.Remove(txFile)
+	defer func() { _ = os.Remove(txFile) }()
 
 	if kind == "" {
 		kind = "claim"
@@ -564,7 +552,9 @@ func tmpFile(pattern string) string {
 	if err != nil {
 		log.Fatalf("create temp file %s: %v", pattern, err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		log.Fatalf("close temp file %s: %v", f.Name(), err)
+	}
 	return f.Name()
 }
 
@@ -879,7 +869,7 @@ func signAndBroadcastMsgEditValidator(
 	}
 
 	unsignedFile := tmpFile("edit-val-unsigned-*.json")
-	defer os.Remove(unsignedFile)
+	defer func() { _ = os.Remove(unsignedFile) }()
 
 	// 1. Generate the unsigned edit-validator tx (generate-only).
 	accNum, seq, err := queryAccountNumberAndSequence(newCompositeAddr)

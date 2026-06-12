@@ -66,6 +66,68 @@ func strictUnmarshal(data []byte, v any) error {
 	return d.Decode(v)
 }
 
+// ApplyFileConfig layers a parsed FileConfig onto c following the precedence
+// defaults < [common] < [chains.<chain>] < explicit CLI flags. setFlags is the
+// set of flag names the user passed on the command line (collected via
+// flag.Visit); fields whose flag was set are never overwritten by the config.
+// An empty chain applies only [common]; a non-empty chain that is absent from
+// the file is an error.
+func ApplyFileConfig(c *Config, fc *FileConfig, chain string, setFlags map[string]bool) error {
+	if fc == nil {
+		return nil
+	}
+	applyLayer(c, fc.Common, setFlags)
+	if chain == "" {
+		return nil
+	}
+	sec, ok := fc.Chains[chain]
+	if !ok {
+		return fmt.Errorf("chain %q not found in config (available: %v)", chain, fc.ChainNames())
+	}
+	applyLayer(c, sec, setFlags)
+	return nil
+}
+
+// applyLayer overlays the non-nil fields of sec onto c, skipping any field
+// whose corresponding flag name appears in setFlags (so explicit CLI flags are
+// never clobbered). The flag names here MUST match those registered in
+// configureFlags.
+func applyLayer(c *Config, sec ChainSection, setFlags map[string]bool) {
+	str := func(flagName string, src *string, dst *string) {
+		if src != nil && !setFlags[flagName] {
+			*dst = *src
+		}
+	}
+	intf := func(flagName string, src *int, dst *int) {
+		if src != nil && !setFlags[flagName] {
+			*dst = *src
+		}
+	}
+	boolf := func(flagName string, src *bool, dst *bool) {
+		if src != nil && !setFlags[flagName] {
+			*dst = *src
+		}
+	}
+
+	str("bin", sec.Bin, &c.Bin)
+	str("rpc", sec.RPC, &c.RPC)
+	str("grpc", sec.GRPC, &c.GRPC)
+	str("chain-id", sec.ChainID, &c.ChainID)
+	str("home", sec.Home, &c.Home)
+	str("keyring-backend", sec.KeyringBackend, &c.KeyringBackend)
+	str("evm-cutover-version", sec.EVMCutoverVer, &c.EVMCutoverVer)
+	str("funding-key", sec.FundingKey, &c.FundingKey)
+	str("accounts", sec.AccountsPath, &c.AccountsPath)
+	str("max-account-amount", sec.MaxAccountAmount, &c.MaxAccountAmount)
+	str("account-prefix", sec.AccountPrefix, &c.AccountPrefix)
+	intf("num-accounts", sec.NumAccounts, &c.NumAccounts)
+	intf("funding-batch-size", sec.FundingBatchSize, &c.FundingBatchSize)
+	intf("parallelism", sec.Parallelism, &c.Parallelism)
+	intf("num-multisig23-accounts", sec.NumMultisig23, &c.NumMultisig23)
+	intf("num-multisig35-accounts", sec.NumMultisig35, &c.NumMultisig35)
+	boolf("actions", sec.Actions, &c.Actions)
+}
+
 // ChainNames returns the configured chain names in sorted order (stable wizard
 // menu ordering).
 func (fc *FileConfig) ChainNames() []string {

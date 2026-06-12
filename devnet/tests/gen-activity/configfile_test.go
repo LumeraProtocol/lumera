@@ -154,4 +154,18 @@ func TestApplyFileConfigPrecedence(t *testing.T) {
 			t.Errorf("ChainID = %q, want empty (no chain selected)", c.ChainID)
 		}
 	})
+
+	t.Run("chain section overrides common for an overlapping key", func(t *testing.T) {
+		overlap, err := LoadFileConfig(writeTempTOML(t, "[common]\nfunding-key = \"common-funder\"\n[chains.devnet]\nfunding-key = \"chain-funder\"\n"))
+		if err != nil {
+			t.Fatalf("LoadFileConfig: %v", err)
+		}
+		c := &Config{}
+		if err := ApplyFileConfig(c, overlap, "devnet", map[string]bool{}); err != nil {
+			t.Fatalf("ApplyFileConfig: %v", err)
+		}
+		if c.FundingKey != "chain-funder" {
+			t.Errorf("FundingKey = %q, want chain-funder (chain layer must override common)", c.FundingKey)
+		}
+	})
 }

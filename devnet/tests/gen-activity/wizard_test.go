@@ -68,6 +68,54 @@ func TestEditSettingRejectsBadInt(t *testing.T) {
 	}
 }
 
+func TestEditSettingModeMapping(t *testing.T) {
+	cases := []struct {
+		choice           string
+		addAccounts      bool
+		activityExisting bool
+	}{
+		{"fresh", false, false},
+		{"add-accounts", true, false},
+		{"activity-existing", false, true},
+	}
+	for _, tc := range cases {
+		c := &Config{}
+		p := &fakePrompter{selectQueue: []string{tc.choice}}
+		if err := editSetting(c, settingMode, p); err != nil {
+			t.Fatalf("edit mode %q: %v", tc.choice, err)
+		}
+		if c.AddAccounts != tc.addAccounts || c.ActivityExisting != tc.activityExisting {
+			t.Errorf("mode %q -> AddAccounts=%v ActivityExisting=%v, want %v/%v",
+				tc.choice, c.AddAccounts, c.ActivityExisting, tc.addAccounts, tc.activityExisting)
+		}
+	}
+}
+
+func TestRunWizardManualChainNoConfig(t *testing.T) {
+	cfg := &Config{
+		Bin: "lumerad", KeyringBackend: "test", FundingKey: "faucet",
+		AccountsPath: "accounts.json", MaxAccountAmount: "10000000ulume",
+		ActionStates: "pending,done,approved", MaxActionsPerRun: 3,
+		FundingBatchSize: 10, Parallelism: 5,
+	}
+	// fc == nil: runWizard takes the manual-entry branch (promptManualChain),
+	// then the menu loop exits immediately on Quit.
+	p := &fakePrompter{
+		selectQueue: []string{menuQuit},
+		inputs: map[string]string{
+			"rpc":      "tcp://manual:26657",
+			"grpc":     "manual:9090",
+			"chain-id": "lumera-manual-1",
+		},
+	}
+	if err := runWizard(cfg, nil, p, func(*Config) error { return nil }); err != nil {
+		t.Fatalf("runWizard: %v", err)
+	}
+	if cfg.RPC != "tcp://manual:26657" || cfg.GRPC != "manual:9090" || cfg.ChainID != "lumera-manual-1" {
+		t.Errorf("manual chain not applied: rpc=%q grpc=%q chain-id=%q", cfg.RPC, cfg.GRPC, cfg.ChainID)
+	}
+}
+
 // fakePrompter scripts wizard answers keyed by setting key. selectQueue is a
 // FIFO of answers for SelectOne calls.
 type fakePrompter struct {
@@ -97,4 +145,56 @@ func (f *fakePrompter) Confirm(key, label string, def bool) (bool, error) {
 		return v, nil
 	}
 	return def, nil
+}
+
+func TestRunWizardEditsThenRuns(t *testing.T) {
+	fc, err := LoadFileConfig(writeTempTOML(t, sampleTOML))
+	if err != nil {
+		t.Fatalf("LoadFileConfig: %v", err)
+	}
+	cfg := &Config{
+		Bin: "lumerad", KeyringBackend: "test",
+		MaxAccountAmount: "10000000ulume", ActionStates: "pending,done,approved",
+		MaxActionsPerRun: 3, FundingBatchSize: 10, Parallelism: 5,
+	}
+
+	// Script: pick chain "devnet", edit funding-key, then Run.
+	p := &fakePrompter{
+		selectQueue: []string{
+			"devnet",                           // chain picker
+			menuKeyFromItem(menuItems(cfg)[0]), // first menu choice -> funding-key setting line
+			menuRun,                            // then run
+		},
+		inputs: map[string]string{"funding-key": "wizfunder"},
+	}
+
+	var ran *Config
+	runner := func(c *Config) error { ran = c; return nil }
+
+	if err := runWizard(cfg, fc, p, runner); err != nil {
+		t.Fatalf("runWizard: %v", err)
+	}
+	if ran == nil {
+		t.Fatal("runner was not invoked on Run")
+	}
+	if ran.ChainID != "lumera-devnet-1" {
+		t.Errorf("ChainID = %q, want lumera-devnet-1 (chain applied)", ran.ChainID)
+	}
+	if ran.FundingKey != "wizfunder" {
+		t.Errorf("FundingKey = %q, want wizfunder (edited)", ran.FundingKey)
+	}
+}
+
+func TestRunWizardQuitDoesNotRun(t *testing.T) {
+	cfg := &Config{Bin: "lumerad"}
+	p := &fakePrompter{selectQueue: []string{menuQuit}}
+	called := false
+	runner := func(*Config) error { called = true; return nil }
+
+	if err := runWizard(cfg, nil, p, runner); err != nil {
+		t.Fatalf("runWizard: %v", err)
+	}
+	if called {
+		t.Error("runner must not be called when user quits")
+	}
 }

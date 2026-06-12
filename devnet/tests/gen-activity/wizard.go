@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/AlecAivazis/survey/v2"
 )
 
 // prompter abstracts the interactive prompts so the wizard's control flow is
@@ -162,19 +164,124 @@ func editSetting(c *Config, key string, p prompter) error {
 		}
 		c.DryRun = v
 	case settingNumAccounts:
-		return editInt(key,"Number of accounts", &c.NumAccounts, p)
+		return editInt(key, "Number of accounts", &c.NumAccounts, p)
 	case settingNumMultisig23:
-		return editInt(key,"Number of 2-of-3 multisig accounts", &c.NumMultisig23, p)
+		return editInt(key, "Number of 2-of-3 multisig accounts", &c.NumMultisig23, p)
 	case settingNumMultisig35:
-		return editInt(key,"Number of 3-of-5 multisig accounts", &c.NumMultisig35, p)
+		return editInt(key, "Number of 3-of-5 multisig accounts", &c.NumMultisig35, p)
 	case settingParallelism:
-		return editInt(key,"Parallelism", &c.Parallelism, p)
+		return editInt(key, "Parallelism", &c.Parallelism, p)
 	case settingFundingBatch:
-		return editInt(key,"Funding batch size", &c.FundingBatchSize, p)
+		return editInt(key, "Funding batch size", &c.FundingBatchSize, p)
 	default:
 		return fmt.Errorf("unknown setting %q", key)
 	}
 	return nil
+}
+
+// runWizard drives the interactive flow: optionally pick a chain (re-seeding cfg
+// from that chain's config section), then loop the settings menu until the user
+// chooses Run (validate + invoke runner) or Quit (return without running).
+// runner is injected so tests can assert invocation without a live chain.
+func runWizard(cfg *Config, fc *FileConfig, p prompter, runner func(*Config) error) error {
+	if fc != nil && len(fc.Chains) > 0 {
+		names := fc.ChainNames()
+		def := cfg.Chain
+		if def == "" {
+			def = names[0]
+		}
+		chosen, err := p.SelectOne("Select chain", names, def)
+		if err != nil {
+			return err
+		}
+		cfg.Chain = chosen
+		// Re-seed defaults from the chosen chain (wizard is interactive: the
+		// chain's values become the working defaults the user can then edit).
+		applyLayer(cfg, fc.Common, nil)
+		applyLayer(cfg, fc.Chains[chosen], nil)
+	} else {
+		// Manual entry when there is no config file / no chains defined.
+		if err := promptManualChain(cfg, p); err != nil {
+			return err
+		}
+	}
+
+	for {
+		choice, err := p.SelectOne("Settings (select to edit, then Run)", menuItems(cfg), menuRun)
+		if err != nil {
+			return err
+		}
+		key := menuKeyFromItem(choice)
+		switch key {
+		case menuRun:
+			if err := cfg.Validate(); err != nil {
+				fmt.Printf("  cannot run: %v\n", err)
+				continue
+			}
+			return runner(cfg)
+		case menuQuit:
+			return nil
+		default:
+			if err := editSetting(cfg, key, p); err != nil {
+				fmt.Printf("  %v\n", err)
+			}
+		}
+	}
+}
+
+// promptManualChain asks for the minimum connection settings when no config file
+// is present, so a bare `gen-activity` invocation still works.
+func promptManualChain(cfg *Config, p prompter) error {
+	rpc, err := p.Input("rpc", "RPC endpoint", cfg.RPC)
+	if err != nil {
+		return err
+	}
+	cfg.RPC = rpc
+	grpc, err := p.Input("grpc", "gRPC endpoint", cfg.GRPC)
+	if err != nil {
+		return err
+	}
+	cfg.GRPC = grpc
+	chainID, err := p.Input("chain-id", "Chain ID", cfg.ChainID)
+	if err != nil {
+		return err
+	}
+	cfg.ChainID = chainID
+	return nil
+}
+
+// surveyPrompter is the production prompter backed by survey/v2.
+type surveyPrompter struct{}
+
+func newSurveyPrompter() prompter { return surveyPrompter{} }
+
+func (surveyPrompter) SelectOne(label string, options []string, def string) (string, error) {
+	answer := def
+	prompt := &survey.Select{Message: label, Options: options, Default: def}
+	if err := survey.AskOne(prompt, &answer); err != nil {
+		return "", err
+	}
+	return answer, nil
+}
+
+// The first parameter (the setting key) is unused by the survey impl but
+// required by the prompter interface, so it is named _.
+func (surveyPrompter) Input(_ string, label, def string) (string, error) {
+	answer := def
+	prompt := &survey.Input{Message: label, Default: def}
+	if err := survey.AskOne(prompt, &answer); err != nil {
+		return "", err
+	}
+	return answer, nil
+}
+
+func (surveyPrompter) Confirm(_ string, label string, def bool) (bool, error) {
+	answer := def
+	prompt := &survey.Confirm{Message: label, Default: def}
+	if err := survey.AskOne(prompt, &answer); err != nil {
+		return false, err
+	}
+	return answer, nil
 }
 
 // editInt prompts for an integer setting and applies it only on a clean parse.

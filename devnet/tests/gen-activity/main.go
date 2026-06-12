@@ -23,7 +23,23 @@ const defaultEVMCutoverVer = "v1.20.0"
 const usageDescription = "tests-gen-activity generates realistic account activity against a live Lumera devnet chain."
 
 func main() {
-	cfg := parseFlags()
+	cfg := &Config{}
+	configureFlags(flag.CommandLine, cfg)
+	flag.Parse()
+
+	wizard, err := resolveConfig(cfg, flag.CommandLine)
+	if err != nil {
+		log.Fatalf("configuration: %v", err)
+	}
+
+	if wizard {
+		fc, _ := LoadFileConfig(cfg.ConfigPath)
+		if err := runWizard(cfg, fc, newSurveyPrompter(), run); err != nil {
+			log.Fatalf("wizard: %v", err)
+		}
+		return
+	}
+
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
 	}
@@ -32,11 +48,28 @@ func main() {
 	}
 }
 
-func parseFlags() *Config {
-	c := &Config{}
-	configureFlags(flag.CommandLine, c)
-	flag.Parse()
-	return c
+// resolveConfig loads any config file referenced by cfg.ConfigPath, layers it
+// onto cfg honoring CLI-flag precedence, and reports whether the tool should run
+// in wizard mode (no flags passed, or -w/-wizard). fs must be the FlagSet that
+// already parsed the command line (so fs.Visit/fs.NFlag reflect what the user
+// set).
+func resolveConfig(cfg *Config, fs *flag.FlagSet) (wizard bool, err error) {
+	setFlags := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { setFlags[f.Name] = true })
+
+	fc, err := LoadFileConfig(cfg.ConfigPath)
+	if err != nil {
+		return false, err
+	}
+	if fc == nil && setFlags["config"] {
+		return false, fmt.Errorf("config file %q not found", cfg.ConfigPath)
+	}
+	if err := ApplyFileConfig(cfg, fc, cfg.Chain, setFlags); err != nil {
+		return false, err
+	}
+
+	wizard = cfg.Wizard || fs.NFlag() == 0
+	return wizard, nil
 }
 
 func configureFlags(fs *flag.FlagSet, c *Config) {

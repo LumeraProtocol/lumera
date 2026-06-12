@@ -57,3 +57,76 @@ func TestDetectKeyStyleFallsBackToLegacy(t *testing.T) {
 		t.Fatalf("detectKeyStyle fallback = %+v, want legacy", got)
 	}
 }
+
+func TestResolveConfigAppliesFileAndDetectsWizard(t *testing.T) {
+	t.Run("no flags -> wizard mode, common applied", func(t *testing.T) {
+		cfg := &Config{}
+		fs := flag.NewFlagSet("gen", flag.ContinueOnError)
+		configureFlags(fs, cfg)
+		if err := fs.Parse([]string{}); err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		path := writeTempTOML(t, sampleTOML)
+		cfg.ConfigPath = path
+
+		wizard, err := resolveConfig(cfg, fs)
+		if err != nil {
+			t.Fatalf("resolveConfig: %v", err)
+		}
+		if !wizard {
+			t.Error("expected wizard=true when no flags passed")
+		}
+		if cfg.FundingKey != "faucet" {
+			t.Errorf("FundingKey = %q, want faucet (from common)", cfg.FundingKey)
+		}
+	})
+
+	t.Run("flags passed -> command-line mode", func(t *testing.T) {
+		cfg := &Config{}
+		fs := flag.NewFlagSet("gen", flag.ContinueOnError)
+		configureFlags(fs, cfg)
+		path := writeTempTOML(t, sampleTOML)
+		if err := fs.Parse([]string{"-chain", "devnet", "-config", path}); err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		wizard, err := resolveConfig(cfg, fs)
+		if err != nil {
+			t.Fatalf("resolveConfig: %v", err)
+		}
+		if wizard {
+			t.Error("expected wizard=false when flags passed")
+		}
+		if cfg.ChainID != "lumera-devnet-1" {
+			t.Errorf("ChainID = %q, want lumera-devnet-1 (chain layered)", cfg.ChainID)
+		}
+	})
+
+	t.Run("-w forces wizard even with flags", func(t *testing.T) {
+		cfg := &Config{}
+		fs := flag.NewFlagSet("gen", flag.ContinueOnError)
+		configureFlags(fs, cfg)
+		path := writeTempTOML(t, sampleTOML)
+		if err := fs.Parse([]string{"-w", "-config", path}); err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		wizard, err := resolveConfig(cfg, fs)
+		if err != nil {
+			t.Fatalf("resolveConfig: %v", err)
+		}
+		if !wizard {
+			t.Error("expected wizard=true when -w passed")
+		}
+	})
+
+	t.Run("explicit missing -config is an error", func(t *testing.T) {
+		cfg := &Config{}
+		fs := flag.NewFlagSet("gen", flag.ContinueOnError)
+		configureFlags(fs, cfg)
+		if err := fs.Parse([]string{"-config", filepath.Join(t.TempDir(), "nope.toml"), "-chain", "devnet"}); err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		if _, err := resolveConfig(cfg, fs); err == nil {
+			t.Error("expected error when explicit -config path is missing")
+		}
+	})
+}

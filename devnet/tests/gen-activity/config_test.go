@@ -103,6 +103,38 @@ func TestConfigValidate(t *testing.T) {
 	})
 }
 
+func TestConfigValidateVesting(t *testing.T) {
+	t.Run("valid vesting-percent passes", func(t *testing.T) {
+		c := validConfig()
+		c.VestingPercent = 30
+		c.NumPermanentLocked = 2
+		if err := c.Validate(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	t.Run("vesting-percent over 100 fails", func(t *testing.T) {
+		c := validConfig()
+		c.VestingPercent = 101
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for vesting-percent > 100")
+		}
+	})
+	t.Run("negative vesting-percent fails", func(t *testing.T) {
+		c := validConfig()
+		c.VestingPercent = -1
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for negative vesting-percent")
+		}
+	})
+	t.Run("negative num-permanent-locked fails", func(t *testing.T) {
+		c := validConfig()
+		c.NumPermanentLocked = -1
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for negative num-permanent-locked-accounts")
+		}
+	})
+}
+
 func TestConfigValidateMultisigCounts(t *testing.T) {
 	t.Run("zero multisig counts pass", func(t *testing.T) {
 		c := validConfig()

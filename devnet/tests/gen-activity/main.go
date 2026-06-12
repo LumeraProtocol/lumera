@@ -97,6 +97,8 @@ func configureFlags(fs *flag.FlagSet, c *Config) {
 	fs.IntVar(&c.NumAccounts, "num-accounts", 10, "number of accounts to generate")
 	fs.IntVar(&c.NumMultisig23, "num-multisig23-accounts", 0, "number of 2-of-3 multisig accounts to generate")
 	fs.IntVar(&c.NumMultisig35, "num-multisig35-accounts", 0, "number of 3-of-5 multisig accounts to generate")
+	fs.IntVar(&c.VestingPercent, "vesting-percent", 0, "percent of regular accounts to create as continuous/delayed vesting (0-100)")
+	fs.IntVar(&c.NumPermanentLocked, "num-permanent-locked-accounts", 0, "number of dedicated PermanentLocked accounts to generate")
 	fs.StringVar(&c.MaxAccountAmount, "max-account-amount", "10000000ulume", "upper bound for per-account funding")
 	fs.StringVar(&c.AccountPrefix, "account-prefix", "gen", "name prefix for generated accounts")
 	fs.BoolVar(&c.AddAccounts, "add-accounts", false, "add -num-accounts new users to an existing registry")

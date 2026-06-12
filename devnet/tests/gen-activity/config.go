@@ -38,6 +38,9 @@ type Config struct {
 	NumMultisig23 int // 2-of-3 multisig accounts
 	NumMultisig35 int // 3-of-5 multisig accounts
 
+	VestingPercent     int // percent of regular accounts created as vesting (0-100)
+	NumPermanentLocked int // dedicated PermanentLocked accounts
+
 	// Rerun modes.
 	AddAccounts      bool
 	ActivityExisting bool
@@ -91,6 +94,12 @@ func (c *Config) Validate() error {
 	}
 	if c.NumMultisig35 < 0 {
 		return fmt.Errorf("-num-multisig35-accounts must be >= 0, got %d", c.NumMultisig35)
+	}
+	if c.VestingPercent < 0 || c.VestingPercent > 100 {
+		return fmt.Errorf("-vesting-percent must be in [0,100], got %d", c.VestingPercent)
+	}
+	if c.NumPermanentLocked < 0 {
+		return fmt.Errorf("-num-permanent-locked-accounts must be >= 0, got %d", c.NumPermanentLocked)
 	}
 
 	coin, err := common.ValidateMaxAccountAmount(c.MaxAccountAmount)

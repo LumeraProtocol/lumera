@@ -29,8 +29,10 @@ type ChainSection struct {
 	Actions          *bool   `toml:"actions"`
 	FundingBatchSize *int    `toml:"funding-batch-size"`
 	Parallelism      *int    `toml:"parallelism"`
-	NumMultisig23    *int    `toml:"num-multisig23-accounts"`
-	NumMultisig35    *int    `toml:"num-multisig35-accounts"`
+	NumMultisig23      *int    `toml:"num-multisig23-accounts"`
+	NumMultisig35      *int    `toml:"num-multisig35-accounts"`
+	VestingPercent     *int    `toml:"vesting-percent"`
+	NumPermanentLocked *int    `toml:"num-permanent-locked-accounts"`
 }
 
 // FileConfig is the parsed gen-activity-config.toml: a shared [common] section
@@ -125,6 +127,8 @@ func applyLayer(c *Config, sec ChainSection, setFlags map[string]bool) {
 	intf("parallelism", sec.Parallelism, &c.Parallelism)
 	intf("num-multisig23-accounts", sec.NumMultisig23, &c.NumMultisig23)
 	intf("num-multisig35-accounts", sec.NumMultisig35, &c.NumMultisig35)
+	intf("vesting-percent", sec.VestingPercent, &c.VestingPercent)
+	intf("num-permanent-locked-accounts", sec.NumPermanentLocked, &c.NumPermanentLocked)
 	boolf("actions", sec.Actions, &c.Actions)
 }
 

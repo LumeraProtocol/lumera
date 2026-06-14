@@ -338,6 +338,8 @@ start_lumera() {
 	fi
 	# shellcheck disable=SC2086
 	run "${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
+	LUMERAD_PID=$!
+	echo "[BOOT] ${MONIKER}: lumerad started, pid=${LUMERAD_PID}"
 
 	if [ "${MONIKER}" = "${PRIMARY_MONIKER}" ]; then
 		mkdir -p "$(dirname "${PRIMARY_STARTED_FLAG}")"
@@ -348,7 +350,39 @@ start_lumera() {
 
 tail_logs() {
 	touch "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}" "${TEST_ACCOUNTS_SETUP_OUT}"
-	exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}" "${TEST_ACCOUNTS_SETUP_OUT}"
+	tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}" "${TEST_ACCOUNTS_SETUP_OUT}" &
+	TAIL_PID=$!
+}
+
+# Wait on the lumerad process and propagate its exit code as the container's
+# exit code. If lumerad dies (crash, SIGKILL on host that matches `pkill -f
+# 'lumerad start'`, OOM, etc.) the container exits non-zero. Combined with the
+# docker-compose `restart: unless-stopped` policy this auto-recovers from
+# silent zombification and surfaces real crashes to docker / observability.
+#
+# History: 2026-06-02 — a host `pkill -9 -f 'lumerad start'` matched lumerad
+# inside the 5 validator containers. PID 1 was bash + tail -F, so containers
+# stayed "Up" for 6 days while chain was dead. See PR description.
+wait_for_lumera() {
+	if [ -z "${LUMERAD_PID:-}" ]; then
+		echo "[BOOT] ${MONIKER}: lumerad pid not set; cannot supervise."
+		# Fall back to old tail-forever behaviour rather than exit 0 silently.
+		wait "${TAIL_PID:-}" 2>/dev/null || true
+		return 0
+	fi
+	# `wait <pid>` returns the exit status of that process. We deliberately do
+	# NOT use `set -e` here so we can capture the code.
+	set +e
+	wait "${LUMERAD_PID}"
+	local rc=$?
+	set -e
+	echo "[BOOT] ${MONIKER}: lumerad exited rc=${rc} — terminating container so docker restart policy can recover."
+	if [ -n "${TAIL_PID:-}" ]; then
+		kill "${TAIL_PID}" 2>/dev/null || true
+	fi
+	# Sleep briefly so the last log lines are flushed by tail -F before we exit.
+	sleep 1
+	exit "${rc}"
 }
 
 run_auto_flow() {
@@ -361,6 +395,7 @@ run_auto_flow() {
 	launch_test_accounts_setup
 	start_nm_ui_if_present
 	tail_logs
+	wait_for_lumera
 }
 
 case "${START_MODE}" in
@@ -388,6 +423,7 @@ run)
 	launch_test_accounts_setup
 	start_nm_ui_if_present
 	tail_logs
+	wait_for_lumera
 	;;
 
 wait)

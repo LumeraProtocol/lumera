@@ -96,7 +96,7 @@ func configureFlags(fs *flag.FlagSet, c *Config) {
 	fs.StringVar(&c.Home, "home", "", "lumerad home directory")
 	fs.StringVar(&c.KeyringBackend, "keyring-backend", "test", "local funder keyring backend")
 	fs.StringVar(&c.EVMCutoverVer, "evm-cutover-version", defaultEVMCutoverVer, "lumerad version where accounts switch to coin-type 60")
-	fs.StringVar(&c.FundingKey, "funding-key", "", "funder key name in the local keyring (required)")
+	fs.StringVar(&c.FundingKey, "funding-key", "governance_key", "funder key name in the local keyring")
 	fs.StringVar(&c.AccountsPath, "accounts", "devnet/tests/gen-activity/accounts.json", "registry file path")
 	fs.IntVar(&c.NumAccounts, "num-accounts", 10, "number of accounts to generate")
 	fs.IntVar(&c.NumMultisig23, "num-multisig23-accounts", 0, "number of 2-of-3 multisig accounts to generate")
@@ -112,9 +112,9 @@ func configureFlags(fs *flag.FlagSet, c *Config) {
 	fs.IntVar(&c.MaxActionsPerRun, "max-actions-per-run", 3, "cap action uploads/registrations per run")
 	fs.StringVar(&c.ActionStates, "action-states", "pending,done,approved", "target action states to generate")
 	fs.DurationVar(&c.ActionReadinessTimeout, "action-readiness-timeout", 180*time.Second, "time to wait for usable active supernodes")
-	fs.IntVar(&c.FundingBatchSize, "funding-batch-size", 10, "funder transfers to pipeline before waiting for inclusion")
+	fs.IntVar(&c.FundingBatchSize, "funding-batch-size", 1, "funder transfers to pipeline before waiting for inclusion")
 	fs.IntVar(&c.Parallelism, "parallelism", 5, "maximum concurrent per-account activity workers")
-	fs.BoolVar(&c.DryRun, "dry-run", false, "print planned accounts/activity without submitting txs")
+	fs.BoolVar(&c.DryRun, "dry-run", true, "print planned accounts/activity without submitting txs")
 }
 
 // run executes the runtime flow described in the design. Steps 1-6 are

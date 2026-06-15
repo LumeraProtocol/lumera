@@ -191,6 +191,13 @@ func editSetting(c *Config, key string, p prompter) error {
 	return nil
 }
 
+// chainSummary renders the selected chain's connection settings followed by a
+// divider, shown once after chain selection and before the settings menu.
+func chainSummary(cfg *Config) string {
+	return fmt.Sprintf("\nChain: %s\n  chain-id: %s\n  rpc:      %s\n  grpc:     %s\n----------\n",
+		cfg.Chain, cfg.ChainID, cfg.RPC, cfg.GRPC)
+}
+
 // runWizard drives the interactive flow: optionally pick a chain (re-seeding cfg
 // from that chain's config section), then loop the settings menu until the user
 // chooses Run (validate + invoke runner) or Quit (return without running).
@@ -215,6 +222,7 @@ func runWizard(cfg *Config, fc *FileConfig, p prompter, runner func(*Config) err
 		if err := applyLayer(cfg, fc.Chains[chosen], nil); err != nil {
 			return err
 		}
+		fmt.Print(chainSummary(cfg))
 	} else {
 		// Manual entry when there is no config file / no chains defined.
 		if err := promptManualChain(cfg, p); err != nil {
@@ -273,7 +281,7 @@ func newSurveyPrompter() prompter { return surveyPrompter{} }
 
 func (surveyPrompter) SelectOne(label string, options []string, def string) (string, error) {
 	answer := def
-	prompt := &survey.Select{Message: label, Options: options, Default: def}
+	prompt := &survey.Select{Message: label, Options: options, Default: def, PageSize: 20}
 	if err := survey.AskOne(prompt, &answer); err != nil {
 		return "", err
 	}

@@ -233,3 +233,13 @@ func TestMenuItemsIncludeVesting(t *testing.T) {
 		}
 	}
 }
+
+func TestChainSummaryShowsConnectionAndDivider(t *testing.T) {
+	c := &Config{Chain: "devnet", ChainID: "lumera-devnet-1", RPC: "tcp://localhost:26657", GRPC: "localhost:9090"}
+	out := chainSummary(c)
+	for _, want := range []string{"devnet", "lumera-devnet-1", "tcp://localhost:26657", "localhost:9090", "----------"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("chainSummary missing %q:\n%s", want, out)
+		}
+	}
+}

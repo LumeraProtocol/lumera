@@ -177,3 +177,134 @@ teardown() {
   [[ "$(cat "$CMD_LOG")" == *"tx feegrant grant prepare-funder-supernova_validator_2 lumera1locked"* ]]
   [[ "$(cat "$CMD_LOG")" == *"--fee-granter lumera1liquid"* ]]
 }
+
+@test "validator setup selects migrated evm validator key when it is active on chain" {
+  run env \
+    MONIKER=supernova_validator_2 \
+    SUPERNODE_SETUP_LIB_ONLY=1 \
+    SUPERNODE_SHARED_DIR="$SHARED_DIR" \
+    bash -c '
+      source "$1"
+      DAEMON=lumerad
+      KEY_NAME=supernova_validator_2_key
+      VALIDATOR_BASE_KEY_NAME=supernova_validator_2_key
+      lumerad() {
+        case "$*" in
+          "keys show supernova_validator_2_key -a --keyring-backend test") printf "%s\n" "lumera1legacy" ;;
+          "keys show supernova_validator_2_key --bech val -a --keyring-backend test") printf "%s\n" "lumeravaloper1legacy" ;;
+          "q staking validator lumeravaloper1legacy --output json") return 1 ;;
+          "keys show supernova_validator_2_key_evm -a --keyring-backend test") printf "%s\n" "lumera1migrated" ;;
+          "keys show supernova_validator_2_key_evm --bech val -a --keyring-backend test") printf "%s\n" "lumeravaloper1migrated" ;;
+          "q staking validator lumeravaloper1migrated --output json") printf "%s\n" "{\"validator\":{\"operator_address\":\"lumeravaloper1migrated\"}}" ;;
+          *) return 1 ;;
+        esac
+      }
+      select_active_validator_key
+      printf "%s\n%s\n%s\n" "$KEY_NAME" "$VAL_ADDR" "$VALOPER_ADDR"
+    ' bash "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == $'supernova_validator_2_key_evm\nlumera1migrated\nlumeravaloper1migrated' ]]
+}
+
+@test "migrated validator multisig signing uses discovered evm signer keys" {
+  run env \
+    MONIKER=supernova_validator_2 \
+    SUPERNODE_SETUP_LIB_ONLY=1 \
+    SUPERNODE_SHARED_DIR="$SHARED_DIR" \
+    bash -c '
+      source "$1"
+      DAEMON=lumerad
+      KEY_NAME=supernova_validator_2_key_evm
+      VALIDATOR_BASE_KEY_NAME=supernova_validator_2_key
+      lumerad() {
+        case "$*" in
+          "keys show val2-evm-signer-1 -a --keyring-backend test") printf "%s\n" "lumera1evmsigner1" ;;
+          "keys show val2-evm-signer-2 -a --keyring-backend test") printf "%s\n" "lumera1evmsigner2" ;;
+          *) return 1 ;;
+        esac
+      }
+      validator_multisig_signer_key 1
+      validator_multisig_signer_key 2
+    ' bash "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == $'val2-evm-signer-1\nval2-evm-signer-2' ]]
+}
+
+@test "supernode evm key recovery uses supernode keyring writer" {
+  CMD_LOG="$SHARED_DIR/commands.log"
+  mkdir -p "$SHARED_DIR/supernode"
+  cat >"$SHARED_DIR/supernode/config.yml" <<'YAML'
+supernode:
+    key_name: "supernova_supernode_2_key_evm"
+keyring:
+    backend: "test"
+    dir: "keys"
+YAML
+
+  run env \
+    MONIKER=supernova_validator_2 \
+    SUPERNODE_SETUP_LIB_ONLY=1 \
+    SUPERNODE_SHARED_DIR="$SHARED_DIR" \
+    CMD_LOG="$CMD_LOG" \
+    bash -c '
+      source "$1"
+      SN_BASEDIR="$SHARED_DIR/supernode"
+      SN_CONFIG="$SN_BASEDIR/config.yml"
+      SN_KEYRING_HOME="$SN_BASEDIR/keys"
+      SN=supernode-linux-amd64
+      mkdir -p "$SN_KEYRING_HOME/keyring-test"
+      touch "$SN_KEYRING_HOME/keyring-test/supernova_supernode_2_key_evm.info"
+      supernode-linux-amd64() {
+        printf "%s\n" "$*" >>"$CMD_LOG"
+        case "$*" in
+          "keys list -d "*)
+            return 1
+            ;;
+          "keys recover supernova_supernode_2_key_evm -d "*)
+            return 0
+            ;;
+        esac
+      }
+      ensure_supernode_evm_key_from_mnemonic supernova_supernode_2_key_evm "test test test test test test test test test test test junk"
+    ' bash "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$CMD_LOG")" == *"keys list -d $SHARED_DIR/supernode"* ]]
+  [[ "$(cat "$CMD_LOG")" == *"keys recover supernova_supernode_2_key_evm -d $SHARED_DIR/supernode"* ]]
+  compgen -G "$SHARED_DIR/supernode/keys/keyring-test/supernova_supernode_2_key_evm.info.bak-"* >/dev/null
+}
+
+@test "supernode binary install does not downgrade newer installed version" {
+  RELEASE_DIR="$SHARED_DIR/release"
+  mkdir -p "$RELEASE_DIR" "$SHARED_DIR/bin"
+  cat >"$RELEASE_DIR/supernode-linux-amd64" <<'SH'
+#!/bin/sh
+case "$1" in
+  version) printf '%s\n' 'Version: v2.5.2' ;;
+esac
+SH
+  cat >"$SHARED_DIR/bin/supernode-linux-amd64" <<'SH'
+#!/bin/sh
+case "$1" in
+  version) printf '%s\n' 'Version: v2.6.0-rc1' ;;
+esac
+SH
+  chmod +x "$RELEASE_DIR/supernode-linux-amd64" "$SHARED_DIR/bin/supernode-linux-amd64"
+
+  run env \
+    MONIKER=supernova_validator_2 \
+    SUPERNODE_SETUP_LIB_ONLY=1 \
+    SUPERNODE_SHARED_DIR="$SHARED_DIR" \
+    bash -c '
+      source "$1"
+      SN_BIN_DST="$SHARED_DIR/bin/supernode-linux-amd64"
+      install_supernode_binary
+      "$SN_BIN_DST" version
+    ' bash "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"newer than shared release"* ]]
+  [[ "$output" == *"Version: v2.6.0-rc1"* ]]
+}

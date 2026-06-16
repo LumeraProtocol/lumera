@@ -7,6 +7,15 @@ import (
 	"gen/tests/common"
 )
 
+// Run modes. The legacy boolean flags (AddAccounts/ActivityExisting) fold into
+// these via resolveMode; the unset state means ModeFresh.
+const (
+	ModeFresh            = "fresh"
+	ModeAddAccounts      = "add-accounts"
+	ModeActivityExisting = "activity-existing"
+	ModeMigrate          = "migrate"
+)
+
 // Config holds the parsed command-line configuration for the activity
 // generator.
 type Config struct {
@@ -23,6 +32,10 @@ type Config struct {
 	ConfigPath string
 	Chain      string
 	Wizard     bool
+
+	// Mode is the explicit run mode (fresh|add-accounts|activity-existing|
+	// migrate). Empty means "derive from the legacy boolean flags below".
+	Mode string
 
 	// Funding signer.
 	FundingKey string
@@ -60,31 +73,79 @@ type Config struct {
 	// Parsed/validated values, populated by Validate.
 	maxAmount    common.Coin
 	actionStates []common.ActionState
+	resolvedMode string
+}
+
+// resolveMode reconciles the explicit Mode field with the legacy boolean flags
+// (AddAccounts/ActivityExisting) into a single canonical mode, returning an
+// error on any contradiction. The unset state means ModeFresh.
+func (c *Config) resolveMode() (string, error) {
+	// Mode implied by the legacy boolean flags.
+	boolMode := ""
+	switch {
+	case c.AddAccounts && c.ActivityExisting:
+		return "", fmt.Errorf("-add-accounts and -activity-existing are mutually exclusive")
+	case c.AddAccounts:
+		boolMode = ModeAddAccounts
+	case c.ActivityExisting:
+		boolMode = ModeActivityExisting
+	}
+
+	if c.Mode == "" {
+		if boolMode == "" {
+			return ModeFresh, nil
+		}
+		return boolMode, nil
+	}
+
+	switch c.Mode {
+	case ModeFresh, ModeAddAccounts, ModeActivityExisting, ModeMigrate:
+	default:
+		return "", fmt.Errorf("invalid -mode %q (want fresh|add-accounts|activity-existing|migrate)", c.Mode)
+	}
+
+	// An explicit mode must not contradict a legacy boolean flag.
+	if boolMode != "" && boolMode != c.Mode {
+		return "", fmt.Errorf("-mode %q conflicts with -%s", c.Mode, boolMode)
+	}
+	return c.Mode, nil
 }
 
 // Validate checks the configuration and populates parsed values (maxAmount,
 // actionStates). It returns the first error encountered.
 func (c *Config) Validate() error {
+	mode, err := c.resolveMode()
+	if err != nil {
+		return err
+	}
+	c.resolvedMode = mode
+
+	// Requirements common to every mode.
 	if c.Bin == "" {
 		return fmt.Errorf("-bin is required")
 	}
 	if c.ChainID == "" {
 		return fmt.Errorf("-chain-id is required")
 	}
-	if c.FundingKey == "" {
-		return fmt.Errorf("-funding-key is required")
-	}
 	if c.AccountsPath == "" {
 		return fmt.Errorf("-accounts is required")
 	}
-	if c.AddAccounts && c.ActivityExisting {
-		return fmt.Errorf("-add-accounts and -activity-existing are mutually exclusive")
+	if c.Parallelism < 1 {
+		return fmt.Errorf("-parallelism must be >= 1, got %d", c.Parallelism)
+	}
+
+	// Migrate mode signs with the legacy accounts and uses evmigration fee
+	// handling, so it needs neither a funder key nor any generation/activity
+	// settings. Skip those checks.
+	if mode == ModeMigrate {
+		return nil
+	}
+
+	if c.FundingKey == "" {
+		return fmt.Errorf("-funding-key is required")
 	}
 	if c.NumAccounts < 0 {
 		return fmt.Errorf("-num-accounts must be >= 0, got %d", c.NumAccounts)
-	}
-	if c.Parallelism < 1 {
-		return fmt.Errorf("-parallelism must be >= 1, got %d", c.Parallelism)
 	}
 	if c.FundingBatchSize < 1 {
 		return fmt.Errorf("-funding-batch-size must be >= 1, got %d", c.FundingBatchSize)

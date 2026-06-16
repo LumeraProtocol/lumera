@@ -9,7 +9,24 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"gen/tests/common"
 )
+
+// evmigCLI builds a common.ChainCLI from this tool's connection flags so the
+// shared migration query/parsing primitives can be reused instead of the local
+// duplicates.
+func evmigCLI() *common.ChainCLI {
+	return &common.ChainCLI{
+		Bin:            *flagBin,
+		ChainID:        *flagChainID,
+		RPC:            *flagRPC,
+		Home:           *flagHome,
+		KeyringBackend: "test",
+		Gas:            *flagGas,
+		GasPrices:      *flagGasPrices,
+	}
+}
 
 const (
 	protoPermanentLockedAccountType  = "/cosmos.vesting.v1beta1.PermanentLockedAccount"
@@ -48,48 +65,25 @@ type migrationParams struct {
 }
 
 // queryMigrationEstimate queries the evmigration module for a migration estimate
-// for the given legacy address.
+// for the given legacy address. It delegates to the shared common helper and
+// maps the result onto this tool's local type.
 func queryMigrationEstimate(addr string) (migrationEstimate, error) {
-	out, err := run("query", "evmigration", "migration-estimate", addr)
+	est, err := evmigCLI().MigrationEstimate(addr)
 	if err != nil {
-		return migrationEstimate{}, fmt.Errorf("query migration-estimate: %s\n%w", out, err)
+		return migrationEstimate{}, err
 	}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(out), &raw); err != nil {
-		return migrationEstimate{}, fmt.Errorf("parse migration-estimate: %s\n%w", truncate(out, 300), err)
-	}
-
-	estimate := migrationEstimate{}
-	if estimate.WouldSucceed, err = parseFlexibleJSONBool(raw["would_succeed"]); err != nil {
-		return migrationEstimate{}, fmt.Errorf("parse migration-estimate.would_succeed: %w", err)
-	}
-	estimate.RejectionReason = parseFlexibleJSONString(raw["rejection_reason"])
-	if estimate.DelegationCount, err = parseFlexibleJSONInt(raw["delegation_count"]); err != nil {
-		return migrationEstimate{}, fmt.Errorf("parse migration-estimate.delegation_count: %w", err)
-	}
-	if estimate.UnbondingCount, err = parseFlexibleJSONInt(raw["unbonding_count"]); err != nil {
-		return migrationEstimate{}, fmt.Errorf("parse migration-estimate.unbonding_count: %w", err)
-	}
-	if estimate.RedelegationCount, err = parseFlexibleJSONInt(raw["redelegation_count"]); err != nil {
-		return migrationEstimate{}, fmt.Errorf("parse migration-estimate.redelegation_count: %w", err)
-	}
-	if estimate.AuthzGrantCount, err = parseFlexibleJSONInt(raw["authz_grant_count"]); err != nil {
-		return migrationEstimate{}, fmt.Errorf("parse migration-estimate.authz_grant_count: %w", err)
-	}
-	if estimate.FeegrantCount, err = parseFlexibleJSONInt(raw["feegrant_count"]); err != nil {
-		return migrationEstimate{}, fmt.Errorf("parse migration-estimate.feegrant_count: %w", err)
-	}
-	if estimate.ActionCount, err = parseFlexibleJSONInt(raw["action_count"]); err != nil {
-		return migrationEstimate{}, fmt.Errorf("parse migration-estimate.action_count: %w", err)
-	}
-	if estimate.ValDelegationCount, err = parseFlexibleJSONInt(raw["val_delegation_count"]); err != nil {
-		return migrationEstimate{}, fmt.Errorf("parse migration-estimate.val_delegation_count: %w", err)
-	}
-	if estimate.IsValidator, err = parseFlexibleJSONBool(raw["is_validator"]); err != nil {
-		return migrationEstimate{}, fmt.Errorf("parse migration-estimate.is_validator: %w", err)
-	}
-
-	return estimate, nil
+	return migrationEstimate{
+		WouldSucceed:       est.WouldSucceed,
+		RejectionReason:    est.RejectionReason,
+		DelegationCount:    est.DelegationCount,
+		UnbondingCount:     est.UnbondingCount,
+		RedelegationCount:  est.RedelegationCount,
+		AuthzGrantCount:    est.AuthzGrantCount,
+		FeegrantCount:      est.FeegrantCount,
+		ActionCount:        est.ActionCount,
+		ValDelegationCount: est.ValDelegationCount,
+		IsValidator:        est.IsValidator,
+	}, nil
 }
 
 // queryAccountNumberAndSequence returns the on-chain account number and sequence
@@ -372,35 +366,20 @@ func waitForAccountOnChain(addr string, timeout time.Duration) error {
 	return fmt.Errorf("account %s not available on-chain after %s: %w", addr, timeout, lastErr)
 }
 
-// queryMigrationStats queries the global migration statistics from the evmigration module.
+// queryMigrationStats queries the global migration statistics from the
+// evmigration module via the shared common helper.
 func queryMigrationStats() (migrationStats, error) {
-	out, err := run("query", "evmigration", "migration-stats")
+	s, err := evmigCLI().MigrationStats()
 	if err != nil {
-		return migrationStats{}, fmt.Errorf("query migration-stats: %s\n%w", out, err)
+		return migrationStats{}, err
 	}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(out), &raw); err != nil {
-		return migrationStats{}, fmt.Errorf("parse migration-stats: %s\n%w", truncate(out, 300), err)
-	}
-
-	stats := migrationStats{}
-	if stats.TotalMigrated, err = parseFlexibleJSONInt(raw["total_migrated"]); err != nil {
-		return migrationStats{}, fmt.Errorf("parse migration-stats.total_migrated: %w", err)
-	}
-	if stats.TotalLegacy, err = parseFlexibleJSONInt(raw["total_legacy"]); err != nil {
-		return migrationStats{}, fmt.Errorf("parse migration-stats.total_legacy: %w", err)
-	}
-	if stats.TotalLegacyStaked, err = parseFlexibleJSONInt(raw["total_legacy_staked"]); err != nil {
-		return migrationStats{}, fmt.Errorf("parse migration-stats.total_legacy_staked: %w", err)
-	}
-	if stats.TotalValidatorsMigrated, err = parseFlexibleJSONInt(raw["total_validators_migrated"]); err != nil {
-		return migrationStats{}, fmt.Errorf("parse migration-stats.total_validators_migrated: %w", err)
-	}
-	if stats.TotalValidatorsLegacy, err = parseFlexibleJSONInt(raw["total_validators_legacy"]); err != nil {
-		return migrationStats{}, fmt.Errorf("parse migration-stats.total_validators_legacy: %w", err)
-	}
-
-	return stats, nil
+	return migrationStats{
+		TotalMigrated:           s.TotalMigrated,
+		TotalLegacy:             s.TotalLegacy,
+		TotalLegacyStaked:       s.TotalLegacyStaked,
+		TotalValidatorsMigrated: s.TotalValidatorsMigrated,
+		TotalValidatorsLegacy:   s.TotalValidatorsLegacy,
+	}, nil
 }
 
 // queryLegacyAccountAddresses returns the addresses of all accounts still in
@@ -425,148 +404,20 @@ func queryLegacyAccountAddresses() ([]string, error) {
 	return addrs, nil
 }
 
-// queryMigrationParams queries the evmigration module parameters.
+// queryMigrationParams queries the evmigration module parameters via the shared
+// common helper.
 func queryMigrationParams() (migrationParams, error) {
-	out, err := run("query", "evmigration", "params")
+	p, err := evmigCLI().MigrationParams()
 	if err != nil {
-		return migrationParams{}, fmt.Errorf("query evmigration params: %s\n%w", out, err)
+		return migrationParams{}, err
 	}
-
-	var top map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(out), &top); err != nil {
-		return migrationParams{}, fmt.Errorf("parse evmigration params: %s\n%w", truncate(out, 300), err)
-	}
-
-	paramsRaw := top["params"]
-	if len(paramsRaw) == 0 {
-		paramsRaw = []byte(out)
-	}
-
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(paramsRaw, &raw); err != nil {
-		return migrationParams{}, fmt.Errorf("parse evmigration params payload: %s\n%w", truncate(string(paramsRaw), 300), err)
-	}
-
-	params := migrationParams{}
-	if params.EnableMigration, err = parseFlexibleJSONBool(raw["enable_migration"]); err != nil {
-		return migrationParams{}, fmt.Errorf("parse params.enable_migration: %w", err)
-	}
-	if params.MigrationEndTime, err = parseFlexibleJSONInt64(raw["migration_end_time"]); err != nil {
-		return migrationParams{}, fmt.Errorf("parse params.migration_end_time: %w", err)
-	}
-	if params.MaxMigrationsPerBlock, err = parseFlexibleJSONInt(raw["max_migrations_per_block"]); err != nil {
-		return migrationParams{}, fmt.Errorf("parse params.max_migrations_per_block: %w", err)
-	}
-	if params.MaxValidatorDelegations, err = parseFlexibleJSONInt(raw["max_validator_delegations"]); err != nil {
-		return migrationParams{}, fmt.Errorf("parse params.max_validator_delegations: %w", err)
-	}
-
-	return params, nil
+	return migrationParams{
+		EnableMigration:         p.EnableMigration,
+		MigrationEndTime:        p.MigrationEndTime,
+		MaxMigrationsPerBlock:   p.MaxMigrationsPerBlock,
+		MaxValidatorDelegations: p.MaxValidatorDelegations,
+	}, nil
 }
 
-// --- Flexible JSON parsers ---
-// Cosmos SDK query output is inconsistent across versions: numeric fields may
-// appear as JSON numbers or as quoted strings. These helpers handle both.
-
-// parseFlexibleJSONInt parses an int from JSON that may be a number or a quoted string.
-func parseFlexibleJSONInt(raw json.RawMessage) (int, error) {
-	if len(raw) == 0 {
-		return 0, nil
-	}
-
-	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
-		asString = strings.TrimSpace(asString)
-		if asString == "" {
-			return 0, nil
-		}
-		n, err := strconv.Atoi(asString)
-		if err != nil {
-			return 0, fmt.Errorf("parse %q as int: %w", asString, err)
-		}
-		return n, nil
-	}
-
-	var asInt int
-	if err := json.Unmarshal(raw, &asInt); err == nil {
-		return asInt, nil
-	}
-
-	var asInt64 int64
-	if err := json.Unmarshal(raw, &asInt64); err == nil {
-		return int(asInt64), nil
-	}
-
-	return 0, fmt.Errorf("unsupported numeric format: %s", string(raw))
-}
-
-// parseFlexibleJSONInt64 parses an int64 from JSON that may be a number or a quoted string.
-func parseFlexibleJSONInt64(raw json.RawMessage) (int64, error) {
-	if len(raw) == 0 {
-		return 0, nil
-	}
-
-	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
-		asString = strings.TrimSpace(asString)
-		if asString == "" {
-			return 0, nil
-		}
-		n, err := strconv.ParseInt(asString, 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("parse %q as int64: %w", asString, err)
-		}
-		return n, nil
-	}
-
-	var asInt64 int64
-	if err := json.Unmarshal(raw, &asInt64); err == nil {
-		return asInt64, nil
-	}
-
-	var asInt int
-	if err := json.Unmarshal(raw, &asInt); err == nil {
-		return int64(asInt), nil
-	}
-
-	return 0, fmt.Errorf("unsupported numeric format: %s", string(raw))
-}
-
-// parseFlexibleJSONBool parses a bool from JSON that may be a boolean or a quoted string.
-func parseFlexibleJSONBool(raw json.RawMessage) (bool, error) {
-	if len(raw) == 0 {
-		return false, nil
-	}
-
-	var asBool bool
-	if err := json.Unmarshal(raw, &asBool); err == nil {
-		return asBool, nil
-	}
-
-	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
-		asString = strings.TrimSpace(strings.ToLower(asString))
-		switch asString {
-		case "", "false", "0":
-			return false, nil
-		case "true", "1":
-			return true, nil
-		default:
-			return false, fmt.Errorf("parse %q as bool", asString)
-		}
-	}
-
-	return false, fmt.Errorf("unsupported bool format: %s", string(raw))
-}
-
-// parseFlexibleJSONString parses a string from JSON, falling back to raw content if unquoted.
-func parseFlexibleJSONString(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return ""
-	}
-	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
-		return strings.TrimSpace(asString)
-	}
-	return strings.TrimSpace(string(raw))
-}
+// Flexible JSON scalar parsing now lives in the shared common package
+// (common/migration.go); the query helpers above delegate to it.

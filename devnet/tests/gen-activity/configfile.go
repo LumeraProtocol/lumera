@@ -22,6 +22,7 @@ type ChainSection struct {
 	Home             *string `toml:"home"`
 	KeyringBackend   *string `toml:"keyring-backend"`
 	EVMCutoverVer    *string `toml:"evm-cutover-version"`
+	Mode             *string `toml:"mode"`
 	FundingKey       *string `toml:"funding-key"`
 	AccountsPath     *string `toml:"accounts"`
 	NumAccounts      *int    `toml:"num-accounts"`
@@ -140,6 +141,7 @@ func applyLayer(c *Config, sec ChainSection, setFlags map[string]bool) error {
 	str("home", sec.Home, &c.Home)
 	str("keyring-backend", sec.KeyringBackend, &c.KeyringBackend)
 	str("evm-cutover-version", sec.EVMCutoverVer, &c.EVMCutoverVer)
+	str("mode", sec.Mode, &c.Mode)
 	str("funding-key", sec.FundingKey, &c.FundingKey)
 	str("accounts", sec.AccountsPath, &c.AccountsPath)
 	str("max-account-amount", sec.MaxAccountAmount, &c.MaxAccountAmount)

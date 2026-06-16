@@ -128,6 +128,20 @@ dry-run = true
 	}
 }
 
+func TestApplyFileConfigAppliesMode(t *testing.T) {
+	fc, err := LoadFileConfig(writeTempTOML(t, "[common]\nmode = \"migrate\"\n"))
+	if err != nil {
+		t.Fatalf("LoadFileConfig: %v", err)
+	}
+	c := &Config{}
+	if err := ApplyFileConfig(c, fc, "", map[string]bool{}); err != nil {
+		t.Fatalf("ApplyFileConfig: %v", err)
+	}
+	if c.Mode != ModeMigrate {
+		t.Errorf("Mode = %q, want %q", c.Mode, ModeMigrate)
+	}
+}
+
 func TestApplyFileConfigPrecedence(t *testing.T) {
 	fc, err := LoadFileConfig(writeTempTOML(t, sampleTOML))
 	if err != nil {

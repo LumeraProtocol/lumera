@@ -107,6 +107,7 @@ func configureFlags(fs *flag.FlagSet, c *Config) {
 	fs.IntVar(&c.NumPermanentLocked, "num-permanent-locked-accounts", 0, "number of dedicated PermanentLocked accounts to generate")
 	fs.StringVar(&c.MaxAccountAmount, "max-account-amount", "10000000ulume", "upper bound for per-account funding")
 	fs.StringVar(&c.AccountPrefix, "account-prefix", "gen", "name prefix for generated accounts")
+	fs.StringVar(&c.Mode, "mode", "", "run mode: fresh|add-accounts|activity-existing|migrate (default fresh; -add-accounts/-activity-existing are shorthands)")
 	fs.BoolVar(&c.AddAccounts, "add-accounts", false, "add -num-accounts new users to an existing registry")
 	fs.BoolVar(&c.ActivityExisting, "activity-existing", false, "generate more activity for existing accounts")
 	fs.BoolVar(&c.Actions, "actions", true, "include CASCADE action activity")
@@ -123,6 +124,12 @@ func configureFlags(fs *flag.FlagSet, c *Config) {
 // read-only; -dry-run stops after printing the plan and never mutates the
 // keyring or registry.
 func run(cfg *Config) error {
+	// Migrate mode is a distinct flow: it migrates existing registry accounts to
+	// their EVM-compatible counterparts instead of generating/funding accounts.
+	if cfg.resolvedMode == ModeMigrate {
+		return runMigrateMode(cfg)
+	}
+
 	// Step 2: detect key style from the current lumerad runtime.
 	keyStyle := detectKeyStyle(cfg.Bin, cfg.EVMCutoverVer)
 	log.Printf("key style: %s (algo=%s coin-type=%d)", keyStyle.Name(), keyStyle.Algo, keyStyle.CoinType)

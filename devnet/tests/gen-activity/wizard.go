@@ -92,24 +92,56 @@ func settingValue(c *Config, key string) string {
 	}
 }
 
-// modeLabel renders the current run mode derived from the AddAccounts /
-// ActivityExisting flags.
+// modeLabel renders the current run mode, preferring the explicit Mode field and
+// falling back to the legacy AddAccounts / ActivityExisting flags.
 func modeLabel(c *Config) string {
+	if mode, err := c.resolveMode(); err == nil {
+		return mode
+	}
+	// Contradictory flags: fall back to a best-effort label.
 	switch {
 	case c.AddAccounts:
-		return "add-accounts"
+		return ModeAddAccounts
 	case c.ActivityExisting:
-		return "activity-existing"
+		return ModeActivityExisting
 	default:
-		return "fresh"
+		return ModeFresh
 	}
+}
+
+// migrateVisibleSettings is the subset of editable settings relevant in migrate
+// mode: registry/connection/execution knobs only. Generation and funding
+// settings are hidden because migrate mode neither funds nor creates accounts.
+var migrateVisibleSettings = map[string]bool{
+	settingMode:         true,
+	settingAccountsPath: true,
+	settingParallelism:  true,
+	settingDryRun:       true,
+}
+
+// visibleSettings returns the editable settings shown for the config's resolved
+// mode. Non-migrate modes show the full list; migrate mode shows only the
+// migration-relevant subset.
+func visibleSettings(c *Config) []string {
+	mode, err := c.resolveMode()
+	if err != nil || mode != ModeMigrate {
+		return editableSettings
+	}
+	visible := make([]string, 0, len(migrateVisibleSettings))
+	for _, key := range editableSettings {
+		if migrateVisibleSettings[key] {
+			visible = append(visible, key)
+		}
+	}
+	return visible
 }
 
 // menuItems renders the settings menu: one entry per editable setting (with its
 // current value) followed by the Run and Quit sentinels.
 func menuItems(c *Config) []string {
-	items := make([]string, 0, len(editableSettings)+2)
-	for _, key := range editableSettings {
+	keys := visibleSettings(c)
+	items := make([]string, 0, len(keys)+2)
+	for _, key := range keys {
 		items = append(items, fmt.Sprintf("%-24s %s", key, settingValue(c, key)))
 	}
 	items = append(items, menuRun, menuQuit)
@@ -141,12 +173,15 @@ func editSetting(c *Config, key string, p prompter) error {
 		}
 		c.FundingKey = v
 	case settingMode:
-		v, err := p.SelectOne("Run mode", []string{"fresh", "add-accounts", "activity-existing"}, modeLabel(c))
+		v, err := p.SelectOne("Run mode", []string{ModeFresh, ModeAddAccounts, ModeActivityExisting, ModeMigrate}, modeLabel(c))
 		if err != nil {
 			return err
 		}
-		c.AddAccounts = v == "add-accounts"
-		c.ActivityExisting = v == "activity-existing"
+		// Mode is now first-class; clear the legacy booleans so they can't
+		// contradict it during resolveMode.
+		c.Mode = v
+		c.AddAccounts = false
+		c.ActivityExisting = false
 	case settingAccountsPath:
 		v, err := p.Input(key, "Accounts registry path", c.AccountsPath)
 		if err != nil {

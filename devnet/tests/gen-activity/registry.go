@@ -21,6 +21,27 @@ type MultisigInfo struct {
 	Signers     int      `json:"signers"`
 }
 
+// Migration outcome statuses recorded in MigrationInfo.Status.
+const (
+	MigrationStatusMigrated        = "migrated"
+	MigrationStatusAlreadyMigrated = "already_migrated"
+	MigrationStatusSkipped         = "skipped"
+	MigrationStatusFailed          = "failed"
+)
+
+// MigrationInfo records the result of migrating an account to its EVM-compatible
+// counterpart. It is populated by migrate mode and is absent on records that
+// have never been through migration.
+type MigrationInfo struct {
+	NewName    string `json:"new_name,omitempty"`
+	NewAddress string `json:"new_address,omitempty"`
+	TxHash     string `json:"tx_hash,omitempty"`
+	Height     int64  `json:"height,omitempty"`
+	MigratedAt string `json:"migrated_at,omitempty"`
+	Status     string `json:"status,omitempty"` // migrated, already_migrated, skipped, failed
+	Error      string `json:"error,omitempty"`
+}
+
 // VestingInfo describes a vesting or permanent-locked account. Type is one of
 // the common.VestingType values ("continuous", "delayed", "permanent_locked").
 // EndTime is the unix unlock time (0 for permanent_locked).
@@ -36,12 +57,13 @@ type AccountRecord struct {
 	common.AccountIdentity
 	common.ActivityLog
 
-	HasBalance bool          `json:"has_balance,omitempty"`
-	Funded     bool          `json:"funded,omitempty"`
-	CreatedAt  string        `json:"created_at,omitempty"`
-	UpdatedAt  string        `json:"updated_at,omitempty"`
-	Multisig   *MultisigInfo `json:"multisig,omitempty"`
-	Vesting    *VestingInfo  `json:"vesting,omitempty"`
+	HasBalance bool           `json:"has_balance,omitempty"`
+	Funded     bool           `json:"funded,omitempty"`
+	CreatedAt  string         `json:"created_at,omitempty"`
+	UpdatedAt  string         `json:"updated_at,omitempty"`
+	Multisig   *MultisigInfo  `json:"multisig,omitempty"`
+	Vesting    *VestingInfo   `json:"vesting,omitempty"`
+	Migration  *MigrationInfo `json:"migration,omitempty"`
 }
 
 // ActivityRegistry is the gen-activity-owned top-level registry envelope. It is

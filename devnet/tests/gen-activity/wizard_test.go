@@ -69,24 +69,21 @@ func TestEditSettingRejectsBadInt(t *testing.T) {
 }
 
 func TestEditSettingModeMapping(t *testing.T) {
-	cases := []struct {
-		choice           string
-		addAccounts      bool
-		activityExisting bool
-	}{
-		{"fresh", false, false},
-		{"add-accounts", true, false},
-		{"activity-existing", false, true},
-	}
-	for _, tc := range cases {
+	// Mode is first-class: editing it sets c.Mode and clears the legacy booleans.
+	for _, choice := range []string{ModeFresh, ModeAddAccounts, ModeActivityExisting, ModeMigrate} {
 		c := &Config{}
-		p := &fakePrompter{selectQueue: []string{tc.choice}}
+		p := &fakePrompter{selectQueue: []string{choice}}
 		if err := editSetting(c, settingMode, p); err != nil {
-			t.Fatalf("edit mode %q: %v", tc.choice, err)
+			t.Fatalf("edit mode %q: %v", choice, err)
 		}
-		if c.AddAccounts != tc.addAccounts || c.ActivityExisting != tc.activityExisting {
-			t.Errorf("mode %q -> AddAccounts=%v ActivityExisting=%v, want %v/%v",
-				tc.choice, c.AddAccounts, c.ActivityExisting, tc.addAccounts, tc.activityExisting)
+		if c.Mode != choice {
+			t.Errorf("mode %q -> c.Mode=%q, want %q", choice, c.Mode, choice)
+		}
+		if c.AddAccounts || c.ActivityExisting {
+			t.Errorf("mode %q left legacy bools set: add=%v activity=%v", choice, c.AddAccounts, c.ActivityExisting)
+		}
+		if got, err := c.resolveMode(); err != nil || got != choice {
+			t.Errorf("resolveMode after selecting %q = (%q,%v), want (%q,nil)", choice, got, err, choice)
 		}
 	}
 }

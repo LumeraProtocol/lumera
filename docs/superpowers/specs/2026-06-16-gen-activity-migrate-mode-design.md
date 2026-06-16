@@ -1,8 +1,8 @@
 # gen-activity: migrate mode for generated live-chain accounts
 
 **Date:** 2026-06-16
-**Status:** Approved (design)
-**Tools:** `devnet/tests/gen-activity`, `devnet/tests/evmigration`
+**Status:** Approved (design); revised 2026-06-16 after codebase review
+**Tools:** `devnet/tests/gen-activity`, `devnet/tests/evmigration`, `devnet/tests/common`
 
 ## 1. Goal
 
@@ -12,9 +12,16 @@ cutover.
 
 The design follows option 1 from the discussion: `tests-gen-activity` owns the
 live-chain user experience and its registry, while reusable migration primitives
-are extracted from `devnet/tests/evmigration` into shared Go code. The existing
-`tests_evmigration` binary keeps its devnet scenario modes and reuses the same
-shared migration package.
+live in shared Go code. The existing `tests_evmigration` binary keeps its devnet
+scenario modes and reuses the same shared migration code.
+
+**Revision note (shared-code location):** rather than create a brand-new
+`devnet/tests/migration` package, the shared migration primitives are added to
+the existing `devnet/tests/common` package, which both tools already import
+(`ChainCLI`, `Multisig`, key style, `AccountIdentity`, activity structs, JSON
+helpers). This avoids a new package boundary and a large up-front import churn.
+`tests_evmigration` is then refactored to call these `common` helpers instead of
+its local copies.
 
 ## 2. Background
 
@@ -53,7 +60,19 @@ tests-gen-activity -mode=migrate \
   -dry-run=false
 ```
 
-The existing default wizard should include `migrate` in the run-mode selector.
+`-chain`, `-accounts`, `-parallelism`, and `-dry-run` already exist. The new
+piece is `-mode`. Today the "mode" concept is implicit: two mutually-exclusive
+booleans (`-add-accounts`, `-activity-existing`) with the unset state meaning
+"fresh". This design promotes mode to an explicit `-mode` flag with values
+`fresh | add-accounts | activity-existing | migrate`, backed by a `Mode` config
+field. For backward compatibility the existing booleans continue to set the
+equivalent mode and must not be combined with a conflicting `-mode` value;
+`Validate()` rejects contradictions. `migrate` is mutually exclusive with all
+generation/activity modes.
+
+The existing default wizard already has a run-mode selector
+(`wizard.go` `settingMode`, options `fresh`/`add-accounts`/`activity-existing`);
+add `migrate` to it.
 When `migrate` is selected, hide fields that are not relevant to migration:
 
 - funding key
@@ -78,29 +97,38 @@ The migrate-mode wizard should keep only:
 planned migration set, already-migrated skips, and estimated tx types without
 creating keys, submitting txs, or mutating the registry.
 
-## 5. Shared Migration Package
+## 5. Shared Migration Code (in `devnet/tests/common`)
 
-Create a reusable migration package under `devnet/tests`, for example
-`devnet/tests/migration`. It should depend on `devnet/tests/common` for
-`ChainCLI`, key style, account identity, activity structs, and JSON helpers.
+Add reusable migration primitives to the existing `devnet/tests/common`
+package (new files, e.g. `migration.go`, `migration_keys.go`,
+`migration_multisig.go`, `migration_verify.go`). They build on the package's
+existing `ChainCLI`, `Multisig`, `KeyStyle`, `AccountIdentity`, and JSON
+helpers.
 
-Shared package responsibilities:
+Shared responsibilities:
 
-- query `evmigration params`
-- query `migration-record`
+- query `evmigration params` (`enable_migration`, `migration_end_time`,
+  `max_migrations_per_block`, `max_validator_delegations`, `max_multisig_sub_keys`)
+- query `migration-record` (by legacy address and by new address)
 - query `migration-estimate`
-- derive/import EVM destination keys from legacy mnemonics
-- create destination multisig keys and run the proof flow
-- submit single-sig claim migrations
-- submit multisig proof migrations
+- derive/import EVM destination keys from legacy mnemonics (coin-type 60,
+  `eth_secp256k1`) — deterministic from the same mnemonic
+- create destination multisig keys and run the four-step proof flow
+- submit single-sig claim migrations (`tx evmigration claim-legacy-account`)
+- submit multisig proof migrations (generate-proof-payload → sign-proof ×K →
+  combine-proof → submit-proof)
 - wait for tx inclusion
 - verify migration record and selected post-migration invariants
 - classify outcomes as migrated, already migrated, skipped, or failed
 
-`tests_evmigration` should call this package from its existing modes instead of
-owning all migration helpers locally. Devnet-specific behavior remains in
+`tests_evmigration` is refactored to call these `common` helpers instead of its
+local copies (see §12 step 6). Devnet-specific behavior remains in
 `tests_evmigration`: prepare mode, validator-local discovery, validator
 migration, scenario reports, and devnet-only assertions.
+
+The migration helpers must take their chain seams through interfaces/`ChainCLI`
+so gen-activity can unit-test planning and result application with fakes, the
+same way it already fakes `activityChain`, `fundingChain`, and `multisigExerciser`.
 
 ## 6. gen-activity Registry Changes
 
@@ -118,13 +146,19 @@ type MigrationInfo struct {
 }
 ```
 
-The existing top-level record can either embed these fields directly or place
-them under `migration`. Prefer `migration` to avoid mixing generation metadata
-with migration state:
+The fields go under a nested `migration` object on `AccountRecord` to avoid
+mixing generation metadata with migration state:
 
 ```go
 Migration *MigrationInfo `json:"migration,omitempty"`
 ```
+
+Because the field is optional (`omitempty`) and additive, the registry
+`schemaVersion` stays at **2**; old registries load unchanged. Some live devnet
+registries carry ad-hoc top-level `migrated` / `new_address` keys that were added
+by hand during manual migration testing; these are not part of the struct and
+are ignored on load. Migrate mode supersedes them by writing the structured
+`migration` object, and may optionally backfill from them when present.
 
 A record is eligible when:
 
@@ -146,8 +180,14 @@ Migration mode should target all account types created by `tests-gen-activity`:
 - generated multisig accounts
 
 Single-sig, vesting, and permanent-locked accounts use the same mnemonic-based
-destination-key flow. The post-migration verifier should preserve auth account
-type expectations where the migration module exposes them.
+destination-key flow. The keeper (`x/evmigration/keeper/migrate_auth.go`)
+detects the legacy auth type (continuous/delayed/periodic vesting,
+permanent-locked), captures the original schedule, removes the legacy account,
+transfers the balance, and recreates the vesting account at the new address.
+The destination must be a fresh address or a plain `BaseAccount`
+(`ErrInvalidMigrationDestination` otherwise); the mnemonic-derived coin-type-60
+key is fresh, so this holds. The post-migration verifier should preserve auth
+account type expectations where the migration module exposes them.
 
 Multisig accounts use the existing four-step proof flow: generate payload, sign
 legacy and new sides with enough signers, combine, submit proof. The shared
@@ -175,6 +215,30 @@ per-block migration capacity. A simple initial design:
 
 This keeps parallel migration useful without turning the mempool into a source
 of noisy sequence or per-block-cap failures.
+
+### 8.1 Logging & observability (concurrent troubleshooting)
+
+Concurrency makes interleaved logs hard to read, so every migration log line must
+be self-identifying and correlatable:
+
+- Each work item gets a stable **correlation id** (the account name, plus a
+  monotonic work index) included in every line for that item, e.g.
+  `[migrate gen-0007 #12]`.
+- Log the **lifecycle** of each item at a consistent set of points: queued,
+  preflight/estimate result, destination key derived (with new address),
+  submit (with tx hash), inclusion (with height + wait duration), verify result,
+  and final outcome (migrated / already_migrated / skipped / failed + reason).
+- Worker pool events are logged: worker start/stop, in-flight slot
+  acquisition/release, and throttle waits caused by `max_migrations_per_block`
+  (so a stall is visibly attributed to throttling, not a hang).
+- The coordinator (single writer) logs each registry apply with the item id and
+  resulting status, plus periodic progress (`done N/total, in-flight M`).
+- Each line carries a wall-clock timestamp and is written through one
+  synchronized logger so concurrent lines never interleave mid-line.
+- A run summary at the end tallies counts per outcome and lists failed items with
+  their short error strings, so a run can be triaged without grepping.
+- `dry-run` uses the same correlation ids and lifecycle phrasing (minus the tx
+  lines) so dry-run output maps 1:1 onto a real run.
 
 ## 9. Error Handling
 
@@ -231,11 +295,13 @@ Implementation should land in small steps:
 
 1. Add `mode` to gen-activity config and wizard, with `fresh` as the default
    existing behavior.
-2. Extract read-only migration queries and destination-key derivation.
-3. Add migrate dry-run planning.
-4. Add single-sig migration execution and registry updates.
+2. Add read-only migration queries and destination-key derivation to
+   `devnet/tests/common`.
+3. Add migrate dry-run planning and the `MigrationInfo` registry field.
+4. Add single-sig migration execution (incl. vesting/permanent-locked) and
+   registry updates.
 5. Add multisig migration support.
-6. Refactor `tests_evmigration` to use the shared package.
+6. Refactor `tests_evmigration` to use the shared `common` migration code.
 7. Add deeper post-migration validation shared by both tools.
 
 This sequence gives a usable migrate mode early while keeping the risky

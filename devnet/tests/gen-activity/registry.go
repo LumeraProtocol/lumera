@@ -13,12 +13,25 @@ import (
 // be regenerated.
 const schemaVersion = 2
 
+// MultisigMember is one member sub-key of a generated multisig, including the
+// mnemonic so migrate mode can re-import the key into a fresh keyring. Empty
+// Mnemonic means the key was reused (pre-existing) at generation time and its
+// seed is unknown.
+type MultisigMember struct {
+	Name     string `json:"name"`
+	Address  string `json:"address,omitempty"`
+	Mnemonic string `json:"mnemonic,omitempty"`
+}
+
 // MultisigInfo describes a generated K-of-N multisig account: its member key
-// names, signing threshold (K), and total signer count (N).
+// names, signing threshold (K), and total signer count (N). Members carries the
+// per-member key material (with mnemonics) when available; MemberNames is always
+// populated and kept for backward compatibility with older registries.
 type MultisigInfo struct {
-	MemberNames []string `json:"member_names"`
-	Threshold   int      `json:"threshold"`
-	Signers     int      `json:"signers"`
+	MemberNames []string         `json:"member_names"`
+	Members     []MultisigMember `json:"members,omitempty"`
+	Threshold   int              `json:"threshold"`
+	Signers     int              `json:"signers"`
 }
 
 // Migration outcome statuses recorded in MigrationInfo.Status.

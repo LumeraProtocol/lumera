@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 
 	"gen/tests/common"
@@ -176,8 +177,12 @@ func multisigItem() migrationWorkItem {
 
 func TestMigrateOneMultisigHappyPath(t *testing.T) {
 	chain := &fakeMigrationChain{
-		records:        map[string]common.MigrationRecord{},
-		estimate:       common.MigrationEstimate{WouldSucceed: true, IsMultisig: true},
+		records:  map[string]common.MigrationRecord{},
+		estimate: common.MigrationEstimate{WouldSucceed: true, IsMultisig: true},
+		keys: map[string]bool{ // all member keys already in keyring
+			"gen-msig35-0001-signer-1": true, "gen-msig35-0001-signer-2": true,
+			"gen-msig35-0001-signer-3": true, "gen-msig35-0001-signer-4": true, "gen-msig35-0001-signer-5": true,
+		},
 		multisigResult: common.MultisigProofResult{NewName: "evm-gen-msig35-0001", NewAddress: "lumera1newms", TxHash: "MSTX"},
 	}
 	ex, _ := newTestExecutor(chain)
@@ -211,6 +216,59 @@ func TestMigrateOneMultisigDryRunDoesNotSubmit(t *testing.T) {
 	}
 	if chain.multisigCalls != 0 {
 		t.Errorf("multisigCalls = %d, want 0 in dry-run", chain.multisigCalls)
+	}
+}
+
+func TestMigrateMultisigImportsMissingMembersFromMnemonic(t *testing.T) {
+	item := multisigItem()
+	// Attach member material with mnemonics; keyring starts empty.
+	var members []MultisigMember
+	for _, n := range item.Rec.Multisig.MemberNames {
+		members = append(members, MultisigMember{Name: n, Mnemonic: "seed-" + n})
+	}
+	item.Rec.Multisig.Members = members
+
+	chain := &fakeMigrationChain{
+		records:        map[string]common.MigrationRecord{},
+		estimate:       common.MigrationEstimate{WouldSucceed: true, IsMultisig: true},
+		keys:           map[string]bool{}, // members NOT present -> must be imported
+		multisigResult: common.MultisigProofResult{NewName: "evm-gen-msig35-0001", NewAddress: "lumera1newms", TxHash: "MSTX"},
+	}
+	ex, _ := newTestExecutor(chain)
+
+	res := ex.migrateOne(item, false)
+
+	if res.Status != MigrationStatusMigrated {
+		t.Fatalf("status = %q, want migrated (err=%v)", res.Status, res.Err)
+	}
+	if chain.multisigCalls != 1 {
+		t.Errorf("multisigCalls = %d, want 1", chain.multisigCalls)
+	}
+	// All five members should have been imported from their stored mnemonics.
+	if len(chain.importCalls) != 5 {
+		t.Errorf("importCalls = %v, want 5 member imports", chain.importCalls)
+	}
+}
+
+func TestMigrateMultisigFailsFastWhenMembersMissingNoMnemonic(t *testing.T) {
+	item := multisigItem() // MemberNames only, no Members mnemonics
+	chain := &fakeMigrationChain{
+		records:  map[string]common.MigrationRecord{},
+		estimate: common.MigrationEstimate{WouldSucceed: true, IsMultisig: true},
+		keys:     map[string]bool{}, // members absent and unrecoverable
+	}
+	ex, _ := newTestExecutor(chain)
+
+	res := ex.migrateOne(item, false)
+
+	if res.Status != MigrationStatusFailed {
+		t.Fatalf("status = %q, want failed", res.Status)
+	}
+	if chain.multisigCalls != 0 {
+		t.Errorf("multisigCalls = %d, want 0 (must fail before the ceremony / destination keys)", chain.multisigCalls)
+	}
+	if res.Err == nil || !strings.Contains(res.Err.Error(), "gen-msig35-0001-signer-1") {
+		t.Errorf("error should name the missing member keys, got: %v", res.Err)
 	}
 }
 

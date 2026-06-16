@@ -194,6 +194,25 @@ legacy and new sides with enough signers, combine, submit proof. The shared
 package should reuse the multisig extraction already planned for gen-activity
 and evmigration.
 
+**Member-key portability.** The proof flow signs with the legacy multisig member
+sub-keys, which (unlike a single-sig account's key) cannot be derived on the fly.
+Generation therefore persists each member's mnemonic in
+`MultisigInfo.Members[]` (alongside the existing `member_names`), so migrate mode
+can re-import any missing member key into a fresh keyring before the ceremony —
+giving multisig the same portability single-sig already has. Before creating any
+destination keys, migrate mode pre-flights member-key presence: it imports
+missing keys from their stored mnemonics, and if a key is missing with no
+recoverable mnemonic it fails that account fast with an actionable message
+(rather than the keeper's opaque "key not found"/signature errors) and creates no
+orphan destination keys. Registries generated before this change carry only
+`member_names`; those accounts must be migrated from the keyring that generated
+them.
+
+**Chain-id in the proof.** `generate-proof-payload` MUST be invoked with
+`--chain-id`: the chain id is part of the signed proof payload, and omitting it
+makes the CLI fall back to the bech32 prefix, so every signature fails on-chain
+verification.
+
 ## 8. Parallel Execution
 
 Use a worker pool:

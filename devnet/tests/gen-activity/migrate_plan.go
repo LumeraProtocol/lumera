@@ -20,6 +20,34 @@ type migrationWorkItem struct {
 	CorrelationID string
 }
 
+// memberKeyMaterial is one multisig member's keyring name and (optional) seed
+// mnemonic, used by migrate mode to re-import a missing member key.
+type memberKeyMaterial struct {
+	Name     string
+	Mnemonic string
+}
+
+// multisigMembers returns the per-member key material for a multisig, preferring
+// the richer Members list (carries mnemonics) and falling back to MemberNames
+// (names only) for registries written before member mnemonics were persisted.
+func multisigMembers(ms *MultisigInfo) []memberKeyMaterial {
+	if ms == nil {
+		return nil
+	}
+	if len(ms.Members) > 0 {
+		out := make([]memberKeyMaterial, 0, len(ms.Members))
+		for _, m := range ms.Members {
+			out = append(out, memberKeyMaterial{Name: m.Name, Mnemonic: m.Mnemonic})
+		}
+		return out
+	}
+	out := make([]memberKeyMaterial, 0, len(ms.MemberNames))
+	for _, n := range ms.MemberNames {
+		out = append(out, memberKeyMaterial{Name: n})
+	}
+	return out
+}
+
 // migrationKindOf returns the migration flow a record requires.
 func migrationKindOf(rec *AccountRecord) string {
 	if rec.Multisig != nil && len(rec.Multisig.MemberNames) > 0 {

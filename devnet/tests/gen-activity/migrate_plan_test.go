@@ -43,6 +43,58 @@ func TestMigrationInfoRoundTrip(t *testing.T) {
 	}
 }
 
+func TestMultisigMembersRoundTrip(t *testing.T) {
+	reg := NewRegistry("lumera-devnet-1", "funder", "lumera1funder", "legacy", "t0")
+	rec := &AccountRecord{AccountIdentity: common.AccountIdentity{Name: "gen-msig23-0001", Address: "lumera1ms", KeyStyle: "legacy"}}
+	rec.Multisig = &MultisigInfo{
+		MemberNames: []string{"gen-msig23-0001-signer-1", "gen-msig23-0001-signer-2", "gen-msig23-0001-signer-3"},
+		Members: []MultisigMember{
+			{Name: "gen-msig23-0001-signer-1", Address: "lumera1m1", Mnemonic: "seed one"},
+			{Name: "gen-msig23-0001-signer-2", Address: "lumera1m2", Mnemonic: "seed two"},
+			{Name: "gen-msig23-0001-signer-3", Address: "lumera1m3", Mnemonic: "seed three"},
+		},
+		Threshold: 2, Signers: 3,
+	}
+	reg.UpsertAccount(rec)
+
+	path := filepath.Join(t.TempDir(), "accounts.json")
+	if err := reg.Save(path, "t1"); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	got, err := LoadRegistry(path)
+	if err != nil {
+		t.Fatalf("LoadRegistry: %v", err)
+	}
+	m := got.Accounts[0].Multisig
+	if m == nil || len(m.Members) != 3 {
+		t.Fatalf("members not persisted: %+v", m)
+	}
+	if m.Members[0].Mnemonic != "seed one" || m.Members[2].Name != "gen-msig23-0001-signer-3" {
+		t.Errorf("member material wrong after reload: %+v", m.Members)
+	}
+}
+
+func TestMultisigMembersMaterial(t *testing.T) {
+	t.Run("prefers Members with mnemonics", func(t *testing.T) {
+		ms := &MultisigInfo{
+			MemberNames: []string{"a", "b"},
+			Members:     []MultisigMember{{Name: "a", Mnemonic: "ma"}, {Name: "b", Mnemonic: "mb"}},
+			Threshold:   2, Signers: 2,
+		}
+		got := multisigMembers(ms)
+		if len(got) != 2 || got[0].Name != "a" || got[0].Mnemonic != "ma" {
+			t.Errorf("material = %+v, want names+mnemonics from Members", got)
+		}
+	})
+	t.Run("falls back to MemberNames without mnemonics", func(t *testing.T) {
+		ms := &MultisigInfo{MemberNames: []string{"a", "b", "c"}, Threshold: 2, Signers: 3}
+		got := multisigMembers(ms)
+		if len(got) != 3 || got[1].Name != "b" || got[1].Mnemonic != "" {
+			t.Errorf("material = %+v, want names from MemberNames with empty mnemonics", got)
+		}
+	})
+}
+
 func TestMigrationEligible(t *testing.T) {
 	t.Run("legacy single-sig with mnemonic is eligible", func(t *testing.T) {
 		if !migrationEligible(legacyRec("gen-0001", "lumera1a", "seed words")) {

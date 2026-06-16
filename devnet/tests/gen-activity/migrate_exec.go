@@ -182,6 +182,32 @@ func (e *migrationExecutor) migrateMultisig(item migrationWorkItem) migrationRes
 	ms := rec.Multisig
 	e.log.logf(cid, "multisig proof flow: %d-of-%d members=%v", ms.Threshold, ms.Signers, ms.MemberNames)
 
+	// Ensure every legacy member sub-key is in the keyring before the ceremony.
+	// The proof flow signs with these keys; unlike single-sig, they cannot be
+	// derived on the fly. Import any missing key from its stored mnemonic; if a
+	// key is missing and unrecoverable, fail fast BEFORE creating destination
+	// keys so the run leaves no orphan keys and the operator gets a clear reason.
+	var missing []string
+	for _, m := range multisigMembers(ms) {
+		if e.chain.HasKey(m.Name) {
+			continue
+		}
+		if m.Mnemonic == "" {
+			missing = append(missing, m.Name)
+			continue
+		}
+		if _, err := e.chain.ImportKeyWithStyle(m.Name, m.Mnemonic, common.KeyStyleLegacy); err != nil {
+			return e.fail(item, fmt.Errorf("import multisig member %s from stored mnemonic: %w", m.Name, err))
+		}
+		e.log.logf(cid, "imported missing member key %s from stored mnemonic", m.Name)
+	}
+	if len(missing) > 0 {
+		return e.fail(item, fmt.Errorf(
+			"multisig member keys not in keyring and no stored mnemonic to import them: %v; "+
+				"run from the keyring that generated them (--home/--keyring-backend) or regenerate the "+
+				"registry so member mnemonics are recorded", missing))
+	}
+
 	res, err := e.chain.MigrateMultisigProof(rec.Name, rec.Address, ms.MemberNames, ms.Threshold, ms.Signers)
 	if err != nil {
 		return e.fail(item, fmt.Errorf("multisig proof migration: %w", err))

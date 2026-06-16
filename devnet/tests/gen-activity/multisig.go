@@ -51,7 +51,8 @@ func generateMultisigAccounts(cli *common.ChainCLI, reg *ActivityRegistry, accou
 		composite := names[0]
 		members := memberNames(composite, spec.Signers)
 
-		if err := ensureMembers(cli, members, keyStyle); err != nil {
+		memberKeys, err := ensureMembers(cli, members, keyStyle)
+		if err != nil {
 			log.Printf("  WARN: multisig %s members: %v", composite, err)
 			continue
 		}
@@ -62,7 +63,7 @@ func generateMultisigAccounts(cli *common.ChainCLI, reg *ActivityRegistry, accou
 		}
 		rec := &AccountRecord{
 			AccountIdentity: common.AccountIdentity{Name: composite, Address: addr, KeyStyle: keyStyle.Name()},
-			Multisig:        &MultisigInfo{MemberNames: members, Threshold: spec.Threshold, Signers: spec.Signers},
+			Multisig:        &MultisigInfo{MemberNames: members, Members: memberKeys, Threshold: spec.Threshold, Signers: spec.Signers},
 			CreatedAt:       now,
 			UpdatedAt:       now,
 		}
@@ -73,17 +74,28 @@ func generateMultisigAccounts(cli *common.ChainCLI, reg *ActivityRegistry, accou
 	return recs
 }
 
-// ensureMembers creates any missing member keys with the detected key style.
-func ensureMembers(cli *common.ChainCLI, names []string, keyStyle common.KeyStyle) error {
+// ensureMembers creates any missing member keys with the detected key style and
+// returns the member key material. Newly created keys carry their mnemonic (so
+// migrate mode can re-import them into a fresh keyring); reused keys carry only
+// their name+address because the seed is no longer available.
+func ensureMembers(cli *common.ChainCLI, names []string, keyStyle common.KeyStyle) ([]MultisigMember, error) {
+	members := make([]MultisigMember, 0, len(names))
 	for _, name := range names {
 		if cli.HasKey(name) {
+			addr, err := cli.ShowAddress(name)
+			if err != nil {
+				return nil, fmt.Errorf("resolve existing member key %s: %w", name, err)
+			}
+			members = append(members, MultisigMember{Name: name, Address: addr})
 			continue
 		}
-		if _, err := cli.AddKeyWithStyle(name, keyStyle); err != nil {
-			return fmt.Errorf("add member key %s: %w", name, err)
+		gk, err := cli.AddKeyWithStyle(name, keyStyle)
+		if err != nil {
+			return nil, fmt.Errorf("add member key %s: %w", name, err)
 		}
+		members = append(members, MultisigMember{Name: name, Address: gk.Address, Mnemonic: gk.Mnemonic})
 	}
-	return nil
+	return members, nil
 }
 
 // multisigExerciser performs one multisign tx for a multisig account. It is an

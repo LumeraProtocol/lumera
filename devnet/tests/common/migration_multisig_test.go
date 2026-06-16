@@ -7,7 +7,7 @@ import (
 
 func TestProofFlowArgBuilders(t *testing.T) {
 	t.Run("generate-proof-payload", func(t *testing.T) {
-		args := generateProofPayloadArgs("lumera1legacy", "claim", "/tmp/proof.json", "evm-ms-signer-1,evm-ms-signer-2", 2, "test", "/root/.lumera")
+		args := generateProofPayloadArgs("lumera1legacy", "claim", "/tmp/proof.json", "evm-ms-signer-1,evm-ms-signer-2", 2, "lumera-devnet-1", "test", "/root/.lumera")
 		joined := strings.Join(args, " ")
 		for _, want := range []string{
 			"tx evmigration generate-proof-payload",
@@ -16,6 +16,10 @@ func TestProofFlowArgBuilders(t *testing.T) {
 			"--out /tmp/proof.json",
 			"--new-sub-pub-keys evm-ms-signer-1,evm-ms-signer-2",
 			"--new-threshold 2",
+			// --chain-id is REQUIRED: without it the payload is built with the
+			// wrong chain id (the bech32 prefix "lumera"), so every proof
+			// signature fails on-chain verification.
+			"--chain-id lumera-devnet-1",
 			"--keyring-backend test",
 			"--home /root/.lumera",
 		} {

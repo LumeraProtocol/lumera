@@ -30,7 +30,12 @@ func evmMultisigCompositeName(legacyBase string) string {
 // generateProofPayloadArgs builds `tx evmigration generate-proof-payload`. The
 // new-side signer pubkeys are supplied as a CSV of keyring key names (resolved
 // from the local keyring) and --new-threshold sets the destination K.
-func generateProofPayloadArgs(legacyAddr, kind, outPath, newSubPubKeysCSV string, newThreshold int, keyringBackend, home string) []string {
+//
+// --chain-id is REQUIRED: it is baked into the proof payload that every signer
+// signs. Omitting it makes generate-proof-payload fall back to the bech32 prefix
+// ("lumera"), so the keeper — verifying against the real chain id — rejects all
+// signatures with "migration signature verification failed".
+func generateProofPayloadArgs(legacyAddr, kind, outPath, newSubPubKeysCSV string, newThreshold int, chainID, keyringBackend, home string) []string {
 	args := []string{
 		"tx", "evmigration", "generate-proof-payload",
 		"--legacy", legacyAddr,
@@ -38,6 +43,7 @@ func generateProofPayloadArgs(legacyAddr, kind, outPath, newSubPubKeysCSV string
 		"--out", outPath,
 		"--new-sub-pub-keys", newSubPubKeysCSV,
 		"--new-threshold", strconv.Itoa(newThreshold),
+		"--chain-id", chainID,
 		"--keyring-backend", keyringBackend,
 		"--output", "json",
 	}
@@ -122,7 +128,7 @@ func (m *Multisig) MigrateMultisigProof(legacyBase, legacyAddr string, members [
 	// 2. generate-proof-payload.
 	proofPath := filepath.Join(workDir, "proof.json")
 	newSubCSV := strings.Join(newMembers, ",")
-	if out, err := m.exec(m.CLI.Bin, append(generateProofPayloadArgs(legacyAddr, "claim", proofPath, newSubCSV, threshold, m.keyring(), m.CLI.Home), m.nodeArgs()...)...); err != nil {
+	if out, err := m.exec(m.CLI.Bin, append(generateProofPayloadArgs(legacyAddr, "claim", proofPath, newSubCSV, threshold, m.CLI.ChainID, m.keyring(), m.CLI.Home), m.nodeArgs()...)...); err != nil {
 		return MultisigProofResult{}, fmt.Errorf("generate-proof-payload: %s: %w", truncate(out, 200), err)
 	}
 

@@ -119,6 +119,24 @@ func createVestingOnChain(cli *common.ChainCLI, funderKey string, rec *AccountRe
 	}
 }
 
+// permanentLockedRecord builds a permanent-locked AccountRecord from a generated
+// key, preserving the mnemonic and pubkey so migrate mode can later derive the
+// EVM destination / re-import the key (regular accounts keep these too).
+func permanentLockedRecord(gk common.GeneratedKey, keyStyle common.KeyStyle, lockedAmount, now string) *AccountRecord {
+	return &AccountRecord{
+		AccountIdentity: common.AccountIdentity{
+			Name:      gk.Name,
+			Address:   gk.Address,
+			Mnemonic:  gk.Mnemonic,
+			PubKeyB64: gk.PubKey,
+			KeyStyle:  keyStyle.Name(),
+		},
+		Vesting:   newPermanentLockedInfo(lockedAmount),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+}
+
 // generatePermanentLockedAccounts creates `count` fresh keys named
 // "<prefix>-plock-NNNN", tags each with a permanent-locked VestingInfo, upserts
 // them into the registry, and returns the new records. Keys are created with the
@@ -131,26 +149,22 @@ func generatePermanentLockedAccounts(cli *common.ChainCLI, reg *ActivityRegistry
 	names := reg.AllocateNames(accountPrefix+"-plock", count)
 	var recs []*AccountRecord
 	for _, name := range names {
-		var addr string
+		var gk common.GeneratedKey
 		if cli.HasKey(name) {
-			a, err := cli.ShowAddress(name)
+			// Reused key: address only; its mnemonic is no longer available.
+			addr, err := cli.ShowAddress(name)
 			if err != nil {
 				continue
 			}
-			addr = a
+			gk = common.GeneratedKey{Name: name, Address: addr}
 		} else {
-			gk, err := cli.AddKeyWithStyle(name, keyStyle)
+			created, err := cli.AddKeyWithStyle(name, keyStyle)
 			if err != nil {
 				continue
 			}
-			addr = gk.Address
+			gk = created
 		}
-		rec := &AccountRecord{
-			AccountIdentity: common.AccountIdentity{Name: name, Address: addr, KeyStyle: keyStyle.Name()},
-			Vesting:         newPermanentLockedInfo(lockedAmount),
-			CreatedAt:       now,
-			UpdatedAt:       now,
-		}
+		rec := permanentLockedRecord(gk, keyStyle, lockedAmount, now)
 		reg.UpsertAccount(rec)
 		recs = append(recs, rec)
 	}

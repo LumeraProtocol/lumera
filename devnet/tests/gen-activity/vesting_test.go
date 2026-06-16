@@ -17,6 +17,26 @@ func vestingRecs(n int) []*AccountRecord {
 	return recs
 }
 
+func TestPermanentLockedRecordPreservesKeyMaterial(t *testing.T) {
+	gk := common.GeneratedKey{Name: "gen-plock-0001", Address: "lumera1plock", Mnemonic: "twelve word seed phrase", PubKey: "base64pubkey"}
+	rec := permanentLockedRecord(gk, common.KeyStyleLegacy, "1000ulume", "2026-06-16T00:00:00Z")
+
+	// Migration relies on the mnemonic being recorded (so the key can be
+	// re-imported / its EVM destination derived). Regression: it was dropped.
+	if rec.Mnemonic != "twelve word seed phrase" {
+		t.Errorf("Mnemonic = %q, want it preserved from the generated key", rec.Mnemonic)
+	}
+	if rec.PubKeyB64 != "base64pubkey" {
+		t.Errorf("PubKeyB64 = %q, want it preserved", rec.PubKeyB64)
+	}
+	if rec.Address != "lumera1plock" || rec.KeyStyle != "legacy" {
+		t.Errorf("identity not set correctly: %+v", rec.AccountIdentity)
+	}
+	if rec.Vesting == nil || rec.Vesting.Type != string(common.VestingPermanentLocked) || rec.Vesting.LockedAmount != "1000ulume" {
+		t.Errorf("vesting info wrong: %+v", rec.Vesting)
+	}
+}
+
 func TestPlanVestingSelectsPercentage(t *testing.T) {
 	recs := vestingRecs(10)
 	rng := rand.New(rand.NewSource(1))

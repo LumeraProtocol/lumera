@@ -137,12 +137,16 @@ func runMigration(reg *ActivityRegistry, exec *migrationExecutor, lg *migrationL
 	// Single coordinator: apply each result to the registry and persist.
 	all := make([]migrationResult, 0, total)
 	done := 0
+	var saveErr error
 	for res := range results {
 		all = append(all, res)
 		done++
 		if applyMigrationResult(res.Item.Rec, res, now()) {
 			if err := save(reg); err != nil {
 				lg.logf("coordinator", "WARN: registry save failed after %s: %v", res.Item.CorrelationID, err)
+				if saveErr == nil {
+					saveErr = err
+				}
 			}
 		}
 		lg.logf("coordinator", "progress %d/%d applied: %s status=%s", done, total, res.Item.CorrelationID, resultStatusLabel(res))
@@ -153,6 +157,9 @@ func runMigration(reg *ActivityRegistry, exec *migrationExecutor, lg *migrationL
 		sum.Migrated, sum.AlreadyMigrated, sum.Skipped, sum.Failed, sum.Planned)
 	for _, f := range sum.Failures {
 		lg.logf("coordinator", "FAILED ITEM: %s", f)
+	}
+	if saveErr != nil {
+		return sum, fmt.Errorf("save migration registry: %w", saveErr)
 	}
 	return sum, nil
 }

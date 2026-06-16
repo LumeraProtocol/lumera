@@ -114,6 +114,20 @@ func TestParseMigrationRecord(t *testing.T) {
 		}
 	})
 
+	t.Run("present record with migration height", func(t *testing.T) {
+		out := `{"record": {"legacy_address": "lumera1legacy", "new_address": "lumera1new", "migration_height": "65194"}}`
+		rec, found, err := parseMigrationRecord(out)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !found {
+			t.Fatal("found = false, want true")
+		}
+		if rec.Height != 65194 {
+			t.Errorf("Height = %d, want 65194", rec.Height)
+		}
+	})
+
 	t.Run("absent record", func(t *testing.T) {
 		out := `{}`
 		_, found, err := parseMigrationRecord(out)

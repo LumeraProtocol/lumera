@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 
@@ -97,6 +98,36 @@ func TestRunMigrationProcessesAllAndAppliesToRegistry(t *testing.T) {
 	}
 	if saves == 0 {
 		t.Error("expected registry to be saved at least once")
+	}
+}
+
+func TestRunMigrationReturnsSaveError(t *testing.T) {
+	reg := NewRegistry("lumera-devnet-1", "funder", "lumera1funder", "legacy", "t0")
+	reg.UpsertAccount(legacyRec("gen-0001", "lumera1legacy1", "seed1"))
+
+	chain := &fakeMigrationChain{
+		records:    map[string]common.MigrationRecord{},
+		estimate:   common.MigrationEstimate{WouldSucceed: true},
+		keys:       map[string]bool{"gen-0001": true},
+		claimHash:  "TX",
+		importAddr: map[string]string{},
+	}
+	var buf bytes.Buffer
+	lg := newMigrationLogger(&buf)
+	lg.now = fixedClock()
+	exec := &migrationExecutor{chain: chain, log: lg}
+
+	sum, err := runMigration(reg, exec, lg, migrationRunOpts{Parallelism: 1, MaxPerBlock: 50, Now: func() string { return "t1" }}, func(*ActivityRegistry) error {
+		return errBoom()
+	})
+	if err == nil {
+		t.Fatal("expected registry save error")
+	}
+	if sum.Migrated != 1 {
+		t.Errorf("Migrated = %d, want 1 (summary: %+v)", sum.Migrated, sum)
+	}
+	if got := buf.String(); !strings.Contains(got, "WARN: registry save failed") {
+		t.Errorf("log output missing save warning:\n%s", got)
 	}
 }
 

@@ -12,8 +12,16 @@ import (
 // migrationPreflight rejects a migration run when the chain's migration window
 // is not open. Fatal preflight conditions stop the run before any worker starts.
 func migrationPreflight(params common.MigrationParams) error {
+	return migrationPreflightAt(params, time.Now().Unix())
+}
+
+func migrationPreflightAt(params common.MigrationParams, nowUnix int64) error {
 	if !params.EnableMigration {
 		return fmt.Errorf("migration is disabled on this chain (params.enable_migration=false); the migration window is closed")
+	}
+	if params.MigrationEndTime > 0 && nowUnix > params.MigrationEndTime {
+		return fmt.Errorf("migration window closed at %s (migration_end_time=%d)",
+			time.Unix(params.MigrationEndTime, 0).UTC().Format(time.RFC3339), params.MigrationEndTime)
 	}
 	return nil
 }

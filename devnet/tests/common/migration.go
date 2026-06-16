@@ -219,9 +219,10 @@ func parseMigrationRecord(out string) (MigrationRecord, bool, error) {
 	}
 	var top struct {
 		Record *struct {
-			LegacyAddress string          `json:"legacy_address"`
-			NewAddress    string          `json:"new_address"`
-			Height        json.RawMessage `json:"height"`
+			LegacyAddress   string          `json:"legacy_address"`
+			NewAddress      string          `json:"new_address"`
+			Height          json.RawMessage `json:"height"`
+			MigrationHeight json.RawMessage `json:"migration_height"`
 		} `json:"record"`
 	}
 	if err := json.Unmarshal([]byte(payload), &top); err != nil {
@@ -230,7 +231,11 @@ func parseMigrationRecord(out string) (MigrationRecord, bool, error) {
 	if top.Record == nil || (top.Record.LegacyAddress == "" && top.Record.NewAddress == "") {
 		return MigrationRecord{}, false, nil
 	}
-	height, err := flexInt64(top.Record.Height)
+	heightRaw := top.Record.MigrationHeight
+	if len(heightRaw) == 0 {
+		heightRaw = top.Record.Height
+	}
+	height, err := flexInt64(heightRaw)
 	if err != nil {
 		return MigrationRecord{}, false, fmt.Errorf("migration-record.height: %w", err)
 	}

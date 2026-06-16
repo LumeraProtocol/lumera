@@ -3,5 +3,8 @@ bin/
 bin-*/
 logs/
 
-# Stray binary from `go build ./tests/gen-activity` without -o
+# Stray binaries from `go build ./tests/<tool>` without -o, run from devnet/:
+# Go names the binary after the package dir and drops it in the cwd. Use the
+# Makefile.devnet targets (which pass -o into bin/) instead.
 /gen-activity
+/evmigration

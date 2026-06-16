@@ -1,6 +1,6 @@
 # EVM Legacy Account Migration - User Guide
 
-**Last updated**: 2026-05-08
+**Last updated**: 2026-06-15
 **Applies to**: Lumera chain with `x/evmigration` module enabled (post-EVM upgrade)
 
 ---
@@ -617,13 +617,49 @@ The payload is identical across all co-signers; what differs is whose sub-key si
 
 ### Precondition: ensure the multisig pubkey is on-chain
 
-If the multisig account has never signed a transaction, its pubkey is nil on-chain and `generate-proof-payload` will fail. Submit any transaction from the multisig account first (for example a 1-ulume self-send). Then confirm the key is stored:
+`generate-proof-payload` reads the legacy multisig's `LegacyAminoPubKey` (its threshold and sub-key list) from chain state. If that pubkey is not on-chain, the command fails — the keeper cannot know the account is a multisig, let alone verify a K-of-N proof against it.
+
+**Why a multisig pubkey can be missing.** A Cosmos account only records its public key when the account *signs* an accepted transaction. An account funded at genesis, or one that has only ever *received* funds, exists on-chain with no pubkey stored. The bech32 address alone never reveals whether it was derived from a single key or a multisig — that becomes knowable only after the account signs once. This bites genesis-funded multisigs in particular: they hold a balance and look ready to migrate, but the chain has nothing to verify against.
+
+**How to recognize the unseeded state.** Query the account:
 
 ```bash
 lumerad query auth account <multisig-legacy-address>
 ```
 
-The response must show a `multisig` pubkey structure listing all sub-keys.
+- `pub_key` is a `/cosmos.crypto.multisig.LegacyAminoPubKey` with a `public_keys` list → seeded; proceed with migration.
+- `pub_key: null` **and** `sequence: "0"` → the account has never signed; the multisig pubkey is not seeded. Seed it (below) before migrating.
+- `pub_key: null` with `sequence` greater than `0` → inconsistent state (signed but no stored key). Stop and investigate before doing anything else.
+
+**Seeding is itself a K-of-N multisig transaction.** "Submit any transaction first" is the right idea, but for, say, a 2-of-3 multisig the seeding tx must itself be signed by at least K members and assembled as a multisig tx — a single member cannot seed it alone. A 1-ulume self-send (multisig → the same multisig address) is the cheapest option: the send amount returns to the account and only the fee is spent.
+
+```bash
+# 1. Build the unsigned self-send (use the multisig's keyring key name).
+lumerad tx bank send <multisig-key> <multisig-legacy-address> 1ulume \
+  --generate-only --chain-id <chain-id> > seed.json
+
+# 2. K members each sign independently (--multisig takes the multisig address).
+lumerad tx sign seed.json --from <member-1> --multisig <multisig-legacy-address> \
+  --chain-id <chain-id> --output-document sig1.json
+lumerad tx sign seed.json --from <member-2> --multisig <multisig-legacy-address> \
+  --chain-id <chain-id> --output-document sig2.json
+
+# 3. Combine the K signatures under the multisig key.
+lumerad tx multisign seed.json <multisig-key> sig1.json sig2.json \
+  --chain-id <chain-id> > seed-signed.json
+
+# 4. Broadcast. Once included, the chain stores the multisig pubkey.
+lumerad tx broadcast seed-signed.json --node <rpc-url>
+```
+
+Re-run the `auth account` query and confirm `pub_key` is now a `LegacyAminoPubKey` listing all sub-keys.
+
+**Paying gas after the EVM upgrade.** Unlike the fee-waived migration tx, the seeding self-send is an ordinary fee-paying transaction, so the multisig needs spendable `ulume` for gas (the send amount nets out; the fee does not). If the multisig has no spendable balance — common right after the EVM upgrade, when an operator hasn't funded the legacy account — you have two options:
+
+- **Fund it first** — send a small amount of `ulume` to the multisig from any funded account, then run the self-send.
+- **Use a feegrant** — have a funded account grant fees to the multisig (`lumerad tx feegrant grant <funder> <multisig-legacy-address>`), then add `--fee-granter <funder>` to the broadcast so the grantor pays.
+
+Either way the *signatures* must still come from K multisig members; only the gas source changes.
 
 ### Step 1: Coordinator generates the proof payload template
 
@@ -641,6 +677,7 @@ lumerad tx evmigration generate-proof-payload \
 ```
 
 - `--new-sub-pub-keys` entries are either local keyring key names (eth_secp256k1) or base64-encoded 33-byte compressed eth pubkeys. Mix freely.`--new-threshold` is required with`--new-sub-pub-keys`.
+- **Member order is significant.** `generate-proof-payload` preserves the order you list`--new-sub-pub-keys` (it does not sort), and the signer index is the position in that list. Because the mirror-source rule requires`legacy_proof.signer_indices == new_proof.signer_indices`, list the eth sub-keys in the **same member order as the legacy multisig's`public_keys`** (`lumerad query auth account <multisig-bech32>`), so each co-signer holds the same signer index on both sides. If you also pre-create the destination composite with`lumerad keys add --multisig`, pass`--nosort` so its derived address matches this order-preserving derivation.
 - `--new <bech32>` is optional; the CLI derives the new multisig address from the sub-keys/threshold and cross-checks`--new` if supplied.
 - `--kind claim` targets`MsgClaimLegacyAccount`;`--kind validator` targets`MsgMigrateValidator`.
 - `--chain-id` is**required**: the payload string`lumera-evm-migration:<chain-id>:<evm-chain-id>:<kind>:<legacy>:<new>` embeds the chain ID. An empty or wrong`--chain-id` makes every sub-signature fail verification with`sub-sig 0 invalid`.
@@ -664,6 +701,7 @@ lumerad tx evmigration sign-proof proof.json \
 
 - `--from` signs the legacy half;`--new-key` signs the new half. At least one is required. A co-signer who holds only one sub-key may pass just that flag, but**one-sided partials do not count toward quorum by themselves** — the consensus mirror-source rule requires the same K signer positions to approve both halves, so combine-proof only counts an index that has a valid signature on*both* sides. One-sided partials contribute only when another co-signer supplies the other-side signature at the same index.
 - `sign-proof` is idempotent: re-running with the same key replaces that signer's entry on the corresponding side.
+- When a co-signer passes**both**`--from` and`--new-key`, the two keys must resolve to the**same signer index** in their respective multisigs;`sign-proof` aborts before writing a partial with`legacy key "..." is signer index N, but new key "..." is signer index M; multisig migration requires the same signer position to approve both halves`. A mismatch means the destination multisig's member order doesn't mirror the legacy side — rebuild it per the order note in Step 1.
 - `sign-proof` rejects a file whose`payload_hex` doesn't match a canonical reconstruction from the other fields — catches accidental tampering between steps.
 
 Each co-signer sends their `*-partial.json` back to the coordinator.

@@ -1,6 +1,6 @@
 # Validator Operator EVM Migration Guide
 
-**Last updated**: 2026-04-21
+**Last updated**: 2026-06-15
 **Applies to**: validator operators running a Lumera validator against an EVM-enabled chain (post-EVM upgrade)
 **Prerequisite reading**: [migration.md](migration.md) for the chain-level mechanics of legacy → EVM account migration
 
@@ -84,6 +84,8 @@ lumerad keys add val-legacy --recover --coin-type 118 --algo secp256k1 --keyring
 # New EVM key (coin-type 60 / eth_secp256k1) — same mnemonic, different HD path
 lumerad keys add val-new --recover --coin-type 60 --algo eth_secp256k1 --keyring-backend file
 ```
+
+> **Legacy key already in the keyring?** If the operator's legacy (coin-type 118) key is already present — which is the common case, since it's the key you've been running the validator with — `keys add val-legacy --recover` fails with **`duplicated address created`**. That's expected: the recovered key derives the *same* bech32 address as the one already stored, and a keyring can't hold the same address under two names. **Skip this `keys add` step and pass the existing key's name as the legacy argument** to the migration command (Step 4) or to `migrate-validator.sh`. You only need to recover the new EVM key (`val-new`).
 
 Both are recovered from the same BIP-39 mnemonic. The resulting bech32 addresses differ because the HD paths and address derivation differ — this is expected and is precisely what the migration fixes on-chain.
 
@@ -457,11 +459,14 @@ This section only applies if your validator's **operator key** is a K-of-N multi
    lumerad keys add val-msig-new \
      --multisig val-eth-1,val-eth-2,val-eth-3 \
      --multisig-threshold 2 \
+     --nosort \
      --keyring-backend file
 
    lumerad keys show val-msig-new --address
    # lumera1...  <-- this is the new operator address
    ```
+
+   > **`--nosort` is required, and member order matters.** Without `--nosort`, `keys add` sorts the sub-keys by address, so the composite address here would not match the one `generate-proof-payload` derives from `--new-sub-pub-keys` (which preserves listed order) — and the signer indices would not line up with the legacy side. List the members in the **same order as the legacy multisig's `public_keys`** (see `lumerad query auth account <multisig-legacy-address>`), so each participant occupies the same signer index on both sides. The consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`.
 
 3. **Coordinator generates the proof payload** with `--kind validator`:
 

@@ -203,6 +203,8 @@ Import the legacy key:
 lumerad keys add <legacy-key> --recover --coin-type 118 --algo secp256k1 --keyring-backend test
 ```
 
+> **Already have the legacy key?** If this key is already in the keyring (e.g. the operator key you've been running the node with), this command fails with **`duplicated address created`** — the recovered key resolves to an address the keyring already holds. Skip the import and pass the *existing* key name as `<legacy-key>` to the script. Only the new EVM key needs to be recovered fresh.
+
 Import the new EVM-compatible key:
 
 ```bash
@@ -544,7 +546,7 @@ The coordinator does not need signing keys. Co-signers sign locally.
   --new-key <new-evm-multisig-key>
 ```
 
-If you already created the destination EVM multisig key locally, use `--new-key`. The script reads the keyring entry, extracts its `eth_secp256k1` signer pubkeys, derives the destination address, and infers `--new-sub-pub-keys` for you.
+If you already created the destination EVM multisig key locally, use `--new-key`. The script expects that keyring entry to already exist; it does not create the destination multisig for you. It reads the existing keyring entry, extracts its `eth_secp256k1` signer pubkeys, derives the destination address, and infers `--new-sub-pub-keys` for you.
 
 If you do not have a local destination multisig key, pass the signer pubkeys explicitly:
 
@@ -603,7 +605,7 @@ Signer with only the new sub-key:
   --out partial-new-alice.json
 ```
 
-At least one of `--from` or `--new-key` is required. A signer who has both should pass both.
+At least one of `--from` or `--new-key` is required. A signer who has both should pass both. For multisig-to-multisig migrations, the script rejects a both-sides signature when the legacy key and new EVM key resolve to different signer indices; recreate or rederive the destination multisig so each participant's new key occupies the same signer position as their legacy key.
 
 One-sided partials are allowed, but they do not satisfy quorum by themselves. The final combined proof must have the same K signer indices on both legacy and new sides.
 
@@ -895,11 +897,26 @@ Pass the explicit flag after stopping the node:
 
 ### Multisig `pubkey is not seeded on-chain`
 
-The legacy multisig has never published its `LegacyAminoPubKey` on-chain. Submit any multisig-signed transaction first, then retry `generate`.
+The legacy multisig has never published its `LegacyAminoPubKey` on-chain, so the chain has no key for `generate` to read. This is common for genesis-funded multisigs that have only ever *received* funds. Confirm it with `lumerad query auth account <multisig-address>`: an unseeded account shows `pub_key: null` and `sequence: "0"`.
+
+Submit any multisig-signed transaction first, then retry `generate`. The simplest is a 1-ulume self-send — but note it is **itself a K-of-N multisig tx**: for a 2-of-3 it needs at least two member signatures (`tx sign --multisig` ×K → `tx multisign` → `tx broadcast`), not a single signature. Unlike the fee-waived migration, this tx pays gas, so the multisig needs spendable `ulume`; if it has none, fund it first or broadcast with `--fee-granter <funded-account>`. See [migration.md → Precondition: ensure the multisig pubkey is on-chain](migration.md#precondition-ensure-the-multisig-pubkey-is-on-chain) for the full command sequence.
 
 ### Multisig `payload_hex mismatch`
 
 The proof file was edited or came from incompatible inputs. Regenerate `proof.json` and redistribute it to co-signers.
+
+### Multisig `... is signer index N, but new key ... is signer index M`
+
+`sign` aborts before writing a partial file with:
+
+```text
+legacy key "alice-legacy" is signer index 0, but new key "alice-evm" is signer index 3;
+multisig migration requires the same signer position to approve both halves
+```
+
+**Why:** you passed both `--from` and `--new-key` in one `sign` call, but the two keys sit at *different positions* in their respective multisigs. The consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`, so a co-signer must occupy the **same signer index** on the legacy and new sides. This almost always means the destination multisig was built with a different member order than the legacy one — typically because `keys add --multisig` sorted the sub-keys (its default) instead of preserving caller order.
+
+**Fix:** recreate the destination multisig with `--nosort`, listing the eth sub-keys in the **same member order** as the legacy multisig's `public_keys` (`lumerad query auth account <multisig-legacy-address>`), then regenerate `proof.json` with `--new-sub-pub-keys` in that same order. The early abort is intentional — without it the mismatch would surface much later, at `combine`, as `need K valid partial signatures signed on BOTH sides at matching indices`.
 
 ### Post-verification failed
 

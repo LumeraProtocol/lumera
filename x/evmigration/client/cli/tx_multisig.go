@@ -973,6 +973,16 @@ func findSubKeyIndex(clientCtx client.Context, keyName string, spec *SideSpec, e
 	return 0, fmt.Errorf("key %q pubkey is not a member of partial.SubPubKeys", keyName)
 }
 
+func validateMatchingMultisigSignerIndices(fromKey, newKey string, legacySingle, newSingle bool, legacyIdx, newIdx uint32) error {
+	if legacySingle || newSingle || legacyIdx == newIdx {
+		return nil
+	}
+	return fmt.Errorf(
+		"legacy key %q is signer index %d, but new key %q is signer index %d; multisig migration requires the same signer position to approve both halves",
+		fromKey, legacyIdx, newKey, newIdx,
+	)
+}
+
 // deriveSubKeyAddr returns the bech32 address of keyName from the keyring.
 func deriveSubKeyAddr(clientCtx client.Context, keyName string) (string, error) {
 	rec, err := clientCtx.Keyring.Key(keyName)
@@ -1010,7 +1020,10 @@ keyring. Supply --from <legacy-sub-key> to sign the legacy half, and/or
 --new-key <new-eth-sub-key> to sign the new half. At least one must be set.
 
 Signatures are idempotent: re-running with the same key replaces that
-index's entry in place rather than duplicating it.`,
+index's entry in place rather than duplicating it. When signing both halves of
+a multisig migration in one call, the legacy key and new key must resolve to
+the same signer index in their respective multisigs; otherwise sign-proof
+aborts before writing a partial file.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
@@ -1038,11 +1051,26 @@ index's entry in place rather than duplicating it.`,
 				return fmt.Errorf("invalid payload_hex in partial file: %w", err)
 			}
 
+			var legacyIdx, newIdx uint32
 			if fromKey != "" {
-				idx, err := findSubKeyIndex(clientCtx, fromKey, pp.Legacy, sigverify.SubKeyTypeCosmosSecp256k1)
+				legacyIdx, err = findSubKeyIndex(clientCtx, fromKey, pp.Legacy, sigverify.SubKeyTypeCosmosSecp256k1)
 				if err != nil {
 					return fmt.Errorf("--from: %w", err)
 				}
+			}
+			if newKey != "" {
+				newIdx, err = findSubKeyIndex(clientCtx, newKey, pp.New, sigverify.SubKeyTypeEthSecp256k1)
+				if err != nil {
+					return fmt.Errorf("--new-key: %w", err)
+				}
+			}
+			if fromKey != "" && newKey != "" {
+				if err := validateMatchingMultisigSignerIndices(fromKey, newKey, pp.Legacy.PubKey != "", pp.New.PubKey != "", legacyIdx, newIdx); err != nil {
+					return err
+				}
+			}
+
+			if fromKey != "" {
 				signerAddr, err := deriveSubKeyAddr(clientCtx, fromKey)
 				if err != nil {
 					return fmt.Errorf("--from: %w", err)
@@ -1056,16 +1084,12 @@ index's entry in place rather than duplicating it.`,
 					return fmt.Errorf("legacy sign: %w", err)
 				}
 				pp.PartialLegacySignatures = upsertSig(pp.PartialLegacySignatures, PartialSignature{
-					Index:     idx,
+					Index:     legacyIdx,
 					Signature: base64.StdEncoding.EncodeToString(sig),
 				})
 			}
 
 			if newKey != "" {
-				idx, err := findSubKeyIndex(clientCtx, newKey, pp.New, sigverify.SubKeyTypeEthSecp256k1)
-				if err != nil {
-					return fmt.Errorf("--new-key: %w", err)
-				}
 				signerAddr, err := deriveSubKeyAddr(clientCtx, newKey)
 				if err != nil {
 					return fmt.Errorf("--new-key: %w", err)
@@ -1081,7 +1105,7 @@ index's entry in place rather than duplicating it.`,
 					return fmt.Errorf("new sign: %w", err)
 				}
 				pp.PartialNewSignatures = upsertSig(pp.PartialNewSignatures, PartialSignature{
-					Index:     idx,
+					Index:     newIdx,
 					Signature: base64.StdEncoding.EncodeToString(sig),
 				})
 			}

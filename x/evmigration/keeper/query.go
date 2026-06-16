@@ -360,6 +360,11 @@ func (qs queryServer) MigrationStats(goCtx context.Context, _ *types.QueryMigrat
 		status, shouldCount := qs.remainingLegacyAccountStatus(ctx, acc)
 		if shouldCount {
 			resp.TotalLegacy++
+			if acc.GetPubKey() == nil {
+				resp.TotalLegacyWithoutPubkey++
+			} else {
+				resp.TotalLegacyWithPubkey++
+			}
 			if status.hasDelegations {
 				resp.TotalLegacyStaked++
 			}

@@ -631,8 +631,38 @@ BANNER
   [[ -n "$home_dir"    ]] && args+=(--home "$home_dir")
   (( yes == 1 )) && args+=(-y)
 
-  local broadcast_json tx_hash
-  broadcast_json=$("$BIN" "${args[@]}")
+  # Capture stdout, stderr, and exit code separately so a partial RPC failure
+  # (e.g. lumerad prints `EOF` to stderr after the CometBFT RPC stream drops)
+  # doesn't kill the script under `set -e` with no diagnostic. The tx may or
+  # may not have entered the mempool; before erroring out, probe chain state
+  # for the migration record so the operator gets a definitive answer instead
+  # of a bare `EOF` line.
+  local broadcast_json broadcast_err broadcast_rc=0 tx_hash
+  local stderr_file
+  stderr_file=$(mktemp)
+  broadcast_json=$("$BIN" "${args[@]}" 2>"$stderr_file") || broadcast_rc=$?
+  broadcast_err=$(<"$stderr_file")
+  rm -f "$stderr_file"
+  if (( broadcast_rc != 0 )); then
+    log_error "broadcast command failed (rc=$broadcast_rc)"
+    [[ -n "$broadcast_err" ]] && log_error "lumerad stderr: $broadcast_err"
+    log_error "checking chain state — the tx may still have landed:"
+    log_error "  $BIN query evmigration migration-record $(legacy_value "$legacy") --node $node"
+    if lumerad_q evmigration migration-record "$legacy" >/dev/null 2>&1; then
+      local rec_new
+      rec_new=$(lumerad_q evmigration migration-record "$legacy" 2>/dev/null | jq -r '.record.new_address // empty')
+      if [[ "$rec_new" == "$new" ]]; then
+        log_info "on-chain migration record found for $(legacy_value "$legacy") -> $(new_value "$new")"
+        log_info "broadcast appears to have succeeded despite the RPC error above; running post-broadcast verification"
+        verify_migration "$legacy" "$new" "$snap"
+        show_migration_summary "$legacy" "$new"
+        log_info "migration complete"
+        return 0
+      fi
+    fi
+    log_error "no migration record found for $(legacy_value "$legacy") — tx did not land; safe to re-run submit"
+    exit 2
+  fi
   tx_hash=$(assert_broadcast_accepted "$broadcast_json")
 
   log_info "broadcast tx $tx_hash; waiting for inclusion..."

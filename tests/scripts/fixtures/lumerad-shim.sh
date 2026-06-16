@@ -19,6 +19,13 @@
 #   SHIM_BANK_AFTER_FIXTURE=<name>   — fixture for legacy bank balances AFTER broadcast.
 #   SHIM_BANK_NEW_FIXTURE=<name>     — fixture for bank balances of the new stub addr
 #                                      (always, regardless of phase).
+#
+# submit-proof failure simulation (for broadcast-RPC-EOF tests):
+#   SHIM_SUBMIT_EXIT=<n>      — force submit-proof to exit n (after emitting stderr)
+#   SHIM_SUBMIT_STDERR=<msg>  — emit this to stderr just for submit-proof
+#   SHIM_SUBMIT_LANDED=1      — combined with SHIM_SUBMIT_EXIT, simulate the case
+#                                where the tx actually landed before the RPC dropped
+#                                (record/bank queries flip to their *_AFTER fixtures).
 
 set -u
 
@@ -192,6 +199,18 @@ ADDR
     exit "${SHIM_COMBINE_EXIT:-${SHIM_EXIT:-0}}"
     ;;
   "tx evmigration submit-proof"*)
+    if [[ -n "${SHIM_SUBMIT_STDERR:-}" ]]; then
+      printf '%s\n' "$SHIM_SUBMIT_STDERR" >&2
+    fi
+    if [[ -n "${SHIM_SUBMIT_EXIT:-}" ]]; then
+      # SHIM_SUBMIT_LANDED=1 simulates "the tx actually entered a block before
+      # the RPC dropped"; the wrapper's recovery path can then observe an
+      # on-chain migration record on retry.
+      if [[ -n "${SHIM_STATE_FILE:-}" && "${SHIM_SUBMIT_LANDED:-0}" == "1" ]]; then
+        touch "$SHIM_STATE_FILE"
+      fi
+      exit "$SHIM_SUBMIT_EXIT"
+    fi
     if [[ -n "${SHIM_STATE_FILE:-}" ]]; then
       touch "$SHIM_STATE_FILE"
     fi

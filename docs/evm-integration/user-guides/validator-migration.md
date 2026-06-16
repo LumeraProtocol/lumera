@@ -1,6 +1,6 @@
 # Validator Operator EVM Migration Guide
 
-**Last updated**: 2026-06-15
+**Last updated**: 2026-06-16
 **Applies to**: validator operators running a Lumera validator against an EVM-enabled chain (post-EVM upgrade)
 **Prerequisite reading**: [migration.md](migration.md) for the chain-level mechanics of legacy → EVM account migration
 
@@ -15,6 +15,8 @@ When Lumera upgraded to an EVM-compatible chain, every validator's legacy `secp2
 Validators **must** use `MsgMigrateValidator` (not `MsgClaimLegacyAccount`). The chain explicitly rejects `claim-legacy-account` for validator operator addresses. `MsgMigrateValidator` is a superset — it re-keys the validator record, every delegation pointing to the validator, distribution state, supernode registration (if any), and action references in a single atomic transaction.
 
 **This guide's main flow covers the common single-sig validator operator key case.** If your validator operator key is a K-of-N multisig (rare), see the [Multisig validator operator keys](#multisig-validator-operator-keys) section at the end.
+
+> **Note on `systemctl` commands.** This guide uses `systemctl stop/start lumerad` (and `systemctl restart supernode`) as examples. Many validators don't run the node under systemd — Docker/Kubernetes, cosmovisor, runit/s6, or a bare `lumerad start` under a process supervisor are all common. Substitute whatever supervises your node (e.g. `docker stop <container>`, your cosmovisor service unit, or `pkill -f "lumerad start"`). The only invariant that matters: **`lumerad` must not be producing blocks when you broadcast the migration.**
 
 ---
 
@@ -89,6 +91,8 @@ lumerad keys add val-new --recover --coin-type 60 --algo eth_secp256k1 --keyring
 
 Both are recovered from the same BIP-39 mnemonic. The resulting bech32 addresses differ because the HD paths and address derivation differ — this is expected and is precisely what the migration fixes on-chain.
 
+> **The new EVM address must be fresh — do not fund or use it before migrating.** The migration moves all balances and state to the destination atomically and **refuses to run if the destination already exists on-chain** (the chain and `migrate-validator.sh` both check this). It's tempting to send "a little gas" to the new address first; don't. If the destination already has account state, derive a different coin-type 60 key, or complete the migration first and fund it afterward. The pre-flight will surface this as a destination-freshness failure (`new address ... already exists on-chain`).
+
 Verify both are present:
 
 ```bash
@@ -121,6 +125,8 @@ lumerad query evmigration migration-estimate <legacy-validator-address>
 ```
 
 `would_succeed: true` with `is_validator: true`, `validator_status: BOND_STATUS_BONDED`, `validator_jailed: false`, and `val_delegation_count + val_unbonding_count + val_redelegation_count <= max_validator_delegations` means you're clear to proceed.
+
+> **A terminal rejection may return *only* `rejection_reason`.** When the account can never be migrated as-is — most commonly because it was **already migrated** — the estimate collapses to a single field, e.g. `{ "rejection_reason": "already migrated" }`, with none of the `is_validator` / `would_succeed` / count fields shown above. The query isn't broken; the condition is terminal. For `already migrated`, look up where it went with `lumerad query evmigration migration-record <legacy-address>` and use the new address going forward. See [Troubleshooting](#troubleshooting).
 
 The chain checks the validator's bond status and jailed flag and rejects migration when either disqualifies the validator. Two failure shapes you may see:
 
@@ -190,7 +196,7 @@ Then re-run pre-flight as in step 5 above, and proceed.
 ## Step 4 — Stop the validator
 
 ```bash
-systemctl stop lumerad
+systemctl stop lumerad   # or however you supervise the node — see "Note on systemctl commands" in the Overview
 ```
 
 Stopping before broadcast avoids double-signing risk and prevents the node from producing blocks with the legacy key while migration is in flight.
@@ -218,7 +224,7 @@ lumerad tx evmigration migrate-validator val-legacy val-new \
 >   --i-have-stopped-the-node
 > ```
 >
-> `--i-have-stopped-the-node` acknowledges the jailing risk non-interactively (required for systemd / CI / non-TTY runs; omitting it makes the script prompt for the literal word `yes`). `--yes` alone does **not** satisfy this check. See [migration-scripts.md](migration-scripts.md) for full flag reference, exit codes, and troubleshooting.
+> `--i-have-stopped-the-node` acknowledges the jailing risk non-interactively (required for systemd / CI / non-TTY runs; omitting it makes the script prompt for the literal word `yes`). `--yes` alone does **not** satisfy this check. This gate applies to `--dry-run` too: a dry-run from a non-TTY context (a pipe, CI, `docker exec -i`) aborts with `validator downtime not acknowledged and no TTY available` unless you also pass `--i-have-stopped-the-node` — even though a dry-run never broadcasts. See [migration-scripts.md](migration-scripts.md) for full flag reference, exit codes, and troubleshooting.
 
 Example interactive helper run:
 
@@ -303,7 +309,7 @@ lumerad query staking validator <new-valoper-address> --node tcp://<trusted-rpc>
 ## Step 7 — Restart the validator immediately
 
 ```bash
-systemctl start lumerad
+systemctl start lumerad   # or however you supervise the node — see "Note on systemctl commands" in the Overview
 ```
 
 > **Warning:** restart promptly after migration. Extended downtime leads to missed blocks and eventual jailing. Use a trusted external RPC for the migration broadcast so you're not blocked on your own node being up.
@@ -359,8 +365,10 @@ lumerad query staking delegations <delegator-address>
 lumerad query distribution commission <new-valoper-address>
 lumerad query distribution rewards <delegator-address> <new-valoper-address>
 
-# 5. If running a supernode, confirm record points at the new address
-lumerad query supernode get-supernode <new-address>
+# 5. If running a supernode, confirm record points at the new address.
+#    NOTE: get-supernode takes the VALOPER address (lumeravaloper1…), not the
+#    account address. Convert with: lumerad keys show <new-key> -a --bech val
+lumerad query supernode get-supernode <new-valoper-address>
 ```
 
 ---
@@ -401,6 +409,22 @@ Total of (active delegations + unbonding delegations + redelegations) exceeds th
 
 - Governance proposal to raise `max_validator_delegations`.
 - Delegators redelegate out before validator migration, then back in after.
+
+### `rejection_reason: already migrated`
+
+This operator key was already migrated (migration is one-shot). The estimate returns only this single field — no `is_validator`, `would_succeed`, or counts. Find where it went and use the new address from now on:
+
+```bash
+lumerad query evmigration migration-record <legacy-validator-address>
+# record.new_address is authoritative — your validator now operates under the
+# valoper derived from that address.
+```
+
+If the recorded `new_address` is **not** the EVM key you expected, stop and investigate which mnemonic produced it before doing anything else (see [`migration record exists on-chain but new address mismatch`](#migration-record-exists-on-chain-but-new-address-mismatch) below). Re-broadcasting a migration for an already-migrated key is rejected by the chain; do not retry.
+
+### `new address ... already exists on-chain`
+
+The destination EVM key you derived in Step 2 is not fresh — it already has account state on-chain, and the migration refuses to overwrite it. Derive a different coin-type 60 / `eth_secp256k1` key (or, if you intentionally funded it, note that you must instead pick an unused address). See the destination-freshness warning under [Step 2](#step-2--import-both-keys-from-the-same-mnemonic).
 
 ### `post failed: Post "http://localhost:26657": dial tcp [::1]:26657: connect: connection refused`
 

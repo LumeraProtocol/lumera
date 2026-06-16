@@ -1,6 +1,6 @@
 # EVM Legacy Account Migration - User Guide
 
-**Last updated**: 2026-06-15
+**Last updated**: 2026-06-16
 **Applies to**: Lumera chain with `x/evmigration` module enabled (post-EVM upgrade)
 
 ---
@@ -474,7 +474,7 @@ lumerad keys add new-operator-key \
   --algo eth_secp256k1 \
   --keyring-backend file
 
-# 2. Restart the validator node
+# 2. Restart the validator node (or however you supervise it: docker, cosmovisor, etc.)
 systemctl start lumerad
 ```
 

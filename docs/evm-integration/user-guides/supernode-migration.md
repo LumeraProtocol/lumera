@@ -1,6 +1,6 @@
 # Supernode Operator EVM Migration Guide
 
-**Last updated**: 2026-04-21
+**Last updated**: 2026-06-16
 **Applies to**: operators running a Lumera supernode against an EVM-enabled chain (post-EVM upgrade)
 **Prerequisite reading**: [migration.md](migration.md) for the chain-level mechanics of legacy → EVM account migration
 
@@ -138,7 +138,10 @@ lumerad query evmigration migration-record <legacy-address>
 The response should show `new_address` matching your EVM key's address. Also confirm the supernode's on-chain registration points at the new address:
 
 ```bash
-lumerad query supernode get-supernode <new-address>
+# get-supernode takes the VALOPER address (lumeravaloper1…), not the account
+# address. Convert your new account address with:
+#   lumerad keys show <new-key> -a --bech val
+lumerad query supernode get-supernode <new-valoper-address>
 ```
 
 Finally, confirm `config.yml` reflects the switch:

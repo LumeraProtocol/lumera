@@ -69,7 +69,7 @@ func TestResolveConfigAppliesFileAndDetectsWizard(t *testing.T) {
 		path := writeTempTOML(t, sampleTOML)
 		cfg.ConfigPath = path
 
-		wizard, err := resolveConfig(cfg, fs)
+		wizard, _, err := resolveConfig(cfg, fs)
 		if err != nil {
 			t.Fatalf("resolveConfig: %v", err)
 		}
@@ -89,7 +89,7 @@ func TestResolveConfigAppliesFileAndDetectsWizard(t *testing.T) {
 		if err := fs.Parse([]string{"-chain", "devnet", "-config", path}); err != nil {
 			t.Fatalf("parse: %v", err)
 		}
-		wizard, err := resolveConfig(cfg, fs)
+		wizard, _, err := resolveConfig(cfg, fs)
 		if err != nil {
 			t.Fatalf("resolveConfig: %v", err)
 		}
@@ -109,7 +109,7 @@ func TestResolveConfigAppliesFileAndDetectsWizard(t *testing.T) {
 		if err := fs.Parse([]string{"-w", "-config", path}); err != nil {
 			t.Fatalf("parse: %v", err)
 		}
-		wizard, err := resolveConfig(cfg, fs)
+		wizard, _, err := resolveConfig(cfg, fs)
 		if err != nil {
 			t.Fatalf("resolveConfig: %v", err)
 		}
@@ -125,7 +125,7 @@ func TestResolveConfigAppliesFileAndDetectsWizard(t *testing.T) {
 		if err := fs.Parse([]string{"-config", filepath.Join(t.TempDir(), "nope.toml"), "-chain", "devnet"}); err != nil {
 			t.Fatalf("parse: %v", err)
 		}
-		if _, err := resolveConfig(cfg, fs); err == nil {
+		if _, _, err := resolveConfig(cfg, fs); err == nil {
 			t.Error("expected error when explicit -config path is missing")
 		}
 	})

@@ -108,7 +108,7 @@ func TestRunWizardManualChainNoConfig(t *testing.T) {
 			"chain-id": "lumera-manual-1",
 		},
 	}
-	if err := runWizard(cfg, nil, p, func(*Config) error { return nil }); err != nil {
+	if err := runWizard(cfg, nil, nil, p, func(*Config) error { return nil }); err != nil {
 		t.Fatalf("runWizard: %v", err)
 	}
 	if cfg.RPC != "tcp://manual:26657" || cfg.GRPC != "manual:9090" || cfg.ChainID != "lumera-manual-1" {
@@ -171,7 +171,7 @@ func TestRunWizardEditsThenRuns(t *testing.T) {
 	var ran *Config
 	runner := func(c *Config) error { ran = c; return nil }
 
-	if err := runWizard(cfg, fc, p, runner); err != nil {
+	if err := runWizard(cfg, fc, nil, p, runner); err != nil {
 		t.Fatalf("runWizard: %v", err)
 	}
 	if ran == nil {
@@ -185,13 +185,49 @@ func TestRunWizardEditsThenRuns(t *testing.T) {
 	}
 }
 
+func TestRunWizardPreservesCLIOverridesOnReseed(t *testing.T) {
+	fc, err := LoadFileConfig(writeTempTOML(t, sampleTOML))
+	if err != nil {
+		t.Fatalf("LoadFileConfig: %v", err)
+	}
+	// Simulate `-funding-key cliuser -accounts cli-accounts.json -w`: resolveConfig
+	// already layered the file onto cfg honoring these flags, so cfg holds the CLI
+	// values and setFlags marks them as explicitly set.
+	cfg := &Config{
+		Bin: "lumerad", KeyringBackend: "test",
+		FundingKey: "cliuser", AccountsPath: "cli-accounts.json",
+		MaxAccountAmount: "10000000ulume", ActionStates: "pending,done,approved",
+		MaxActionsPerRun: 3, FundingBatchSize: 10, Parallelism: 5,
+	}
+	setFlags := map[string]bool{"funding-key": true, "accounts": true}
+
+	// Pick the devnet chain (which re-seeds [common]+[chains.devnet]), then Quit.
+	// [common] sets funding-key=faucet and [chains.devnet] sets accounts=...; both
+	// must NOT clobber the explicit CLI overrides.
+	p := &fakePrompter{selectQueue: []string{"devnet", menuQuit}}
+
+	if err := runWizard(cfg, fc, setFlags, p, func(*Config) error { return nil }); err != nil {
+		t.Fatalf("runWizard: %v", err)
+	}
+	if cfg.FundingKey != "cliuser" {
+		t.Errorf("FundingKey = %q, want cliuser (CLI override must survive reseed)", cfg.FundingKey)
+	}
+	if cfg.AccountsPath != "cli-accounts.json" {
+		t.Errorf("AccountsPath = %q, want cli-accounts.json (CLI override must survive reseed)", cfg.AccountsPath)
+	}
+	// Non-overridden chain values should still be seeded from the chosen chain.
+	if cfg.ChainID != "lumera-devnet-1" {
+		t.Errorf("ChainID = %q, want lumera-devnet-1 (chain seeded)", cfg.ChainID)
+	}
+}
+
 func TestRunWizardQuitDoesNotRun(t *testing.T) {
 	cfg := &Config{Bin: "lumerad"}
 	p := &fakePrompter{selectQueue: []string{menuQuit}}
 	called := false
 	runner := func(*Config) error { called = true; return nil }
 
-	if err := runWizard(cfg, nil, p, runner); err != nil {
+	if err := runWizard(cfg, nil, nil, p, runner); err != nil {
 		t.Fatalf("runWizard: %v", err)
 	}
 	if called {

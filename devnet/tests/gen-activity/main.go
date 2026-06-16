@@ -31,14 +31,14 @@ func main() {
 	configureFlags(flag.CommandLine, cfg)
 	flag.Parse()
 
-	wizard, err := resolveConfig(cfg, flag.CommandLine)
+	wizard, setFlags, err := resolveConfig(cfg, flag.CommandLine)
 	if err != nil {
 		log.Fatalf("configuration: %v", err)
 	}
 
 	if wizard {
 		fc, _ := LoadFileConfig(cfg.ConfigPath)
-		if err := runWizard(cfg, fc, newSurveyPrompter(), run); err != nil {
+		if err := runWizard(cfg, fc, setFlags, newSurveyPrompter(), run); err != nil {
 			log.Fatalf("wizard: %v", err)
 		}
 		return
@@ -57,23 +57,25 @@ func main() {
 // in wizard mode (no flags passed, or -w/-wizard). fs must be the FlagSet that
 // already parsed the command line (so fs.Visit/fs.NFlag reflect what the user
 // set).
-func resolveConfig(cfg *Config, fs *flag.FlagSet) (wizard bool, err error) {
-	setFlags := map[string]bool{}
+// The returned setFlags map records which CLI flags the user set explicitly; the
+// wizard reuses it so a later chain re-seed cannot clobber those overrides.
+func resolveConfig(cfg *Config, fs *flag.FlagSet) (wizard bool, setFlags map[string]bool, err error) {
+	setFlags = map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { setFlags[f.Name] = true })
 
 	fc, err := LoadFileConfig(cfg.ConfigPath)
 	if err != nil {
-		return false, err
+		return false, setFlags, err
 	}
 	if fc == nil && setFlags["config"] {
-		return false, fmt.Errorf("config file %q not found", cfg.ConfigPath)
+		return false, setFlags, fmt.Errorf("config file %q not found", cfg.ConfigPath)
 	}
 	if err := ApplyFileConfig(cfg, fc, cfg.Chain, setFlags); err != nil {
-		return false, err
+		return false, setFlags, err
 	}
 
 	wizard = cfg.Wizard || fs.NFlag() == 0
-	return wizard, nil
+	return wizard, setFlags, nil
 }
 
 func configureFlags(fs *flag.FlagSet, c *Config) {

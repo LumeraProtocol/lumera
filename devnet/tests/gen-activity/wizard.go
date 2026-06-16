@@ -202,7 +202,12 @@ func chainSummary(cfg *Config) string {
 // from that chain's config section), then loop the settings menu until the user
 // chooses Run (validate + invoke runner) or Quit (return without running).
 // runner is injected so tests can assert invocation without a live chain.
-func runWizard(cfg *Config, fc *FileConfig, p prompter, runner func(*Config) error) error {
+//
+// setFlags marks the CLI flags the user set explicitly (the same map
+// resolveConfig built). The chain re-seed honors it so explicit overrides keep
+// winning over [common]/[chains.*], preserving the documented
+// flag > chain > common precedence even after the user switches chains.
+func runWizard(cfg *Config, fc *FileConfig, setFlags map[string]bool, p prompter, runner func(*Config) error) error {
 	if fc != nil && len(fc.Chains) > 0 {
 		names := fc.ChainNames()
 		def := cfg.Chain
@@ -215,11 +220,12 @@ func runWizard(cfg *Config, fc *FileConfig, p prompter, runner func(*Config) err
 		}
 		cfg.Chain = chosen
 		// Re-seed defaults from the chosen chain (wizard is interactive: the
-		// chain's values become the working defaults the user can then edit).
-		if err := applyLayer(cfg, fc.Common, nil); err != nil {
+		// chain's values become the working defaults the user can then edit),
+		// but never clobber values the user set explicitly on the CLI.
+		if err := applyLayer(cfg, fc.Common, setFlags); err != nil {
 			return err
 		}
-		if err := applyLayer(cfg, fc.Chains[chosen], nil); err != nil {
+		if err := applyLayer(cfg, fc.Chains[chosen], setFlags); err != nil {
 			return err
 		}
 		fmt.Print(chainSummary(cfg))

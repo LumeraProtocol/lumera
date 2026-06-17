@@ -11,8 +11,8 @@
     "interact:devnet": "hardhat run scripts/interact.ts --network devnet"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "hardhat": "^2.22.0",
+    "@nomicfoundation/hardhat-toolbox": "^7.0.0",
+    "hardhat": "^3.9.0",
     "typescript": "^5.4.0",
     "ts-node": "^10.9.0",
     "@types/node": "^20.0.0"

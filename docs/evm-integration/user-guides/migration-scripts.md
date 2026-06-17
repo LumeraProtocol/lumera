@@ -910,8 +910,7 @@ The proof file was edited or came from incompatible inputs. Regenerate `proof.js
 `sign` aborts before writing a partial file with:
 
 ```text
-legacy key "alice-legacy" is signer index 0, but new key "alice-evm" is signer index 3;
-multisig migration requires the same signer position to approve both halves
+legacy key "alice-legacy" is signer index 0, but new key "alice-evm" is signer index 3; multisig migration requires the same signer position to approve both halves
 ```
 
 **Why:** you passed both `--from` and `--new-key` in one `sign` call, but the two keys sit at *different positions* in their respective multisigs. The consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`, so a co-signer must occupy the **same signer index** on the legacy and new sides. This almost always means the destination multisig was built with a different member order than the legacy one — typically because `keys add --multisig` sorted the sub-keys (its default) instead of preserving caller order.

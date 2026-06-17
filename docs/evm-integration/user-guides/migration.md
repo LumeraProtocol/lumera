@@ -676,13 +676,13 @@ lumerad tx evmigration generate-proof-payload \
   --out proof.json
 ```
 
-- `--new-sub-pub-keys` entries are either local keyring key names (eth_secp256k1) or base64-encoded 33-byte compressed eth pubkeys. Mix freely.`--new-threshold` is required with`--new-sub-pub-keys`.
-- **Member order is significant.** `generate-proof-payload` preserves the order you list`--new-sub-pub-keys` (it does not sort), and the signer index is the position in that list. Because the mirror-source rule requires`legacy_proof.signer_indices == new_proof.signer_indices`, list the eth sub-keys in the **same member order as the legacy multisig's`public_keys`** (`lumerad query auth account <multisig-bech32>`), so each co-signer holds the same signer index on both sides. If you also pre-create the destination composite with`lumerad keys add --multisig`, pass`--nosort` so its derived address matches this order-preserving derivation.
-- `--new <bech32>` is optional; the CLI derives the new multisig address from the sub-keys/threshold and cross-checks`--new` if supplied.
-- `--kind claim` targets`MsgClaimLegacyAccount`;`--kind validator` targets`MsgMigrateValidator`.
-- `--chain-id` is**required**: the payload string`lumera-evm-migration:<chain-id>:<evm-chain-id>:<kind>:<legacy>:<new>` embeds the chain ID. An empty or wrong`--chain-id` makes every sub-signature fail verification with`sub-sig 0 invalid`.
-- `--sig-format` (optional, default`SIG_FORMAT_CLI`) applies to the legacy side. Use`SIG_FORMAT_ADR036` only when sub-signers sign via a wallet that emits ADR-036`signArbitrary` output (e.g. Keplr).
-- `generate-proof-payload`**needs keyring access** to resolve`--new-sub-pub-keys` key names, so pass`--keyring-backend` (and`--keyring-dir` /`--home` when needed). It still does not broadcast anything.
+- `--new-sub-pub-keys` entries are either local keyring key names (eth_secp256k1) or base64-encoded 33-byte compressed eth pubkeys. Mix freely. `--new-threshold` is required with `--new-sub-pub-keys`.
+- **Member order is significant.** `generate-proof-payload` preserves the order you list `--new-sub-pub-keys` (it does not sort), and the signer index is the position in that list. Because the mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`, list the eth sub-keys in the **same member order as the legacy multisig's `public_keys`** (`lumerad query auth account <multisig-bech32>`), so each co-signer holds the same signer index on both sides. If you also pre-create the destination composite with `lumerad keys add --multisig`, pass `--nosort` so its derived address matches this order-preserving derivation.
+- `--new <bech32>` is optional; the CLI derives the new multisig address from the sub-keys/threshold and cross-checks `--new` if supplied.
+- `--kind claim` targets `MsgClaimLegacyAccount`; `--kind validator` targets `MsgMigrateValidator`.
+- `--chain-id` is **required**: the payload string `lumera-evm-migration:<chain-id>:<evm-chain-id>:<kind>:<legacy>:<new>` embeds the chain ID. An empty or wrong `--chain-id` makes every sub-signature fail verification with `sub-sig 0 invalid`.
+- `--sig-format` (optional, default `SIG_FORMAT_CLI`) applies to the legacy side. Use `SIG_FORMAT_ADR036` only when sub-signers sign via a wallet that emits ADR-036 `signArbitrary` output (e.g. Keplr).
+- `generate-proof-payload` **needs keyring access** to resolve `--new-sub-pub-keys` key names, so pass `--keyring-backend` (and `--keyring-dir` / `--home` when needed). It still does not broadcast anything.
 
 The output `proof.json` is a v2 `PartialProof` with two sibling `SideSpec`s (`legacy` and `new`), each listing `threshold` + `sub_pub_keys`, plus empty `partial_legacy_signatures` and `partial_new_signatures` arrays. Distribute to all co-signers.
 
@@ -699,10 +699,10 @@ lumerad tx evmigration sign-proof proof.json \
   --out my-partial.json
 ```
 
-- `--from` signs the legacy half;`--new-key` signs the new half. At least one is required. A co-signer who holds only one sub-key may pass just that flag, but**one-sided partials do not count toward quorum by themselves** — the consensus mirror-source rule requires the same K signer positions to approve both halves, so combine-proof only counts an index that has a valid signature on*both* sides. One-sided partials contribute only when another co-signer supplies the other-side signature at the same index.
+- `--from` signs the legacy half; `--new-key` signs the new half. At least one is required. A co-signer who holds only one sub-key may pass just that flag, but **one-sided partials do not count toward quorum by themselves** — the consensus mirror-source rule requires the same K signer positions to approve both halves, so combine-proof only counts an index that has a valid signature on *both* sides. One-sided partials contribute only when another co-signer supplies the other-side signature at the same index.
 - `sign-proof` is idempotent: re-running with the same key replaces that signer's entry on the corresponding side.
-- When a co-signer passes**both**`--from` and`--new-key`, the two keys must resolve to the**same signer index** in their respective multisigs;`sign-proof` aborts before writing a partial with`legacy key "..." is signer index N, but new key "..." is signer index M; multisig migration requires the same signer position to approve both halves`. A mismatch means the destination multisig's member order doesn't mirror the legacy side — rebuild it per the order note in Step 1.
-- `sign-proof` rejects a file whose`payload_hex` doesn't match a canonical reconstruction from the other fields — catches accidental tampering between steps.
+- When a co-signer passes **both** `--from` and `--new-key`, the two keys must resolve to the **same signer index** in their respective multisigs; `sign-proof` aborts before writing a partial with `legacy key "..." is signer index N, but new key "..." is signer index M; multisig migration requires the same signer position to approve both halves`. A mismatch means the destination multisig's member order doesn't mirror the legacy side — rebuild it per the order note in Step 1.
+- `sign-proof` rejects a file whose `payload_hex` doesn't match a canonical reconstruction from the other fields — catches accidental tampering between steps.
 
 Each co-signer sends their `*-partial.json` back to the coordinator.
 

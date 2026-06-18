@@ -101,4 +101,72 @@ func TestConfigValidate(t *testing.T) {
 			t.Error("expected error for negative num-accounts")
 		}
 	})
+
+	t.Run("add-accounts and activity-existing are mutually exclusive", func(t *testing.T) {
+		c := validConfig()
+		c.AddAccounts = true
+		c.ActivityExisting = true
+		if err := c.Validate(); err == nil {
+			t.Error("expected error when both add-accounts and activity-existing are set")
+		}
+	})
+}
+
+func TestConfigValidateVesting(t *testing.T) {
+	t.Run("valid vesting-percent passes", func(t *testing.T) {
+		c := validConfig()
+		c.VestingPercent = 30
+		c.NumPermanentLocked = 2
+		if err := c.Validate(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	t.Run("vesting-percent over 100 fails", func(t *testing.T) {
+		c := validConfig()
+		c.VestingPercent = 101
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for vesting-percent > 100")
+		}
+	})
+	t.Run("negative vesting-percent fails", func(t *testing.T) {
+		c := validConfig()
+		c.VestingPercent = -1
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for negative vesting-percent")
+		}
+	})
+	t.Run("negative num-permanent-locked fails", func(t *testing.T) {
+		c := validConfig()
+		c.NumPermanentLocked = -1
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for negative num-permanent-locked-accounts")
+		}
+	})
+}
+
+func TestConfigValidateMultisigCounts(t *testing.T) {
+	t.Run("zero multisig counts pass", func(t *testing.T) {
+		c := validConfig()
+		c.NumMultisig23 = 0
+		c.NumMultisig35 = 0
+		if err := c.Validate(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("negative num-multisig23 fails", func(t *testing.T) {
+		c := validConfig()
+		c.NumMultisig23 = -1
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for negative num-multisig23-accounts")
+		}
+	})
+
+	t.Run("negative num-multisig35 fails", func(t *testing.T) {
+		c := validConfig()
+		c.NumMultisig35 = -2
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for negative num-multisig35-accounts")
+		}
+	})
 }

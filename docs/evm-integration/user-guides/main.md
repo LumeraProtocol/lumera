@@ -12,6 +12,7 @@ This directory holds the operator- and end-user-facing documentation for living 
 | An end user with a legacy (coin-type 118) account | [migration.md](migration.md) | [migration-scripts.md](migration-scripts.md) if you have many accounts to batch |
 | A validator operator | [validator-migration.md](validator-migration.md) | [migration-scripts.md](migration-scripts.md) for the `migrate-validator.sh` wrapper |
 | A supernode operator | [supernode-migration.md](supernode-migration.md) | [migration.md](migration.md) for chain-level mechanics |
+| A Hermes IBC relayer operator | [relayer-migration.md](relayer-migration.md) | [migration-scripts.md](migration-scripts.md) for the `migrate-account.sh` wrapper |
 | A node operator (full node, sentry, public RPC) | [node-evm-config-guide.md](node-evm-config-guide.md) | [tune-guide.md](tune-guide.md) for parameter sizing |
 | A governance participant or chain steward | [tune-guide.md](tune-guide.md) | [node-evm-config-guide.md](node-evm-config-guide.md) for what each knob controls |
 
@@ -32,6 +33,10 @@ The validator-specific procedure: maintenance window planning against `downtime_
 ### [supernode-migration.md](supernode-migration.md) — Supernode Operator Migration
 
 Two paths to the same end state: **Path A** (the daemon migrates for you on restart once `evm_key_name` is set in `config.yml`) or **Path B** (you migrate via Portal/Keplr or the shell helpers first, then the daemon detects the on-chain record and just performs local cleanup). Covers the multisig refusal behavior — the daemon won't drive a K-of-N ceremony and points you to the offline `lumerad` CLI flow — plus troubleshooting for address-mismatch and proto-skew errors.
+
+### [relayer-migration.md](relayer-migration.md) — Hermes IBC Relayer Migration
+
+Migrating a Hermes relayer's Lumera signing account from legacy `secp256k1` to `eth_secp256k1`. The relayer is the one account where a **second tool** (Hermes) must re-derive the same key from the mnemonic, so the guide centers on the HD-path gotcha: Hermes' default `ethermint` derivation does *not* match lumerad's `m/44'/60'/0'/0/0`, so you must set `address_type = { derivation = 'ethermint', proto_type = { pk_type = '/cosmos.evm.crypto.v1.ethsecp256k1.PubKey' } }` and pass `--hd-path "m/44'/60'/0'/0/0"` to `hermes keys add`. Includes a mandatory derived-address gate before the irreversible migration, and the stop → migrate → re-key → restart sequence.
 
 ### [node-evm-config-guide.md](node-evm-config-guide.md) — Node Operator EVM Config
 

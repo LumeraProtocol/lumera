@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"gen/tests/common"
@@ -76,7 +77,7 @@ func TestLoadRegistryRejectsWrongSchemaVersion(t *testing.T) {
 		t.Error("expected error loading registry without schema_version, got nil")
 	}
 
-	data = []byte(`{"schema_version":2,"chain_id":"lumera-devnet-1","accounts":[]}`)
+	data = []byte(`{"schema_version":3,"chain_id":"lumera-devnet-1","accounts":[]}`)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("seed file: %v", err)
 	}
@@ -114,5 +115,80 @@ func TestAllocateNames(t *testing.T) {
 		if more[i] != wantMore[i] {
 			t.Fatalf("more = %v, want %v", more, wantMore)
 		}
+	}
+}
+
+func TestRegistrySchemaIsV2(t *testing.T) {
+	if schemaVersion != 2 {
+		t.Fatalf("schemaVersion = %d, want 2", schemaVersion)
+	}
+	reg := NewRegistry("lumera-devnet-1", "faucet", "", "legacy", "2026-06-12T00:00:00Z")
+	if reg.SchemaVersion != 2 {
+		t.Errorf("NewRegistry schema = %d, want 2", reg.SchemaVersion)
+	}
+}
+
+func TestMultisigRecordRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "accounts.json")
+	reg := NewRegistry("lumera-devnet-1", "faucet", "", "legacy", "2026-06-12T00:00:00Z")
+	reg.UpsertAccount(&AccountRecord{
+		AccountIdentity: common.AccountIdentity{Name: "gen-msig23-0001", Address: "lumera1msig"},
+		Multisig: &MultisigInfo{
+			MemberNames: []string{"gen-msig23-0001-signer-1", "gen-msig23-0001-signer-2", "gen-msig23-0001-signer-3"},
+			Threshold:   2,
+			Signers:     3,
+		},
+	})
+	if err := reg.Save(path, "2026-06-12T00:00:00Z"); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	got, err := LoadRegistry(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(got.Accounts) != 1 || got.Accounts[0].Multisig == nil {
+		t.Fatalf("multisig info not persisted: %+v", got.Accounts)
+	}
+	if got.Accounts[0].Multisig.Threshold != 2 || got.Accounts[0].Multisig.Signers != 3 {
+		t.Errorf("multisig threshold/signers = %d/%d, want 2/3",
+			got.Accounts[0].Multisig.Threshold, got.Accounts[0].Multisig.Signers)
+	}
+}
+
+func TestVestingRecordRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "accounts.json")
+	reg := NewRegistry("lumera-devnet-1", "faucet", "", "legacy", "2026-06-12T00:00:00Z")
+	reg.UpsertAccount(&AccountRecord{
+		AccountIdentity: common.AccountIdentity{Name: "gen-0003", Address: "lumera1vest"},
+		Vesting:         &VestingInfo{Type: "continuous", EndTime: 1800000000, LockedAmount: "5000000ulume"},
+		Funded:          true,
+	})
+	if err := reg.Save(path, "2026-06-12T00:00:00Z"); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	got, err := LoadRegistry(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got.Accounts[0].Vesting == nil || got.Accounts[0].Vesting.Type != "continuous" {
+		t.Fatalf("vesting info not persisted: %+v", got.Accounts[0].Vesting)
+	}
+	if got.Accounts[0].Vesting.EndTime != 1800000000 {
+		t.Errorf("vesting end-time = %d, want 1800000000", got.Accounts[0].Vesting.EndTime)
+	}
+}
+
+func TestAllocateNamesPerKindContinuesIndex(t *testing.T) {
+	reg := NewRegistry("c", "f", "", "legacy", "t")
+	reg.Accounts = []*AccountRecord{
+		{AccountIdentity: common.AccountIdentity{Name: "gen-msig23-0001"}},
+		{AccountIdentity: common.AccountIdentity{Name: "gen-msig23-0002"}},
+	}
+	names := reg.AllocateNames("gen-msig23", 2)
+	want := []string{"gen-msig23-0003", "gen-msig23-0004"}
+	if !reflect.DeepEqual(names, want) {
+		t.Errorf("AllocateNames = %v, want %v", names, want)
 	}
 }

@@ -24,6 +24,23 @@ have() {
 	command -v "$1" >/dev/null 2>&1
 }
 
+lumerad_claims_start_flags() {
+	local daemon="$1"
+	local claims_file="$2"
+	local help
+
+	[ -f "${claims_file}" ] || return 0
+
+	help="$("${daemon}" start --help 2>&1 || true)"
+	if grep -q -- '--claims-path' <<<"${help}"; then
+		if grep -q -- '--skip-claims-check' <<<"${help}"; then
+			printf '%s\n' "--skip-claims-check=false --claims-path=${claims_file}"
+		else
+			printf '%s\n' "--claims-path=${claims_file}"
+		fi
+	fi
+}
+
 wait_for_file() {
 	while [[ ! -s "$1" ]]; do
 		sleep 1

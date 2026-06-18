@@ -598,7 +598,7 @@ Multisig legacy accounts (flat K-of-N `secp256k1`) use an offline, coordinator-d
 > - **Shape + K/N must mirror.** A K-of-N legacy multisig migrates to a K-of-N`eth_secp256k1` multisig — same K, same N. Different K, different N, or single↔multisig shape mismatch is rejected with`ErrMirrorSourceMismatch` (code 1121).
 > - **Same K signer positions sign both halves.**`legacy_proof.signer_indices` must equal`new_proof.signer_indices`. Co-signers who sign only one side don't count toward the K-of-K threshold on the other.
 > - **Sub-key uniqueness.** Each side's`sub_pub_keys` must have pairwise-distinct entries.
-> - **Zero-signer submit.**`submit-proof` takes no`--from`, no fee flags, no envelope signature — authorization is the proof bytes.
+> - **Zero-signer submit.**`submit-proof` takes no`--from`, no fee flags, no envelope signature — authorization is the proof bytes. Mempool acceptance of zero-signer migration txs requires `app/evmigration_signer_extraction_adapter.go` to be wired into the EVM mempool's `CosmosPoolConfig.SignerExtractor`; without it, `ExperimentalEVMMempool` falls back to the SDK's default extractor and rejects the tx with `tx must have at least one signer` before the migration-aware ante chain runs.
 >
 > Full reference with error codes and helper functions: [legacy-migration.md § Consensus invariants](../evmigration/legacy-migration.md#consensus-invariants).
 

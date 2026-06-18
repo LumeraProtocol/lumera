@@ -178,21 +178,21 @@ connect.
 
 1. Open the account selector and choose **Accounts**, then **Add wallet**.
 
-   ![MetaMask Accounts list](../assets/metamask-5.png)
-   ![MetaMask Add a wallet options](../assets/metamask-6.png)
+   <img src="../assets/metamask-5.png" alt="MetaMask Accounts list" width="230">
+   <img src="../assets/metamask-6.png" alt="MetaMask Add a wallet options" width="230">
 
 2. Choose **Import a wallet** (12/18/24-word Secret Recovery Phrase) or **Import
    an account** (single private key), depending on what you hold for the migrated
    key, and enter it.
 
-   ![MetaMask Import Secret Recovery Phrase screen](../assets/metamask-7.png)
+   <img src="../assets/metamask-7.png" alt="MetaMask Import Secret Recovery Phrase screen" width="230">
 
 3. (Recommended) Rename the account so it is easy to find — open the account's
    **⋮** menu, choose **Rename**, and give it a clear label such as
    `Test EVM Account`.
 
-   ![MetaMask account context menu with Rename](../assets/metamask-8.png)
-   ![MetaMask Rename dialog](../assets/metamask-9.png)
+   <img src="../assets/metamask-8.png" alt="MetaMask account context menu with Rename" width="230">
+   <img src="../assets/metamask-9.png" alt="MetaMask Rename dialog" width="230">
 
 > **Security:** only import a Secret Recovery Phrase or private key you own and
 > control. The EVM account uses coin-type 60 (`eth_secp256k1`); a legacy Lumera

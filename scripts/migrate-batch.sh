@@ -199,13 +199,22 @@ _mb_filter_targets() {
 # Probes chain and prints one of:
 #   migrated       — migration-record exists
 #   ready          — auth pubkey present, no migration record
-#   needs-pubkey   — auth account exists but no pubkey
-#   needs-funding  — account not found AND --funder needed to even send
-#   unknown        — RPC failure
+#   needs-pubkey   — auth account exists (or has balance) but no pubkey
+#   needs-funding  — account not found on auth AND balance==0
+#   unknown        — RPC failure (cannot even read bank balances)
 # Plus prints `balance=<ulume>` on second line.
+#
+# NOTE: the existing auth_pubkey_type helper hard-exits (exit 2) when the
+# account does not exist on auth, which is a LEGITIMATE state for fresh
+# foundation accounts. We deliberately do NOT call it here; we probe auth
+# ourselves and disambiguate "account not found" from "RPC down" by using
+# `bank balances` as the RPC-liveness probe (which succeeds with an empty
+# balances array for unknown addresses).
 _mb_classify_target() {
   local addr="$1"
-  local rec_json balance_json balance pk_type
+  local rec_json balance_json balance auth_json pk_type_str
+
+  # 1) already migrated?
   if rec_json=$(lumerad_q_capture evmigration migration-record "$addr" 2>/dev/null); then
     if [[ -n "$rec_json" && "$(jq -r '.record.new_address // empty' <<<"$rec_json")" != "" ]]; then
       printf 'migrated\n'
@@ -213,31 +222,46 @@ _mb_classify_target() {
       return 0
     fi
   fi
-  # Probe auth pubkey type and balance.
-  pk_type=$(auth_pubkey_type "$addr" 2>/dev/null || echo "unknown")
-  if balance_json=$(lumerad_q_capture bank balances "$addr" 2>/dev/null); then
-    balance=$(jq -r '[.balances[]? | select(.denom == "ulume").amount | tonumber] | add // 0' <<<"$balance_json")
-  else
-    balance=0
+
+  # 2) bank balances — also our RPC-liveness probe.
+  if ! balance_json=$(lumerad_q_capture bank balances "$addr" 2>/dev/null); then
+    printf 'unknown\n'
+    printf 'balance=0\n'
+    return 0
   fi
-  case "$pk_type" in
-    multisig|single-sig)
+  balance=$(jq -r '[.balances[]? | select(.denom == "ulume").amount | tonumber] | add // 0' <<<"$balance_json")
+
+  # 3) auth account — may legitimately be absent for a fresh foundation
+  # account. We treat that as "not on auth" (acct_known=0), NOT as RPC failure.
+  local acct_known=0
+  pk_type_str=""
+  if auth_json=$(lumerad_q_capture auth account "$addr" 2>/dev/null) && [[ -n "$auth_json" ]]; then
+    acct_known=1
+    # Walk the object for the first pub_key/pubkey @type we find. Matches the
+    # priority-order traversal in auth_pubkey_type, without its hard-exit.
+    pk_type_str=$(jq -r '
+      [.. | objects | (.pub_key // .pubkey) | objects | .["@type"] // empty]
+      | map(select(. != "")) | first // ""' <<<"$auth_json" 2>/dev/null || echo "")
+  fi
+
+  case "$pk_type_str" in
+    *LegacyAminoPubKey*|*secp256k1*)
       printf 'ready\n'
-      printf 'balance=%s\n' "$balance"
-      ;;
-    none)
-      if [[ "$balance" == "0" ]]; then
-        printf 'needs-funding\n'
-      else
-        printf 'needs-pubkey\n'
-      fi
-      printf 'balance=%s\n' "$balance"
       ;;
     *)
-      printf 'unknown\n'
-      printf 'balance=%s\n' "$balance"
+      # No pubkey on chain. Two sub-cases:
+      #   - account exists on auth but no pubkey (genesis / received-only) → needs-pubkey
+      #   - account does NOT exist on auth at all → needs-funding to create it,
+      #     unless someone has already sent to it (balance > 0), in which case
+      #     it's effectively needs-pubkey.
+      if (( acct_known == 1 )) || [[ "$balance" != "0" ]]; then
+        printf 'needs-pubkey\n'
+      else
+        printf 'needs-funding\n'
+      fi
       ;;
   esac
+  printf 'balance=%s\n' "$balance"
 }
 
 ###############################################################################
@@ -507,16 +531,28 @@ _mb_keyring_addr() {
 
 # _mb_send_with_funder <funder_key> <to_addr> <amount>
 # Operator's keyring; one tx, wait for inclusion.
+#
+# NOTE: the funder-keyring flags are passed via an array (not ${VAR:+...}
+# expansion) because this script runs with IFS=$'\n\t' set at the top,
+# under which `${VAR:+--flag "$VAR"}` does NOT word-split on spaces and
+# would produce a single mangled argv element like `--keyring-dir /path`.
+# Do NOT collapse this into shell parameter expansion.
 _mb_send_with_funder() {
   local funder="$1" to="$2" amount="$3"
+  local funder_extra=()
+  [[ -n "$_MB_FUNDER_KEYRING_DIR" ]] && funder_extra+=(--keyring-dir "$_MB_FUNDER_KEYRING_DIR")
+  [[ -n "$_MB_FUNDER_HOME"        ]] && funder_extra+=(--home        "$_MB_FUNDER_HOME")
+
   local out tx_hash
-  out=$("$BIN" tx bank send "$funder" "$to" "$amount" \
-    --node "$NODE" --chain-id "$CHAIN_ID" \
-    --keyring-backend "$_MB_FUNDER_KEYRING_BACKEND" \
-    ${_MB_FUNDER_KEYRING_DIR:+--keyring-dir "$_MB_FUNDER_KEYRING_DIR"} \
-    ${_MB_FUNDER_HOME:+--home "$_MB_FUNDER_HOME"} \
-    --fees 5000ulume --gas auto --gas-adjustment 1.3 \
-    --output json -y 2>&1) || { log_error "funder send failed: $out"; return 1; }
+  if ! out=$("$BIN" tx bank send "$funder" "$to" "$amount" \
+              --node "$NODE" --chain-id "$CHAIN_ID" \
+              --keyring-backend "$_MB_FUNDER_KEYRING_BACKEND" \
+              "${funder_extra[@]}" \
+              --fees 5000ulume --gas auto --gas-adjustment 1.3 \
+              --output json -y); then
+    log_error "funder send failed (broadcast exited non-zero)"
+    return 1
+  fi
   tx_hash=$(assert_broadcast_accepted "$out")
   wait_for_tx "$tx_hash"
 }
@@ -567,9 +603,10 @@ _mb_multisig_self_send() {
 
   # 4. broadcast + wait
   local out tx_hash
-  out=$("$BIN" tx broadcast "$signed" --node "$NODE" --output json) || {
-    log_error "multisig self-send broadcast failed: $out"; return 1;
-  }
+  if ! out=$("$BIN" tx broadcast "$signed" --node "$NODE" --output json); then
+    log_error "multisig self-send broadcast failed (broadcast exited non-zero)"
+    return 1
+  fi
   tx_hash=$(assert_broadcast_accepted "$out")
   wait_for_tx "$tx_hash"
 }
@@ -696,23 +733,38 @@ _mb_execute_one() {
       local signers_csv
       signers_csv=$(IFS=','; printf '%s' "${signer_names[*]}")
       log_info "  publishing multisig pubkey via self-send (K=$threshold signers)"
-      _mb_multisig_self_send "$legacy_key_name" "$addr" "$signers_csv" "$threshold" || {
-        log_error "  multisig self-send failed"; return 1;
-      }
+      if ! _mb_multisig_self_send "$legacy_key_name" "$addr" "$signers_csv" "$threshold"; then
+        log_error "  multisig self-send failed"
+        return 1
+      fi
     else
       log_info "  publishing single-sig pubkey via self-send"
       local out tx_hash
-      out=$("$BIN" tx bank send "$legacy_key_name" "$addr" 100000ulume \
-        --node "$NODE" --chain-id "$CHAIN_ID" \
-        --fees 5000ulume --gas auto --gas-adjustment 1.3 \
-        --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
-        --output json -y) || { log_error "  self-send failed: $out"; return 1; }
-      tx_hash=$(assert_broadcast_accepted "$out")
-      wait_for_tx "$tx_hash"
+      if ! out=$("$BIN" tx bank send "$legacy_key_name" "$addr" 100000ulume \
+                   --node "$NODE" --chain-id "$CHAIN_ID" \
+                   --fees 5000ulume --gas auto --gas-adjustment 1.3 \
+                   --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
+                   --output json -y); then
+        log_error "  single-sig self-send broadcast exited non-zero"
+        return 1
+      fi
+      tx_hash=$(assert_broadcast_accepted "$out") || return 1
+      wait_for_tx "$tx_hash" || return 1
     fi
   fi
 
   # ---- 8. delegate to existing migrate-* scripts -----------------------------
+  #
+  # IMPORTANT: every sub-script call below is guarded so that --continue-on-error
+  # at the batch level can actually work. `set -e` would otherwise abort the
+  # entire process the moment migrate-multisig.sh / migrate-account.sh exit
+  # non-zero (e.g. on a transient broadcast RPC drop or the documented exit-8
+  # "seed the pubkey first" race). Do NOT collapse these into bare invocations.
+  #
+  # NOTE on `submit --yes`: foundation accounts in this driver are NEVER
+  # validators (validators have their own migration path via migrate-validator.sh
+  # and require explicit --i-have-stopped-the-node). For claim-multisig submits
+  # the --yes flag is safe and matches the batch-level confirmation contract.
   if [[ "$kind" == "multisig" ]]; then
     log_info "  invoking migrate-multisig.sh (generate -> sign x$threshold -> combine -> submit)"
     local workdir proof partials=() final_tx
@@ -721,43 +773,58 @@ _mb_execute_one() {
     final_tx="${workdir}/tx.json"
 
     # generate
-    "${SCRIPT_DIR}/migrate-multisig.sh" generate \
-      --legacy "$addr" \
-      --new-key "$new_key_name" \
-      --chain-id "$CHAIN_ID" --node "$NODE" \
-      --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
-      --out "$proof" --binary "$BIN"
+    if ! "${SCRIPT_DIR}/migrate-multisig.sh" generate \
+           --legacy "$addr" \
+           --new-key "$new_key_name" \
+           --chain-id "$CHAIN_ID" --node "$NODE" \
+           --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
+           --out "$proof" --binary "$BIN"; then
+      log_error "  migrate-multisig.sh generate failed"
+      return 1
+    fi
 
     # sign x threshold (using first K signers, both legacy and new sides)
     local j=0
     while (( j < threshold )); do
       local sname="${signer_names[$j]}"
       local partial="${workdir}/partial-${j}.json"
-      "${SCRIPT_DIR}/migrate-multisig.sh" sign "$proof" \
-        --from "legacy-${sname}" \
-        --new-key "new-${sname}" \
-        --chain-id "$CHAIN_ID" --node "$NODE" \
-        --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
-        --out "$partial" --binary "$BIN"
+      if ! "${SCRIPT_DIR}/migrate-multisig.sh" sign "$proof" \
+             --from "legacy-${sname}" \
+             --new-key "new-${sname}" \
+             --chain-id "$CHAIN_ID" --node "$NODE" \
+             --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
+             --out "$partial" --binary "$BIN"; then
+        log_error "  migrate-multisig.sh sign failed (signer #$j: $sname)"
+        return 1
+      fi
       partials+=("$partial")
       j=$((j+1))
     done
 
     # combine
-    "${SCRIPT_DIR}/migrate-multisig.sh" combine "${partials[@]}" \
-      --out "$final_tx" --binary "$BIN"
+    if ! "${SCRIPT_DIR}/migrate-multisig.sh" combine "${partials[@]}" \
+           --out "$final_tx" --binary "$BIN"; then
+      log_error "  migrate-multisig.sh combine failed"
+      return 1
+    fi
 
     # submit
-    "${SCRIPT_DIR}/migrate-multisig.sh" submit "$final_tx" \
-      --chain-id "$CHAIN_ID" --node "$NODE" \
-      --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
-      --binary "$BIN" --yes
+    if ! "${SCRIPT_DIR}/migrate-multisig.sh" submit "$final_tx" \
+           --chain-id "$CHAIN_ID" --node "$NODE" \
+           --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
+           --binary "$BIN" --yes; then
+      log_error "  migrate-multisig.sh submit failed"
+      return 1
+    fi
   else
     log_info "  invoking migrate-account.sh"
-    "${SCRIPT_DIR}/migrate-account.sh" "$legacy_key_name" "$new_key_name" \
-      --chain-id "$CHAIN_ID" --node "$NODE" \
-      --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
-      --binary "$BIN" --yes
+    if ! "${SCRIPT_DIR}/migrate-account.sh" "$legacy_key_name" "$new_key_name" \
+           --chain-id "$CHAIN_ID" --node "$NODE" \
+           --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
+           --binary "$BIN" --yes; then
+      log_error "  migrate-account.sh failed"
+      return 1
+    fi
   fi
 
   # ---- 9. verify -------------------------------------------------------------
@@ -889,6 +956,33 @@ E_USAGE
   log_info "  funder         : ${_MB_FUNDER:-<none>}"
   log_info "  top-up amount  : $_MB_TOP_UP_AMOUNT"
   log_info "  dry-run        : $(( _MB_DRY_RUN ))"
+  log_info ""
+
+  # Mainnet guard. This driver has only been validated on devnet/testnet.
+  # Refuse mainnet chain-ids unless the operator explicitly opts in via env var.
+  # Keep the chain-id patterns aligned with the public Lumera mainnet identifier;
+  # if mainnet is renamed, update both this allowlist and the README.
+  case "$CHAIN_ID" in
+    lumera-mainnet*|lumera-1)
+      if [[ "${LUMERA_BATCH_MAINNET_OK:-}" != "i-understand" ]]; then
+        log_error "execute: chain-id '$CHAIN_ID' looks like mainnet."
+        log_error "  this driver is currently scoped to testnet/devnet."
+        log_error "  to override (you accept full responsibility), set:"
+        log_error "    LUMERA_BATCH_MAINNET_OK=i-understand"
+        exit 1
+      fi
+      log_warn "execute: LUMERA_BATCH_MAINNET_OK=i-understand set; proceeding on $CHAIN_ID"
+      ;;
+  esac
+
+  # Show the full target list BEFORE the confirmation prompt, so the operator
+  # can sanity-check WHICH 31 (or whatever count) are about to be touched.
+  log_info "=== Targets to process ==="
+  jq -r --argjson width 38 '
+    to_entries[]
+    | "  \(.key + 1 | tostring | (. + "."))  [\(.value.kind)]  \(.value.name)"
+      + "  -> "  + .value.address
+  ' <<<"$targets"
   log_info ""
 
   if (( yes == 0 )) && (( _MB_DRY_RUN == 0 )); then

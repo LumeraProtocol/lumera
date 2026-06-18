@@ -70,7 +70,7 @@ Common flags:
 | `--target <name>` | Process only the named target. Use this for the first run. |
 | `--funder <key>` | Operator-keyring key that pays fees for zero-balance targets. |
 | `--top-up-amount <coins>` | How much to send to a zero-balance target. Default `100000ulume`. |
-| `--funder-keyring-{backend,dir,home}` | How to reach the funder key. Defaults: `test`, `~/.lumera`. |
+| `--funder-keyring-{backend,dir,home}` | How to reach the funder key. Defaults: `test` backend, lumerad's default home / keyring dir. |
 | `--dry-run` | Stop after read-only steps + address reconstruction; no broadcasts. |
 | `--yes` | Skip the interactive confirmation. |
 | `--continue-on-error` | Don't stop the batch on the first failed target. |
@@ -136,6 +136,11 @@ never by name suffix.
 - All on-chain queries are routed through the existing `lumerad_q` /
   `auth_pubkey_type` / `wait_for_tx` / `assert_broadcast_accepted` helpers
   from `evmigration-common.sh`.
+- **Mainnet guard.** `execute` refuses chain-ids matching `lumera-mainnet*` or
+  `lumera-1` unless the operator opts in via `LUMERA_BATCH_MAINNET_OK=i-understand`.
+  This driver is currently scoped to testnet/devnet; remove this guard only
+  after a dedicated mainnet-hardening pass (durable run log, per-target
+  confirmation, etc.).
 
 ## Exit codes
 

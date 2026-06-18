@@ -1,5 +1,7 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { network } from "hardhat";
+import type {} from "@nomicfoundation/hardhat-ethers";
+import type { HardhatEthers } from "@nomicfoundation/hardhat-ethers/types";
 
 // These tests run against a live Lumera node (devnet or localnode).
 // They are NOT unit tests — they require the precompiles to be available.
@@ -11,6 +13,12 @@ import { ethers } from "hardhat";
 describe("Lumera Precompile Contracts", function () {
   // Increase timeout for on-chain calls
   this.timeout(60_000);
+
+  let ethers: HardhatEthers;
+
+  before(async function () {
+    ({ ethers } = await network.create());
+  });
 
   describe("Direct precompile calls", function () {
     it("should query action module params via precompile", async function () {

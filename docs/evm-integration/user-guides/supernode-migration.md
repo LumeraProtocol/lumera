@@ -1,6 +1,6 @@
 # Supernode Operator EVM Migration Guide
 
-**Last updated**: 2026-04-21
+**Last updated**: 2026-06-16
 **Applies to**: operators running a Lumera supernode against an EVM-enabled chain (post-EVM upgrade)
 **Prerequisite reading**: [migration.md](migration.md) for the chain-level mechanics of legacy → EVM account migration
 
@@ -138,7 +138,10 @@ lumerad query evmigration migration-record <legacy-address>
 The response should show `new_address` matching your EVM key's address. Also confirm the supernode's on-chain registration points at the new address:
 
 ```bash
-lumerad query supernode get-supernode <new-address>
+# get-supernode takes the VALOPER address (lumeravaloper1…), not the account
+# address. Convert your new account address with:
+#   lumerad keys show <new-key> -a --bech val
+lumerad query supernode get-supernode <new-valoper-address>
 ```
 
 Finally, confirm `config.yml` reflects the switch:
@@ -311,7 +314,7 @@ Four-step offline ceremony:
   #    derives the new multisig:
   lumerad keys add <op>-eth-<N> --key-type eth_secp256k1 --keyring-backend <backend>
   lumerad keys add <op>-msig-new --multisig <op>-eth-1,<op>-eth-2,<op>-eth-3 \
-    --multisig-threshold K --keyring-backend <backend>
+    --multisig-threshold K --nosort --keyring-backend <backend>
 
   # 2) Coordinator builds the proof template:
   lumerad tx evmigration generate-proof-payload \
@@ -349,11 +352,14 @@ lumerad keys add <op-name>-eth-<N> --key-type eth_secp256k1 \
 lumerad keys add <op-name>-msig-new \
   --multisig <op-name>-eth-1,<op-name>-eth-2,<op-name>-eth-3 \
   --multisig-threshold 2 \
+  --nosort \
   --keyring-backend <backend>
 
 lumerad keys show <op-name>-msig-new --address
 # lumera1...   <-- the new multisig bech32; record this as new_address
 ```
+
+> **`--nosort` is required, and member order must mirror the legacy side.** Without `--nosort`, `keys add` sorts sub-keys by address, so this composite address won't match the one `generate-proof-payload` derives from `--new-sub-pub-keys` (which preserves the listed order), and the signer indices won't line up. List the members in the **same order as the legacy multisig's `public_keys`** (`lumerad query auth account <multisig-legacy-address>`) so each co-signer holds the same signer index on both sides — the consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`.
 
 This replaces the old single-EOA "recover the new EVM key" step: the destination is a multisig derived from fresh eth sub-keys, not an EOA recovered from a mnemonic.
 
@@ -489,6 +495,8 @@ Regenerate `proof.json` with the correct `--chain-id`, have the affected signer 
 **What if I only have K−1 of the sub-keys available on the legacy side?** — you can't complete migration. The K-of-N threshold is enforced by the keeper (`need <K> valid partial signatures, have <N>`). Recover the missing legacy sub-key(s) from their mnemonics, or coordinate with the actual holders.
 
 **What if only K−1 co-signers have provided eth sub-keys for the destination side?** — same situation, symmetric: you need K valid new-side partials. Have the missing co-signer(s) generate their eth sub-key (`lumerad keys add ... --key-type eth_secp256k1`), rebuild `proof.json` via `generate-proof-payload` with the full `--new-sub-pub-keys` list, and re-sign.
+
+**`legacy key "..." is signer index N, but new key "..." is signer index M; multisig migration requires the same signer position to approve both halves`** — raised by `sign-proof` when a co-signer passes both `--from` and `--new-key` in one call but the two keys occupy *different* positions in their respective multisigs. Each co-signer must hold the **same signer index** on the legacy and new sides (the consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`). The usual root cause is a destination multisig built without `--nosort` (so `keys add` sorted the sub-keys) or with a member order that doesn't mirror the legacy `public_keys`. Recreate `<op-name>-msig-new` with `--nosort`, listing the eth sub-keys in the same member order as the legacy multisig (`lumerad query auth account <multisig-legacy-address>`), then regenerate `proof.json` and re-sign.
 
 **The supernode's embedded error message says `assemble-proof` but the CLI has `combine-proof`. Which is correct?** — the CLI command is `combine-proof`. Any older embedded error message in the supernode binary is stale; use this guide's commands.
 

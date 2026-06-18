@@ -4,6 +4,9 @@
   "description": "Solidity interfaces and example contracts for Lumera's custom EVM precompiles",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "compile": "hardhat compile",
     "clean": "hardhat clean",

@@ -260,11 +260,11 @@ func flexInt(raw json.RawMessage) (int, error) {
 		if asString == "" {
 			return 0, nil
 		}
-		n, err := strconv.ParseInt(asString, 10, strconv.IntSize)
+		n, err := strconv.Atoi(asString)
 		if err != nil {
 			return 0, fmt.Errorf("parse %q as int: %w", asString, err)
 		}
-		return int(n), nil
+		return n, nil
 	}
 	var asInt int
 	if err := json.Unmarshal(raw, &asInt); err == nil {

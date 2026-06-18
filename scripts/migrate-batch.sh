@@ -552,12 +552,27 @@ _mb_import_signer() {
 # _mb_add_multisig <name> <members_csv> <threshold>
 # Creates a multisig key inside the ephemeral keyring. Idempotent: if a key
 # of that name already exists it's removed first.
+#
+# CRITICAL: --nosort is mandatory. Without it, `lumerad keys add --multisig`
+# sorts sub-keys by ADDRESS before assembling the multisig pubkey. That
+# silently produces a DIFFERENT multisig address when the input order does
+# not coincide with address-sort order, AND silently rearranges the new
+# multisig's public_keys[] in a different order than the legacy multisig's
+# public_keys[]. The latter breaks `migrate-multisig.sh sign` with
+# "legacy key X is signer index N, but new key X is signer index M" because
+# the sign-proof CLI enforces that the same logical signer occupies the same
+# index on both sides.
+#
+# The output.json file's public_keys[] order is canonical. We must preserve
+# that exact order on BOTH the legacy and the new multisigs, which means
+# --nosort on every `keys add --multisig` invocation.
 _mb_add_multisig() {
   local name="$1" members_csv="$2" threshold="$3"
   "$BIN" keys delete "$name" --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" -y >/dev/null 2>&1 || true
   "$BIN" keys add "$name" \
     --multisig "$members_csv" \
     --multisig-threshold "$threshold" \
+    --nosort \
     --keyring-backend test \
     --keyring-dir "$_MB_EPHEMERAL_DIR" >/dev/null
 }
@@ -607,8 +622,11 @@ _mb_multisig_self_send() {
   workdir=$(mktemp -d "${_MB_EPHEMERAL_DIR}/selfsend-XXXXXX")
   local unsigned="${workdir}/unsigned.json"
 
-  # 1. Unsigned tx (self-send 100000ulume to publish pubkey).
-  "$BIN" tx bank send "$multi_addr" "$multi_addr" 100000ulume \
+  # 1. Unsigned tx (self-send 100000ulume to publish pubkey). The first
+  # positional argument is the FROM key NAME (looked up in the keyring), not
+  # an address. lumerad rejects an address here as "no key name or address
+  # provided; have you forgotten the --from flag?".
+  "$BIN" tx bank send "$multi_name" "$multi_addr" 100000ulume \
     --node "$NODE" --chain-id "$CHAIN_ID" \
     --fees 5000ulume --gas auto --gas-adjustment 1.3 \
     --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \

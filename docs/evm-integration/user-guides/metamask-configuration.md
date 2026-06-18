@@ -33,6 +33,21 @@ Official references:
 - MetaMask `eth_chainId` reference: <https://docs.metamask.io/services/reference/ethereum/json-rpc-methods/eth_chainid/>
 - MetaMask `wallet_addEthereumChain` reference: <https://docs.metamask.io/metamask-connect/evm/reference/json-rpc-api/wallet_addEthereumChain/>
 
+## EVM RPC URLs by Network
+
+The RPC URL you give MetaMask is always the **EVM JSON-RPC** endpoint (`evm-rpc.*`)
+for the target network. The chain ID (`76857769`) and currency symbol (`LUME`) are
+identical on every Lumera network.
+
+| Network | RPC URL (EVM JSON-RPC) | Chain ID |
+| --- | --- | --- |
+| Lumera Mainnet | `https://evm-rpc.lumera.io` | `76857769` |
+| Lumera Testnet | `https://evm-rpc.testnet.lumera.io` | `76857769` |
+| Lumera Devnet (public) | `https://evm-rpc.pastel.network` | `76857769` |
+| Local devnet node | `http://localhost:8545` (validator 1 — see [Validator Local Ports](#validator-local-ports)) | `76857769` |
+
+The rest of this guide uses the public **devnet** values as the worked example.
+
 ## Lumera Devnet Values
 
 Use these values for the public Lumera devnet endpoint operated for the Portal.

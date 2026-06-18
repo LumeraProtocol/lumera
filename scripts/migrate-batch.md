@@ -71,6 +71,7 @@ Common flags:
 | `--funder <key>` | Operator-keyring key that pays fees for zero-balance targets. |
 | `--top-up-amount <coins>` | How much to send to a zero-balance target. Default `100000ulume`. |
 | `--funder-keyring-{backend,dir,home}` | How to reach the funder key. Defaults: `test` backend, lumerad's default home / keyring dir. |
+| `--log-file <path>` | Append one JSONL audit record per lifecycle milestone (batch_start, target_start, classify, keyring_setup, reconstructed, funding_*, self_send_*, ceremony_start, target_done, batch_done). Mode 0600 on create, append-only, correlated by per-run `batch_id`. Operator handles rotation. |
 | `--dry-run` | Stop after read-only steps + address reconstruction; no broadcasts. |
 | `--yes` | Skip the interactive confirmation. |
 | `--continue-on-error` | Don't stop the batch on the first failed target. |

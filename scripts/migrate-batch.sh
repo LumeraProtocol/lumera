@@ -470,6 +470,46 @@ S_USAGE
 # Module-level state for the per-target ephemeral keyring cleanup trap.
 _MB_EPHEMERAL_DIR=""
 
+# Module-level state for the optional persistent run log (--log-file).
+# When _MB_LOG_FILE is non-empty, _mb_log_event appends one JSONL record per
+# milestone (batch_start, target_start, target_done, etc.). The path is
+# resolved to absolute at execute() entry; the file is created mode 0600 and
+# never rotated by this script — operators rotate / archive themselves.
+_MB_LOG_FILE=""
+_MB_BATCH_ID=""
+
+# _mb_log_event <event-name> [key value]...
+#
+# Append a single JSON object as one line to $_MB_LOG_FILE. No-op if the
+# operator did not pass --log-file. Uses jq -nc for safe JSON escaping; do
+# NOT replace with hand-rolled printf — operator-supplied values (addresses,
+# tx hashes, error strings) can contain characters that would break a
+# naive concatenation.
+#
+# Reserved keys ALWAYS present: ts (UTC ISO-8601), batch_id, event.
+# Caller-provided keys are placed alongside; keys must be valid jq variable
+# names (matches /^[a-zA-Z_][a-zA-Z0-9_]*$/), which this script always
+# satisfies.
+_mb_log_event() {
+  [[ -z "$_MB_LOG_FILE" ]] && return 0
+  local event="$1"; shift
+  local args=(--arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              --arg batch "$_MB_BATCH_ID"
+              --arg event "$event")
+  # Dynamically build a jq object expression from the remaining key/value
+  # pairs. Keys map 1:1 to --arg names; missing values default to "".
+  local pairs='{}'
+  while (( $# >= 2 )); do
+    args+=(--arg "$1" "$2")
+    pairs="$pairs + {\"$1\": \$$1}"
+    shift 2
+  done
+  # Best-effort write; do not let log-file IO errors abort the batch.
+  jq -nc "${args[@]}" "{ts: \$ts, batch_id: \$batch, event: \$event} + $pairs" \
+    >>"$_MB_LOG_FILE" 2>/dev/null || \
+      log_warn "log-file write failed (continuing): $_MB_LOG_FILE"
+}
+
 _mb_cleanup_ephemeral() {
   if [[ -n "$_MB_EPHEMERAL_DIR" && -d "$_MB_EPHEMERAL_DIR" ]]; then
     # Defensive: refuse to nuke anything outside /tmp or our intended dir name.
@@ -626,6 +666,7 @@ _mb_execute_one() {
   log_info ""
   log_info "──── target: $name ($kind) ────"
   log_info "  legacy address: $(legacy_value "$addr")"
+  _mb_log_event target_start target "$name" kind "$kind" address "$addr"
 
   # ---- 1. classify -----------------------------------------------------------
   local cls cls_status balance
@@ -633,23 +674,28 @@ _mb_execute_one() {
   cls_status=$(awk 'NR==1' <<<"$cls")
   balance=$(awk -F= 'NR==2 {print $2}' <<<"$cls")
   log_info "  on-chain status: $cls_status  (balance=${balance}ulume)"
+  _mb_log_event classify target "$name" status "$cls_status" balance "$balance"
 
   if [[ "$cls_status" == "migrated" ]]; then
     log_info "  already migrated; skipping"
+    _mb_log_event target_done target "$name" outcome skipped_already_migrated
     return 0
   fi
   if [[ "$cls_status" == "unknown" ]]; then
     log_error "  could not classify on-chain state; check RPC and re-run"
+    _mb_log_event target_done target "$name" outcome failed reason rpc_unknown
     return 2
   fi
   if [[ "$cls_status" == "needs-funding" && -z "${_MB_FUNDER}" ]]; then
     log_error "  needs --funder + --top-up-amount to seed fees; aborting target"
+    _mb_log_event target_done target "$name" outcome failed reason needs_funder_not_provided
     return 1
   fi
 
   # ---- 2. ephemeral keyring --------------------------------------------------
   _mb_make_ephemeral_keyring
   log_info "  ephemeral keyring: $_MB_EPHEMERAL_DIR"
+  _mb_log_event keyring_setup target "$name" ephemeral_dir "$_MB_EPHEMERAL_DIR"
 
   # ---- 3. import all signer mnemonics ----------------------------------------
   local signer_names=()
@@ -691,10 +737,15 @@ _mb_execute_one() {
       log_error "    file:    $addr"
       log_error "    rebuilt: $rebuilt_legacy_addr"
       log_error "  this means signer order or threshold is wrong; aborting target"
+      _mb_log_event target_done target "$name" outcome failed \
+        reason legacy_multisig_address_mismatch \
+        file_address "$addr" rebuilt_address "$rebuilt_legacy_addr"
       return 1
     fi
     log_info "  reconstructed legacy multisig: $(legacy_value "$rebuilt_legacy_addr")  ✓ matches file"
     log_info "  reconstructed new multisig:    $(new_value    "$rebuilt_new_addr")"
+    _mb_log_event reconstructed target "$name" \
+      legacy_address "$rebuilt_legacy_addr" new_address "$rebuilt_new_addr"
   else
     # Standalone single-sig — the single signer's two variants ARE the
     # legacy and new keys.
@@ -707,34 +758,45 @@ _mb_execute_one() {
       log_error "    file:    $addr"
       log_error "    rebuilt: $rebuilt_legacy_addr"
       log_error "  aborting target"
+      _mb_log_event target_done target "$name" outcome failed \
+        reason legacy_singlesig_address_mismatch \
+        file_address "$addr" rebuilt_address "$rebuilt_legacy_addr"
       return 1
     fi
     log_info "  reconstructed legacy single-sig: $(legacy_value "$rebuilt_legacy_addr")  ✓ matches file"
+    _mb_log_event reconstructed target "$name" legacy_address "$rebuilt_legacy_addr"
   fi
 
   if (( _MB_DRY_RUN == 1 )); then
     log_info "  --dry-run: stopping before any tx"
+    _mb_log_event target_done target "$name" outcome dry_run_complete
     return 0
   fi
 
   # ---- 6. fund if needed -----------------------------------------------------
   if [[ "$cls_status" == "needs-funding" ]]; then
     log_info "  funding $(legacy_value "$addr") with ${_MB_TOP_UP_AMOUNT} from $(legacy_value "$_MB_FUNDER")"
-    _mb_send_with_funder "$_MB_FUNDER" "$addr" "$_MB_TOP_UP_AMOUNT" || {
-      log_error "  funding failed"; return 1;
-    }
+    _mb_log_event funding_start target "$name" funder "$_MB_FUNDER" amount "$_MB_TOP_UP_AMOUNT"
+    if ! _mb_send_with_funder "$_MB_FUNDER" "$addr" "$_MB_TOP_UP_AMOUNT"; then
+      log_error "  funding failed"
+      _mb_log_event target_done target "$name" outcome failed reason funding_failed
+      return 1
+    fi
+    _mb_log_event funding_done target "$name"
     # Re-classify so we proceed to self-send.
     cls_status="needs-pubkey"
   fi
 
   # ---- 7. self-send to publish pubkey ----------------------------------------
   if [[ "$cls_status" == "needs-pubkey" ]]; then
+    _mb_log_event self_send_start target "$name" mode "$kind"
     if [[ "$kind" == "multisig" ]]; then
       local signers_csv
       signers_csv=$(IFS=','; printf '%s' "${signer_names[*]}")
       log_info "  publishing multisig pubkey via self-send (K=$threshold signers)"
       if ! _mb_multisig_self_send "$legacy_key_name" "$addr" "$signers_csv" "$threshold"; then
         log_error "  multisig self-send failed"
+        _mb_log_event target_done target "$name" outcome failed reason multisig_self_send_failed
         return 1
       fi
     else
@@ -746,11 +808,19 @@ _mb_execute_one() {
                    --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
                    --output json -y); then
         log_error "  single-sig self-send broadcast exited non-zero"
+        _mb_log_event target_done target "$name" outcome failed reason singlesig_self_send_failed
         return 1
       fi
-      tx_hash=$(assert_broadcast_accepted "$out") || return 1
-      wait_for_tx "$tx_hash" || return 1
+      tx_hash=$(assert_broadcast_accepted "$out") || {
+        _mb_log_event target_done target "$name" outcome failed reason singlesig_self_send_rejected
+        return 1
+      }
+      wait_for_tx "$tx_hash" || {
+        _mb_log_event target_done target "$name" outcome failed reason singlesig_self_send_not_included
+        return 1
+      }
     fi
+    _mb_log_event self_send_done target "$name"
   fi
 
   # ---- 8. delegate to existing migrate-* scripts -----------------------------
@@ -767,6 +837,7 @@ _mb_execute_one() {
   # the --yes flag is safe and matches the batch-level confirmation contract.
   if [[ "$kind" == "multisig" ]]; then
     log_info "  invoking migrate-multisig.sh (generate -> sign x$threshold -> combine -> submit)"
+    _mb_log_event ceremony_start target "$name" path multisig threshold "$threshold"
     local workdir proof partials=() final_tx
     workdir=$(mktemp -d "${_MB_EPHEMERAL_DIR}/migrate-XXXXXX")
     proof="${workdir}/proof.json"
@@ -780,6 +851,7 @@ _mb_execute_one() {
            --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
            --out "$proof" --binary "$BIN"; then
       log_error "  migrate-multisig.sh generate failed"
+      _mb_log_event target_done target "$name" outcome failed reason migrate_multisig_generate_failed
       return 1
     fi
 
@@ -795,6 +867,8 @@ _mb_execute_one() {
              --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
              --out "$partial" --binary "$BIN"; then
         log_error "  migrate-multisig.sh sign failed (signer #$j: $sname)"
+        _mb_log_event target_done target "$name" outcome failed \
+          reason migrate_multisig_sign_failed signer_index "$j" signer_name "$sname"
         return 1
       fi
       partials+=("$partial")
@@ -805,6 +879,7 @@ _mb_execute_one() {
     if ! "${SCRIPT_DIR}/migrate-multisig.sh" combine "${partials[@]}" \
            --out "$final_tx" --binary "$BIN"; then
       log_error "  migrate-multisig.sh combine failed"
+      _mb_log_event target_done target "$name" outcome failed reason migrate_multisig_combine_failed
       return 1
     fi
 
@@ -814,30 +889,37 @@ _mb_execute_one() {
            --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
            --binary "$BIN" --yes; then
       log_error "  migrate-multisig.sh submit failed"
+      _mb_log_event target_done target "$name" outcome failed reason migrate_multisig_submit_failed
       return 1
     fi
   else
     log_info "  invoking migrate-account.sh"
+    _mb_log_event ceremony_start target "$name" path single_sig
     if ! "${SCRIPT_DIR}/migrate-account.sh" "$legacy_key_name" "$new_key_name" \
            --chain-id "$CHAIN_ID" --node "$NODE" \
            --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
            --binary "$BIN" --yes; then
       log_error "  migrate-account.sh failed"
+      _mb_log_event target_done target "$name" outcome failed reason migrate_account_failed
       return 1
     fi
   fi
 
   # ---- 9. verify -------------------------------------------------------------
   local rec_json rec_new
-  rec_json=$(lumerad_q_capture evmigration migration-record "$addr") || {
-    log_error "  post-check: could not query migration-record"; return 1;
-  }
+  if ! rec_json=$(lumerad_q_capture evmigration migration-record "$addr"); then
+    log_error "  post-check: could not query migration-record"
+    _mb_log_event target_done target "$name" outcome failed reason post_check_query_failed
+    return 1
+  fi
   rec_new=$(jq -r '.record.new_address // empty' <<<"$rec_json")
   if [[ -z "$rec_new" ]]; then
     log_error "  post-check: no migration record for $(legacy_value "$addr")"
+    _mb_log_event target_done target "$name" outcome failed reason post_check_no_record
     return 1
   fi
   log_info "  ✓ migrated: $(legacy_value "$addr") -> $(new_value "$rec_new")"
+  _mb_log_event target_done target "$name" outcome success new_address "$rec_new"
   return 0
 }
 
@@ -852,6 +934,8 @@ _mb_execute() {
   _MB_FUNDER_KEYRING_BACKEND="test"
   _MB_FUNDER_KEYRING_DIR=""
   _MB_FUNDER_HOME=""
+  _MB_LOG_FILE=""
+  _MB_BATCH_ID=""
   local continue_on_error=0
 
   while (( $# > 0 )); do
@@ -866,6 +950,7 @@ _mb_execute() {
       --funder-keyring-backend)  _require_value "$1" "$#" "${2-}"; _MB_FUNDER_KEYRING_BACKEND="$2"; shift 2 ;;
       --funder-keyring-dir)      _require_value "$1" "$#" "${2-}"; _MB_FUNDER_KEYRING_DIR="$2"; shift 2 ;;
       --funder-home)             _require_value "$1" "$#" "${2-}"; _MB_FUNDER_HOME="$2"; shift 2 ;;
+      --log-file)                _require_value "$1" "$#" "${2-}"; _MB_LOG_FILE="$2"; shift 2 ;;
       --dry-run)                 _MB_DRY_RUN=1; shift ;;
       --yes|-y)                  yes=1; shift ;;
       --continue-on-error)       continue_on_error=1; shift ;;
@@ -876,6 +961,7 @@ Usage: migrate-batch.sh execute --mnemonics <file> \
   [--target <name>] \
   [--funder <key>] [--top-up-amount <coins>] \
   [--funder-keyring-backend <b>] [--funder-keyring-dir <dir>] [--funder-home <dir>] \
+  [--log-file <path>] \
   [--dry-run] [--yes] [--continue-on-error]
 
 Phase C — run the migration lifecycle for each target.
@@ -903,6 +989,14 @@ Optional:
                              self-send. Default: 100000ulume.
   --funder-keyring-*         How to reach the funder key (defaults: backend=test,
                              dir=$HOME default).
+  --log-file <path>          Append JSONL audit records (one event per line)
+                             of every lifecycle milestone: batch_start /
+                             target_start / classify / keyring_setup /
+                             reconstructed / funding_start / funding_done /
+                             self_send_* / ceremony_start / target_done /
+                             batch_done. Created mode 0600 if missing. The
+                             file is APPEND-ONLY; safe to re-run the batch
+                             against the same file. Operator handles rotation.
   --dry-run                  Run read-only steps (incl. address reconstruction
                              + assertion), stop before any broadcast.
   --yes                      Skip interactive confirmation before the batch.
@@ -956,6 +1050,31 @@ E_USAGE
   log_info "  funder         : ${_MB_FUNDER:-<none>}"
   log_info "  top-up amount  : $_MB_TOP_UP_AMOUNT"
   log_info "  dry-run        : $(( _MB_DRY_RUN ))"
+
+  # Initialize the optional JSONL run log. Generate a batch_id we can use to
+  # correlate every event in this run. mktemp-style randomness via /dev/urandom
+  # is preferred over $$/timestamp because two batches can start in the same
+  # second, and we want grep-by-batch to be unambiguous.
+  if [[ -n "$_MB_LOG_FILE" ]]; then
+    # Resolve to absolute path so a later cd cannot redirect appends.
+    case "$_MB_LOG_FILE" in
+      /*) ;;
+      *)  _MB_LOG_FILE="$(pwd)/$_MB_LOG_FILE" ;;
+    esac
+    if [[ ! -e "$_MB_LOG_FILE" ]]; then
+      ( umask 0177 && : >>"$_MB_LOG_FILE" ) || {
+        log_error "execute: cannot create --log-file: $_MB_LOG_FILE"
+        exit 1
+      }
+    fi
+    if [[ ! -w "$_MB_LOG_FILE" ]]; then
+      log_error "execute: --log-file not writable: $_MB_LOG_FILE"
+      exit 1
+    fi
+    _MB_BATCH_ID="$(od -An -tx1 -N8 /dev/urandom 2>/dev/null | tr -d ' \n' || echo "$$-$(date +%s)")"
+    log_info "  log file       : $_MB_LOG_FILE"
+    log_info "  batch id       : $_MB_BATCH_ID"
+  fi
   log_info ""
 
   # Mainnet guard. This driver has only been validated on devnet/testnet.
@@ -989,6 +1108,11 @@ E_USAGE
     confirm "Proceed with migration of $n_rows target(s)?"
   fi
 
+  _mb_log_event batch_start \
+    chain_id "$CHAIN_ID" node "$NODE" target_count "$n_rows" \
+    funder "${_MB_FUNDER:-}" top_up_amount "$_MB_TOP_UP_AMOUNT" \
+    dry_run "$_MB_DRY_RUN"
+
   # Install the trap once. _mb_cleanup_ephemeral is a no-op when there's
   # nothing to clean.
   trap _mb_cleanup_ephemeral EXIT
@@ -1017,6 +1141,8 @@ E_USAGE
   log_info "  succeeded : $ok"
   log_info "  failed    : $failed"
   log_info "  remaining : $(( n_rows - ok - failed ))"
+  _mb_log_event batch_done \
+    succeeded "$ok" failed "$failed" remaining "$(( n_rows - ok - failed ))"
   if (( failed > 0 )); then
     return 1
   fi

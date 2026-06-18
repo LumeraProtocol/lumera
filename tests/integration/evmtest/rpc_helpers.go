@@ -274,7 +274,13 @@ func waitForJSONRPCResult(rpcURL string, waitCh <-chan error, output *bytes.Buff
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		select {
-		case err := <-waitCh:
+		case err, ok := <-waitCh:
+			if !ok {
+				return fmt.Errorf("node wait channel closed before json-rpc became ready")
+			}
+			if err == nil {
+				return fmt.Errorf("node exited before json-rpc became ready")
+			}
 			return fmt.Errorf("node exited before json-rpc became ready: %w", err)
 		default:
 		}

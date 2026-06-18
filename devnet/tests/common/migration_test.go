@@ -1,6 +1,10 @@
 package common
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 func TestParseMigrationEstimate(t *testing.T) {
 	t.Run("single-sig with string-encoded counts", func(t *testing.T) {
@@ -147,6 +151,48 @@ func TestParseMigrationRecord(t *testing.T) {
 		}
 		if found {
 			t.Error("found = true, want false for empty record object")
+		}
+	})
+}
+
+func TestFlexInt(t *testing.T) {
+	t.Run("empty input is zero", func(t *testing.T) {
+		got, err := flexInt(nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != 0 {
+			t.Errorf("flexInt(nil) = %d, want 0", got)
+		}
+	})
+
+	t.Run("string number", func(t *testing.T) {
+		got, err := flexInt(json.RawMessage(`"42"`))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != 42 {
+			t.Errorf("flexInt(\"42\") = %d, want 42", got)
+		}
+	})
+
+	t.Run("json number", func(t *testing.T) {
+		got, err := flexInt(json.RawMessage(`17`))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != 17 {
+			t.Errorf("flexInt(17) = %d, want 17", got)
+		}
+	})
+
+	t.Run("out of range string", func(t *testing.T) {
+		_, err := flexInt(json.RawMessage(`"9223372036854775808"`))
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !strings.Contains(err.Error(), "parse") {
+			t.Errorf("error = %q, want parse context", err)
 		}
 	})
 }

@@ -251,8 +251,26 @@ func parseMigrationRecord(out string) (MigrationRecord, bool, error) {
 // appear as JSON numbers or quoted strings. These helpers accept both.
 
 func flexInt(raw json.RawMessage) (int, error) {
-	v, err := flexInt64(raw)
-	return int(v), err
+	if len(raw) == 0 {
+		return 0, nil
+	}
+	var asString string
+	if err := json.Unmarshal(raw, &asString); err == nil {
+		asString = strings.TrimSpace(asString)
+		if asString == "" {
+			return 0, nil
+		}
+		n, err := strconv.ParseInt(asString, 10, strconv.IntSize)
+		if err != nil {
+			return 0, fmt.Errorf("parse %q as int: %w", asString, err)
+		}
+		return int(n), nil
+	}
+	var asInt int
+	if err := json.Unmarshal(raw, &asInt); err == nil {
+		return asInt, nil
+	}
+	return 0, fmt.Errorf("unsupported numeric format: %s", string(raw))
 }
 
 func flexInt64(raw json.RawMessage) (int64, error) {

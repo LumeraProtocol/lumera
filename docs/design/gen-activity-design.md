@@ -70,8 +70,8 @@ Additional flags:
 
 - `-config=gen-activity-config.toml`: optional TOML config file.
 - `-chain=devnet`: named chain section to use from the config file.
-- `-wizard=false` / `-w=false`: run the interactive wizard; this is also the
-  default when no flags are passed.
+- `-wizard` / `-w`: run the interactive wizard; this is also the default when
+  no flags are passed. Use `-wizard=false` or `-w=false` to disable it.
 - `-keyring-backend=test`: local funder keyring backend.
 - `-add-accounts=true`: add `-num-accounts` new regular users to an existing
   registry.

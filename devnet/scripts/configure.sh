@@ -135,7 +135,7 @@ fi
 CHAIN_ID="$(jq -r '.chain.id' "${CONFIG_JSON}")"
 echo "[CONFIGURE] Lumera chain ID is $CHAIN_ID"
 
-SHARED_DIR="/tmp/${CHAIN_ID}/shared"
+SHARED_DIR="${DEVNET_SHARED_DIR:-/tmp/${CHAIN_ID}/shared}"
 CFG_DIR="${SHARED_DIR}/config"
 RELEASE_DIR="${SHARED_DIR}/release"
 

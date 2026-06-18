@@ -20,10 +20,30 @@ import (
 
 const defaultEVMCutoverVer = "v1.20.0"
 
+// vestingGasTopUp is the small liquid balance sent to each vesting/locked
+// account so it can pay transaction fees (locked balances cannot cover gas).
+const vestingGasTopUp = "1000000ulume"
+
 const usageDescription = "tests-gen-activity generates realistic account activity against a live Lumera devnet chain."
 
 func main() {
-	cfg := parseFlags()
+	cfg := &Config{}
+	configureFlags(flag.CommandLine, cfg)
+	flag.Parse()
+
+	wizard, setFlags, err := resolveConfig(cfg, flag.CommandLine)
+	if err != nil {
+		log.Fatalf("configuration: %v", err)
+	}
+
+	if wizard {
+		fc, _ := LoadFileConfig(cfg.ConfigPath)
+		if err := runWizard(cfg, fc, setFlags, newSurveyPrompter(), run); err != nil {
+			log.Fatalf("wizard: %v", err)
+		}
+		return
+	}
+
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
 	}
@@ -32,11 +52,30 @@ func main() {
 	}
 }
 
-func parseFlags() *Config {
-	c := &Config{}
-	configureFlags(flag.CommandLine, c)
-	flag.Parse()
-	return c
+// resolveConfig loads any config file referenced by cfg.ConfigPath, layers it
+// onto cfg honoring CLI-flag precedence, and reports whether the tool should run
+// in wizard mode (no flags passed, or -w/-wizard). fs must be the FlagSet that
+// already parsed the command line (so fs.Visit/fs.NFlag reflect what the user
+// set).
+// The returned setFlags map records which CLI flags the user set explicitly; the
+// wizard reuses it so a later chain re-seed cannot clobber those overrides.
+func resolveConfig(cfg *Config, fs *flag.FlagSet) (wizard bool, setFlags map[string]bool, err error) {
+	setFlags = map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { setFlags[f.Name] = true })
+
+	fc, err := LoadFileConfig(cfg.ConfigPath)
+	if err != nil {
+		return false, setFlags, err
+	}
+	if fc == nil && setFlags["config"] {
+		return false, setFlags, fmt.Errorf("config file %q not found", cfg.ConfigPath)
+	}
+	if err := ApplyFileConfig(cfg, fc, cfg.Chain, setFlags); err != nil {
+		return false, setFlags, err
+	}
+
+	wizard = cfg.Wizard || fs.NFlag() == 0
+	return wizard, setFlags, nil
 }
 
 func configureFlags(fs *flag.FlagSet, c *Config) {
@@ -49,17 +88,26 @@ func configureFlags(fs *flag.FlagSet, c *Config) {
 	}
 
 	fs.StringVar(&c.Bin, "bin", "lumerad", "lumerad binary path")
+	fs.StringVar(&c.ConfigPath, "config", "gen-activity-config.toml", "path to gen-activity TOML config file (optional)")
+	fs.StringVar(&c.Chain, "chain", "", "named chain section from the config file (e.g. devnet, testnet, mainnet)")
+	fs.BoolVar(&c.Wizard, "wizard", false, "run the interactive wizard (also the default when no flags are passed)")
+	fs.BoolVar(&c.Wizard, "w", false, "shorthand for -wizard")
 	fs.StringVar(&c.RPC, "rpc", "tcp://localhost:26657", "CometBFT RPC endpoint")
 	fs.StringVar(&c.GRPC, "grpc", "localhost:9090", "gRPC endpoint")
 	fs.StringVar(&c.ChainID, "chain-id", "", "chain ID (required)")
 	fs.StringVar(&c.Home, "home", "", "lumerad home directory")
 	fs.StringVar(&c.KeyringBackend, "keyring-backend", "test", "local funder keyring backend")
 	fs.StringVar(&c.EVMCutoverVer, "evm-cutover-version", defaultEVMCutoverVer, "lumerad version where accounts switch to coin-type 60")
-	fs.StringVar(&c.FundingKey, "funding-key", "", "funder key name in the local keyring (required)")
+	fs.StringVar(&c.FundingKey, "funding-key", "governance_key", "funder key name in the local keyring")
 	fs.StringVar(&c.AccountsPath, "accounts", "devnet/tests/gen-activity/accounts.json", "registry file path")
 	fs.IntVar(&c.NumAccounts, "num-accounts", 10, "number of accounts to generate")
+	fs.IntVar(&c.NumMultisig23, "num-multisig23-accounts", 0, "number of 2-of-3 multisig accounts to generate")
+	fs.IntVar(&c.NumMultisig35, "num-multisig35-accounts", 0, "number of 3-of-5 multisig accounts to generate")
+	fs.IntVar(&c.VestingPercent, "vesting-percent", 0, "percent of regular accounts to create as continuous/delayed vesting (0-100)")
+	fs.IntVar(&c.NumPermanentLocked, "num-permanent-locked-accounts", 0, "number of dedicated PermanentLocked accounts to generate")
 	fs.StringVar(&c.MaxAccountAmount, "max-account-amount", "10000000ulume", "upper bound for per-account funding")
 	fs.StringVar(&c.AccountPrefix, "account-prefix", "gen", "name prefix for generated accounts")
+	fs.StringVar(&c.Mode, "mode", "", "run mode: fresh|add-accounts|activity-existing|migrate (default fresh; -add-accounts/-activity-existing are shorthands)")
 	fs.BoolVar(&c.AddAccounts, "add-accounts", false, "add -num-accounts new users to an existing registry")
 	fs.BoolVar(&c.ActivityExisting, "activity-existing", false, "generate more activity for existing accounts")
 	fs.BoolVar(&c.Actions, "actions", true, "include CASCADE action activity")
@@ -67,15 +115,21 @@ func configureFlags(fs *flag.FlagSet, c *Config) {
 	fs.IntVar(&c.MaxActionsPerRun, "max-actions-per-run", 3, "cap action uploads/registrations per run")
 	fs.StringVar(&c.ActionStates, "action-states", "pending,done,approved", "target action states to generate")
 	fs.DurationVar(&c.ActionReadinessTimeout, "action-readiness-timeout", 180*time.Second, "time to wait for usable active supernodes")
-	fs.IntVar(&c.FundingBatchSize, "funding-batch-size", 10, "funder transfers to pipeline before waiting for inclusion")
+	fs.IntVar(&c.FundingBatchSize, "funding-batch-size", 1, "funder transfers to pipeline before waiting for inclusion")
 	fs.IntVar(&c.Parallelism, "parallelism", 5, "maximum concurrent per-account activity workers")
-	fs.BoolVar(&c.DryRun, "dry-run", false, "print planned accounts/activity without submitting txs")
+	fs.BoolVar(&c.DryRun, "dry-run", true, "print planned accounts/activity without submitting txs")
 }
 
 // run executes the runtime flow described in the design. Steps 1-6 are
 // read-only; -dry-run stops after printing the plan and never mutates the
 // keyring or registry.
 func run(cfg *Config) error {
+	// Migrate mode is a distinct flow: it migrates existing registry accounts to
+	// their EVM-compatible counterparts instead of generating/funding accounts.
+	if cfg.resolvedMode == ModeMigrate {
+		return runMigrateMode(cfg)
+	}
+
 	// Step 2: detect key style from the current lumerad runtime.
 	keyStyle := detectKeyStyle(cfg.Bin, cfg.EVMCutoverVer)
 	log.Printf("key style: %s (algo=%s coin-type=%d)", keyStyle.Name(), keyStyle.Algo, keyStyle.CoinType)
@@ -134,15 +188,50 @@ func run(cfg *Config) error {
 	}
 	log.Printf("generated %d new account(s); registry saved", len(newRecs))
 
-	// Step 9: fund unfunded accounts via the single-funder batcher.
+	// Generate multisig accounts (2-of-3 / 3-of-5) alongside regular accounts.
+	var newMultisig []*AccountRecord
+	if specs := multisigPlan(cfg.NumMultisig23, cfg.NumMultisig35); len(specs) > 0 && !cfg.ActivityExisting {
+		newMultisig = generateMultisigAccounts(cli, reg, cfg.AccountPrefix, specs, keyStyle)
+		if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			return fmt.Errorf("save registry after multisig key generation: %w", err)
+		}
+		log.Printf("generated %d new multisig account(s)", len(newMultisig))
+	}
+
+	// Designate a random share of new regular accounts as vesting, and generate
+	// dedicated permanent-locked accounts. Tagged BEFORE funding so the funding
+	// split routes them to the vesting funder (vesting/locked accounts must be
+	// created at funding time).
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	if !cfg.ActivityExisting {
+		lockedAmount := common.Coin{Amount: randomFundingAmount(cfg.maxAmount.Amount, rng), Denom: common.ChainDenom}.String()
+		if sel := planVesting(newRecs, cfg.VestingPercent, lockedAmount, rng, time.Now().Unix()); len(sel) > 0 {
+			log.Printf("designated %d/%d new account(s) as vesting", len(sel), len(newRecs))
+		}
+		if cfg.NumPermanentLocked > 0 {
+			plocked := generatePermanentLockedAccounts(cli, reg, cfg.AccountPrefix, cfg.NumPermanentLocked, keyStyle, lockedAmount, time.Now().UTC().Format(time.RFC3339))
+			log.Printf("generated %d permanent-locked account(s)", len(plocked))
+		}
+		if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			return fmt.Errorf("save registry after vesting designation: %w", err)
+		}
+	}
+
+	// Step 9: fund unfunded accounts via the single-funder batcher.
 	chain := &cliFundingChain{cli: cli, funderKey: cfg.FundingKey, funderAddr: funderAddr, blockWait: 30 * time.Second}
-	targets := unfundedTargets(reg)
+	bankTargets, vestingTargets := splitFundingTargets(reg)
 	amountFor := func(*AccountRecord) string {
 		return common.Coin{Amount: randomFundingAmount(cfg.maxAmount.Amount, rng), Denom: common.ChainDenom}.String()
 	}
-	funded, fundErr := FundAccounts(chain, targets, amountFor, cfg.FundingBatchSize, 3)
-	log.Printf("funded %d/%d account(s)", funded, len(targets))
+	funded, fundErr := FundAccounts(chain, bankTargets, amountFor, cfg.FundingBatchSize, 3)
+	log.Printf("funded %d/%d bank account(s)", funded, len(bankTargets))
+
+	// Vesting/locked accounts are created-and-funded via create-* txs + a liquid
+	// top-up so they can pay gas.
+	if len(vestingTargets) > 0 {
+		vfunded := fundVestingAccounts(cli, cfg.FundingKey, funderAddr, vestingTargets, vestingGasTopUp)
+		log.Printf("funded %d/%d vesting/locked account(s)", vfunded, len(vestingTargets))
+	}
 
 	// Step 11: persist after funding regardless of partial failure.
 	if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
@@ -150,6 +239,13 @@ func run(cfg *Config) error {
 	}
 	if fundErr != nil {
 		return fmt.Errorf("funding phase: %w", fundErr)
+	}
+
+	// Register multisig pubkeys on-chain and exercise each with one multisign
+	// bank-send to a peer. Non-fatal: a failure logs and continues.
+	exerciseMultisigAccounts(cli, reg, newMultisig, cfg)
+	if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return fmt.Errorf("save registry after multisig exercise: %w", err)
 	}
 
 	// Step 10: per-account activity mix. Only funded accounts can transact, and
@@ -318,9 +414,11 @@ func reconcile(reg *ActivityRegistry, cfg *Config, keyStyle common.KeyStyle) {
 	reg.KeyStyle = keyStyle.Name()
 }
 
-// plannedNewAccountCount determines how many new accounts to allocate. On a
-// fresh registry it fills up to -num-accounts; -add-accounts always adds
-// -num-accounts more; -activity-existing alone adds none.
+// plannedNewAccountCount determines how many new regular accounts to allocate.
+// On a fresh registry it fills up to -num-accounts; -add-accounts always adds
+// -num-accounts more; -activity-existing alone adds none. Dedicated multisig
+// composites and permanent-locked fixtures have their own knobs, so they do not
+// satisfy the regular account target.
 func plannedNewAccountCount(cfg *Config, reg *ActivityRegistry) int {
 	if cfg.AddAccounts {
 		return cfg.NumAccounts
@@ -328,10 +426,24 @@ func plannedNewAccountCount(cfg *Config, reg *ActivityRegistry) int {
 	if cfg.ActivityExisting {
 		return 0
 	}
-	if deficit := cfg.NumAccounts - len(reg.Accounts); deficit > 0 {
+	if deficit := cfg.NumAccounts - regularAccountCount(reg); deficit > 0 {
 		return deficit
 	}
 	return 0
+}
+
+func regularAccountCount(reg *ActivityRegistry) int {
+	count := 0
+	for _, rec := range reg.Accounts {
+		if rec.Multisig != nil {
+			continue
+		}
+		if rec.Vesting != nil && rec.Vesting.Type == string(common.VestingPermanentLocked) {
+			continue
+		}
+		count++
+	}
+	return count
 }
 
 func printPlan(cfg *Config, reg *ActivityRegistry, plannedNames []string) {

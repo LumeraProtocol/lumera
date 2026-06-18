@@ -8,8 +8,61 @@ import (
 	"gen/tests/common"
 )
 
-// schemaVersion identifies the gen-activity registry layout.
-const schemaVersion = 1
+// schemaVersion identifies the gen-activity registry layout. v2 adds multisig
+// account records (AccountRecord.Multisig). v1 files are not supported and must
+// be regenerated.
+const schemaVersion = 2
+
+// MultisigMember is one member sub-key of a generated multisig, including the
+// mnemonic so migrate mode can re-import the key into a fresh keyring. Empty
+// Mnemonic means the key was reused (pre-existing) at generation time and its
+// seed is unknown.
+type MultisigMember struct {
+	Name     string `json:"name"`
+	Address  string `json:"address,omitempty"`
+	Mnemonic string `json:"mnemonic,omitempty"`
+}
+
+// MultisigInfo describes a generated K-of-N multisig account: its member key
+// names, signing threshold (K), and total signer count (N). Members carries the
+// per-member key material (with mnemonics) when available; MemberNames is always
+// populated and kept for backward compatibility with older registries.
+type MultisigInfo struct {
+	MemberNames []string         `json:"member_names"`
+	Members     []MultisigMember `json:"members,omitempty"`
+	Threshold   int              `json:"threshold"`
+	Signers     int              `json:"signers"`
+}
+
+// Migration outcome statuses recorded in MigrationInfo.Status.
+const (
+	MigrationStatusMigrated        = "migrated"
+	MigrationStatusAlreadyMigrated = "already_migrated"
+	MigrationStatusSkipped         = "skipped"
+	MigrationStatusFailed          = "failed"
+)
+
+// MigrationInfo records the result of migrating an account to its EVM-compatible
+// counterpart. It is populated by migrate mode and is absent on records that
+// have never been through migration.
+type MigrationInfo struct {
+	NewName    string `json:"new_name,omitempty"`
+	NewAddress string `json:"new_address,omitempty"`
+	TxHash     string `json:"tx_hash,omitempty"`
+	Height     int64  `json:"height,omitempty"`
+	MigratedAt string `json:"migrated_at,omitempty"`
+	Status     string `json:"status,omitempty"` // migrated, already_migrated, skipped, failed
+	Error      string `json:"error,omitempty"`
+}
+
+// VestingInfo describes a vesting or permanent-locked account. Type is one of
+// the common.VestingType values ("continuous", "delayed", "permanent_locked").
+// EndTime is the unix unlock time (0 for permanent_locked).
+type VestingInfo struct {
+	Type         string `json:"type"`
+	EndTime      int64  `json:"end_time,omitempty"`
+	LockedAmount string `json:"locked_amount"`
+}
 
 // AccountRecord is a gen-activity account: the shared identity and activity log
 // plus funding/timestamp metadata owned by this tool.
@@ -17,10 +70,13 @@ type AccountRecord struct {
 	common.AccountIdentity
 	common.ActivityLog
 
-	HasBalance bool   `json:"has_balance,omitempty"`
-	Funded     bool   `json:"funded,omitempty"`
-	CreatedAt  string `json:"created_at,omitempty"`
-	UpdatedAt  string `json:"updated_at,omitempty"`
+	HasBalance bool           `json:"has_balance,omitempty"`
+	Funded     bool           `json:"funded,omitempty"`
+	CreatedAt  string         `json:"created_at,omitempty"`
+	UpdatedAt  string         `json:"updated_at,omitempty"`
+	Multisig   *MultisigInfo  `json:"multisig,omitempty"`
+	Vesting    *VestingInfo   `json:"vesting,omitempty"`
+	Migration  *MigrationInfo `json:"migration,omitempty"`
 }
 
 // ActivityRegistry is the gen-activity-owned top-level registry envelope. It is

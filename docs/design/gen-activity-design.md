@@ -11,9 +11,10 @@ generated account metadata and activity in a rerunnable JSON registry.
 ## Non-Goals
 
 - Do not depend on the controlled Docker devnet status directories.
-- Do not create EVM migration-specific fixtures such as permanent-locked
-  accounts, multisig migration accounts, migration records, or pre/post-upgrade
-  modes.
+- Do not create EVM migration-specific records or pre/post-upgrade modes.
+  Generic multisig accounts and vesting/permanent-locked account types are now
+  supported as devnet activity fixtures, but they stay in the gen-activity
+  registry schema rather than reusing evmigration's migration registry envelope.
 - Do not require devnet chain resets between runs.
 - Do not make action generation fatal by default when supernodes are
   temporarily unavailable.
@@ -67,10 +68,20 @@ tests-gen-activity \
 
 Additional flags:
 
+- `-config=gen-activity-config.toml`: optional TOML config file.
+- `-chain=devnet`: named chain section to use from the config file.
+- `-wizard` / `-w`: run the interactive wizard; this is also the default when
+  no flags are passed. Use `-wizard=false` or `-w=false` to disable it.
 - `-keyring-backend=test`: local funder keyring backend.
-- `-add-accounts=true`: add `-num-accounts` new users to an existing registry.
+- `-add-accounts=true`: add `-num-accounts` new regular users to an existing
+  registry.
 - `-activity-existing=true`: generate more activity for accounts already in the
   registry.
+- `-num-multisig23-accounts=0`: create 2-of-3 multisig accounts.
+- `-num-multisig35-accounts=0`: create 3-of-5 multisig accounts.
+- `-vesting-percent=0`: percentage of newly generated regular accounts to
+  create as continuous or delayed vesting accounts.
+- `-num-permanent-locked-accounts=0`: create dedicated PermanentLocked accounts.
 - `-actions=true`: include CASCADE action activity, enabled by default.
 - `-require-actions=false`: fail the run if action activity cannot be created.
 - `-max-actions-per-run=3`: cap action uploads/registrations per run.
@@ -323,6 +334,63 @@ Integration smoke tests should cover:
 
 `devnet-tests-build` should build `tests-gen-activity` alongside
 `tests_evmigration`.
+
+## Config file, chain selection, and wizard
+
+`gen-activity` reads an optional `gen-activity-config.toml` (path via `-config`,
+default `gen-activity-config.toml` in the working directory). It has a shared
+`[common]` section and any number of `[chains.<name>]` sections; select one with
+`-chain <name>`. TOML keys mirror the CLI flag names.
+
+**Precedence** (low to high): built-in defaults → `[common]` → `[chains.<name>]`
+→ explicitly-set CLI flags. A flag passed on the command line always wins over
+the config file (implemented via `flag.Visit`).
+
+**Mode selection:**
+
+- No flags at all → the interactive **wizard** (arrow-key chain picker + settings
+  menu, powered by survey/v2).
+- Any flag passed → non-interactive command-line mode (unchanged behavior).
+- `-w` / `-wizard` → force the wizard even with flags present (those flags
+  pre-seed the wizard defaults).
+
+See `gen-activity-config.toml.example` for a documented template.
+
+## Multisig accounts
+
+`-num-multisig23-accounts` and `-num-multisig35-accounts` generate K-of-N
+multisig accounts (2-of-3 and 3-of-5). For each, gen-activity:
+
+1. Creates N member keys (`<composite>-signer-<i>`) using the detected key style
+   and a composite key via `keys add --multisig --nosort` (shared
+   `common.Multisig.CreateMultisigKey`).
+2. Funds the composite from the funder (multisig composites are ordinary funding
+   targets).
+3. Publishes the composite pubkey on-chain via a 1-ulume self-send.
+4. Exercises the account with one multisign bank-send to a regular peer
+   (`sign × K → multisign → broadcast`), recorded in the registry.
+
+Records are stored as `AccountRecord.Multisig` (member names, threshold,
+signers) under registry schema v2. Multisig composites are excluded from the
+regular single-sig activity mix (they cannot sign a single-sig `--from` tx). The
+generic ceremony lives in `devnet/tests/common` (`multisig.go`) and is shared
+with the evmigration tool.
+
+## Vesting accounts
+
+`-vesting-percent N` (0–100) randomly designates that share of the run's regular
+generated accounts as **vesting** accounts; each is randomly continuous or
+delayed (cliff) with an end time in now + [1h, 30d]. `-num-permanent-locked-accounts N`
+creates N dedicated **PermanentLocked** accounts (`<prefix>-plock-NNNN`).
+
+Because Cosmos-SDK rejects creating a vesting/locked account at an address that
+already exists, these accounts are created **at funding time** via
+`tx vesting create-vesting-account` / `create-permanent-locked-account` (funding
+the locked amount), then topped up with a small liquid balance so they can pay
+gas. They then participate in the normal activity mix (delegation can use locked
+coins; sends draw on the liquid top-up). Records carry `AccountRecord.Vesting`
+(type, end time, locked amount) under registry schema v2. The create helpers live
+in `devnet/tests/common/vesting.go`.
 
 ## Open Implementation Notes
 

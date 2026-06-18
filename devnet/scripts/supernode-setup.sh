@@ -93,6 +93,7 @@ LUMERA_RPC_ADDR="http://localhost:${LUMERA_RPC_PORT}"
 # KEY_NAME: validator's keyring key, used as --from for on-chain txs
 # SN_KEY_NAME: supernode's own keyring key (derived from MONIKER)
 KEY_NAME="${MONIKER}_key"
+VALIDATOR_BASE_KEY_NAME="${KEY_NAME}"
 SN_BASEDIR="/root/.supernode"
 SN_CONFIG="${SN_BASEDIR}/config.yml"
 SN_KEYRING_HOME="${SN_BASEDIR}/keys"
@@ -236,7 +237,77 @@ validator_is_multisig() {
 
 validator_multisig_signer_key() {
 	local idx="$1"
+	local val_num base_without_evm base_without_new_msig candidate
+	local candidates=()
+
+	candidates+=("${KEY_NAME}-signer-${idx}")
+
+	if [[ "${KEY_NAME}" == *_evm ]]; then
+		val_num="$(echo "${MONIKER}" | grep -oE '[0-9]+$' || true)"
+		if [[ -n "${val_num}" ]]; then
+			candidates+=("val${val_num}-evm-signer-${idx}")
+		fi
+		base_without_evm="${KEY_NAME%_evm}"
+		candidates+=("${base_without_evm}-new-signer-${idx}")
+	elif [[ "${KEY_NAME}" == *-new-msig ]]; then
+		base_without_new_msig="${KEY_NAME%-new-msig}"
+		candidates+=("${base_without_new_msig}-new-signer-${idx}")
+	fi
+
+	candidates+=("${VALIDATOR_BASE_KEY_NAME}-new-signer-${idx}")
+	candidates+=("${VALIDATOR_BASE_KEY_NAME}-signer-${idx}")
+
+	for candidate in "${candidates[@]}"; do
+		if daemon_key_address "${candidate}" >/dev/null 2>&1; then
+			printf '%s\n' "${candidate}"
+			return 0
+		fi
+	done
+
 	printf '%s-signer-%s\n' "${KEY_NAME}" "${idx}"
+}
+
+validator_key_valoper_address() {
+	local key_name="$1"
+	$DAEMON keys show "${key_name}" --bech val -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null
+}
+
+staking_validator_exists() {
+	local valoper_addr="$1"
+	$DAEMON q staking validator "${valoper_addr}" --output json >/dev/null 2>&1
+}
+
+active_validator_key_candidates() {
+	local base="${VALIDATOR_BASE_KEY_NAME}"
+	local candidate seen=""
+
+	for candidate in "${base}_evm" "${base}-new-msig" "${KEY_NAME}" "${base}"; do
+		if [[ -n "${candidate}" && " ${seen} " != *" ${candidate} "* ]]; then
+			printf '%s\n' "${candidate}"
+			seen="${seen} ${candidate}"
+		fi
+	done
+}
+
+select_active_validator_key() {
+	local candidate candidate_addr candidate_valoper
+
+	while IFS= read -r candidate; do
+		[[ -z "${candidate}" ]] && continue
+		candidate_addr="$(daemon_key_address "${candidate}" || true)"
+		[[ -z "${candidate_addr}" ]] && continue
+		candidate_valoper="$(validator_key_valoper_address "${candidate}" || true)"
+		[[ -z "${candidate_valoper}" ]] && continue
+		if staking_validator_exists "${candidate_valoper}"; then
+			KEY_NAME="${candidate}"
+			VAL_ADDR="${candidate_addr}"
+			VALOPER_ADDR="${candidate_valoper}"
+			return 0
+		fi
+	done < <(active_validator_key_candidates)
+
+	VAL_ADDR="$(daemon_key_address "${KEY_NAME}" || true)"
+	VALOPER_ADDR="$(validator_key_valoper_address "${KEY_NAME}" || true)"
 }
 
 query_account_number_sequence() {
@@ -390,7 +461,35 @@ ensure_evm_key_from_mnemonic() {
 }
 
 ensure_supernode_evm_key_from_mnemonic() {
-	ensure_key_from_mnemonic_in_home "$SN_KEYRING_HOME" "supernode keyring" "$1" "$2" "eth_secp256k1" "$SN_EVM_HD_PATH"
+	local key_name="$1"
+	local mnemonic="$2"
+	local info_file backup_file timestamp
+
+	if ! command -v "$SN" >/dev/null 2>&1 || [[ ! -f "$SN_CONFIG" ]]; then
+		ensure_key_from_mnemonic_in_home "$SN_KEYRING_HOME" "supernode keyring" "$key_name" "$mnemonic" "eth_secp256k1" "$SN_EVM_HD_PATH"
+		return 0
+	fi
+
+	if supernode_keyring_can_read_key "$key_name"; then
+		echo "[SN] ${key_name} already exists in supernode keyring and is readable by ${SN}."
+		return 0
+	fi
+
+	info_file="$(supernode_keyring_info_file "$key_name")"
+	if [[ -f "$info_file" ]]; then
+		timestamp="$(date +%Y%m%d%H%M%S)"
+		backup_file="${info_file}.bak-${timestamp}"
+		echo "[SN] Backing up unreadable supernode keyring entry ${info_file} -> ${backup_file}."
+		mv "$info_file" "$backup_file"
+	fi
+
+	echo "[SN] Recovering ${key_name} in supernode keyring with ${SN}."
+	if ! "$SN" keys recover "$key_name" -d "$SN_BASEDIR" --mnemonic="$mnemonic" >/dev/null; then
+		if [[ -n "${backup_file:-}" && -f "$backup_file" && ! -f "$info_file" ]]; then
+			mv "$backup_file" "$info_file"
+		fi
+		return 1
+	fi
 }
 
 ensure_legacy_key_from_mnemonic() {
@@ -445,6 +544,29 @@ ensure_key_from_mnemonic_in_home() {
 	fi
 
 	printf '%s\n' "${mnemonic}" | run "${cmd[@]}" >/dev/null
+}
+
+supernode_keyring_info_file() {
+	local key_name="$1"
+	printf '%s/keyring-%s/%s.info\n' "$SN_KEYRING_HOME" "$KEYRING_BACKEND" "$key_name"
+}
+
+supernode_keyring_can_read_key() {
+	local key_name="$1"
+	local out
+
+	if [[ ! -f "$SN_CONFIG" ]]; then
+		return 1
+	fi
+
+	if ! out="$("$SN" keys list -d "$SN_BASEDIR" 2>/dev/null)"; then
+		return 1
+	fi
+
+	awk -v key="$key_name" '
+		NR > 2 && $1 == key { found = 1 }
+		END { exit(found ? 0 : 1) }
+	' <<<"$out"
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1018,6 +1140,8 @@ install_supernode_binary() {
 	if [ -f "$SN_BIN_DST" ]; then
 		if cmp -s "$src" "$SN_BIN_DST"; then
 			echo "[SN] supernode binary already installed and up-to-date."
+		elif installed_binary_is_newer "$SN_BIN_DST" "$src"; then
+			echo "[SN] Installed supernode binary is newer than shared release; keeping installed binary."
 		else
 			echo "[SN] supernode binary is outdated; updating."
 			run cp -f "$src" "$SN_BIN_DST"
@@ -1029,8 +1153,10 @@ install_supernode_binary() {
 		chmod +x "$SN_BIN_DST"
 	fi
 
-	# 3) Ensure /usr/local/bin/supernode -> supernode-linux-amd64 symlink
-	local link="/usr/local/bin/supernode"
+	# 3) Ensure companion "supernode" symlink points to supernode-linux-amd64
+	local bin_dir link
+	bin_dir="$(dirname "$SN_BIN_DST")"
+	link="${bin_dir}/supernode"
 	if [ -e "$link" ] && [ ! -L "$link" ]; then
 		echo "[SN] Found regular file at $link; removing to create symlink."
 		rm -f "$link"
@@ -1038,7 +1164,7 @@ install_supernode_binary() {
 
 	# Create/update symlink; ensure it points to supernode-linux-amd64
 	(
-		cd /usr/local/bin || exit 1
+		cd "$bin_dir" || exit 1
 		if [ -L "supernode" ]; then
 			current_target="$(readlink supernode)"
 			if [ "$current_target" != "${SN}" ]; then
@@ -1052,6 +1178,34 @@ install_supernode_binary() {
 			ln -sfn "${SN}" "supernode"
 		fi
 	)
+}
+
+binary_version() {
+	local bin="$1"
+	local version
+
+	version="$("$bin" version 2>/dev/null |
+		grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' |
+		head -n1 || true)"
+	normalize_version "$version"
+}
+
+installed_binary_is_newer() {
+	local installed="$1"
+	local source="$2"
+	local installed_version source_version
+
+	installed_version="$(binary_version "$installed" || true)"
+	source_version="$(binary_version "$source" || true)"
+
+	if [[ -z "$installed_version" || -z "$source_version" ]]; then
+		return 1
+	fi
+	if versions_match "$installed_version" "$source_version"; then
+		return 1
+	fi
+
+	version_ge "$installed_version" "$source_version"
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1174,12 +1328,21 @@ configure_supernode() {
 	# Resolve all addresses needed for registration and funding
 	SN_ADDR="$(run_capture $DAEMON keys show "$SN_KEY_NAME" -a --keyring-backend "$KEYRING_BACKEND")"
 	echo "[SN] Supernode address: $SN_ADDR"
-	VAL_ADDR="$(run_capture $DAEMON keys show "$KEY_NAME" -a --keyring-backend "$KEYRING_BACKEND")"
+	select_active_validator_key
+	if [[ -z "${VAL_ADDR:-}" || -z "${VALOPER_ADDR:-}" ]]; then
+		echo "[SN] ERROR: Unable to resolve active validator key/address for ${VALIDATOR_BASE_KEY_NAME}."
+		exit 1
+	fi
+	if [[ "${KEY_NAME}" != "${VALIDATOR_BASE_KEY_NAME}" ]]; then
+		echo "[SN] Using migrated validator key ${KEY_NAME} for on-chain supernode operations."
+	fi
 	echo "[SN] Validator address: $VAL_ADDR"
-	VALOPER_ADDR="$(run_capture $DAEMON keys show "$KEY_NAME" --bech val -a --keyring-backend "$KEYRING_BACKEND")"
 	echo "[SN] Validator operator address: $VALOPER_ADDR"
 
 	GENESIS_ADDR="$(registry_account_address "${KEY_NAME}")"
+	if [[ -z "${GENESIS_ADDR}" && "${KEY_NAME}" != "${VALIDATOR_BASE_KEY_NAME}" ]]; then
+		GENESIS_ADDR="$(registry_account_address "${VALIDATOR_BASE_KEY_NAME}")"
+	fi
 	if [[ -z "${GENESIS_ADDR}" ]]; then
 		echo "[SN] ERROR: Missing validator funding address for ${KEY_NAME} in accounts registry."
 		exit 1

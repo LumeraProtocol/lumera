@@ -437,7 +437,13 @@ func (s *SystemUnderTest) AwaitBlockHeight(t *testing.T, targetHeight int64, tim
 	if len(timeout) != 0 {
 		maxWaitTime = timeout[0]
 	} else {
-		maxWaitTime = time.Duration(targetHeight-s.currentHeight+3) * s.blockTime
+		// Budget generous headroom: under CI load, real block production can run
+		// 2-3x slower than the nominal blockTime. Allow double the nominal time
+		// per remaining block plus a fixed startup slack. This only affects how
+		// long we wait before declaring a genuinely stuck chain failed — the
+		// happy path returns as soon as the target height is reached.
+		blocksRemaining := targetHeight - s.currentHeight
+		maxWaitTime = time.Duration(blocksRemaining)*s.blockTime*2 + 10*s.blockTime
 	}
 	abort := time.NewTimer(maxWaitTime).C
 	for {

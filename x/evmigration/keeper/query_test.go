@@ -203,6 +203,9 @@ func TestQueryMigrationStats(t *testing.T) {
 	require.Equal(t, uint64(3), resp.TotalLegacy)
 	require.Equal(t, uint64(1), resp.TotalLegacyStaked)
 	require.Equal(t, uint64(1), resp.TotalValidatorsLegacy)
+
+	require.Equal(t, uint64(2), resp.TotalLegacyWithPubkey)
+	require.Equal(t, uint64(1), resp.TotalLegacyWithoutPubkey)
 }
 
 // --- MigrationEstimate query tests ---

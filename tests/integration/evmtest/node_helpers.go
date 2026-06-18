@@ -42,10 +42,13 @@ type evmNode struct {
 	chainID  string                   // Chain ID used for this node fixture.
 	keyInfo  testaccounts.TestKeyInfo // Validator key generated during setup.
 
+	haltHeight     int      // Halt height passed to `lumerad start`.
+	extraStartArgs []string // Caller-appended args, preserved across port re-reservation.
+
 	rpcURL      string   // HTTP JSON-RPC endpoint.
 	wsURL       string   // WebSocket JSON-RPC endpoint.
 	cometRPCURL string   // Comet RPC endpoint for Cosmos CLI commands.
-	startArgs   []string // Cached `lumerad start` arguments.
+	startArgs   []string // Cached `lumerad start` arguments (base args + extraStartArgs).
 
 	cancel context.CancelFunc // Process cancellation hook.
 	cmd    *exec.Cmd          // Running node process handle.
@@ -76,11 +79,25 @@ func newEVMNode(t *testing.T, chainID string, haltHeight int) *evmNode {
 		homeDir:     homeDir,
 		chainID:     chainID,
 		keyInfo:     keyInfo,
+		haltHeight:  haltHeight,
 		rpcURL:      fmt.Sprintf("http://127.0.0.1:%d", ports.JSONRPC),
 		wsURL:       fmt.Sprintf("ws://127.0.0.1:%d", ports.JSONWSRPC),
 		cometRPCURL: fmt.Sprintf("tcp://127.0.0.1:%d", ports.CometRPC),
 		startArgs:   buildStartArgs(homeDir, ports, haltHeight),
 	}
+}
+
+// refreshPorts re-reserves a fresh set of node ports and rebuilds startArgs,
+// preserving any caller-appended args. Used to retry startup after a transient
+// "address already in use" race (a previously-reserved port being grabbed by
+// another process, or lingering in TIME_WAIT from a prior node's teardown).
+func (n *evmNode) refreshPorts() {
+	n.t.Helper()
+	ports := reserveNodePorts(n.t)
+	n.rpcURL = fmt.Sprintf("http://127.0.0.1:%d", ports.JSONRPC)
+	n.wsURL = fmt.Sprintf("ws://127.0.0.1:%d", ports.JSONWSRPC)
+	n.cometRPCURL = fmt.Sprintf("tcp://127.0.0.1:%d", ports.CometRPC)
+	n.startArgs = append(buildStartArgs(n.homeDir, ports, n.haltHeight), n.extraStartArgs...)
 }
 
 // Start launches `lumerad start` with precomputed args and captures logs.
@@ -98,11 +115,32 @@ func (n *evmNode) Start() {
 	n.output = output
 }
 
-// StartAndWaitRPC starts the node and blocks until JSON-RPC responds.
+// StartAndWaitRPC starts the node and blocks until JSON-RPC responds. If the
+// node exits during startup because a reserved port was already in use (a race
+// against another process or a prior node still releasing its sockets), it
+// re-reserves fresh ports and retries a few times before failing.
 func (n *evmNode) StartAndWaitRPC() {
 	n.t.Helper()
-	n.Start()
-	waitForJSONRPC(n.t, n.rpcURL, n.waitCh, n.output)
+
+	const maxAttempts = 3
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		n.Start()
+		err := waitForJSONRPCResult(n.rpcURL, n.waitCh, n.output)
+		if err == nil {
+			return
+		}
+
+		out := n.output.String()
+		if attempt < maxAttempts && isAddrInUse(out) {
+			n.t.Logf("node startup attempt %d/%d hit a port conflict, retrying with fresh ports: %v",
+				attempt, maxAttempts, err)
+			n.Stop()
+			n.refreshPorts()
+			continue
+		}
+
+		n.t.Fatalf("json-rpc server did not become ready: %v\n%s", err, out)
+	}
 }
 
 // Stop gracefully terminates the running node process.
@@ -159,6 +197,7 @@ func (n *evmNode) StartArgs() []string {
 }
 
 func (n *evmNode) AppendStartArgs(args ...string) {
+	n.extraStartArgs = append(n.extraStartArgs, args...)
 	n.startArgs = append(n.startArgs, args...)
 }
 

@@ -179,7 +179,7 @@ message QueryMigrationStatsRequest {}
 message QueryMigrationStatsResponse {
   // total_migrated is the number of accounts that completed migration (O(1) from state counter).
   uint64 total_migrated            = 1;
-  // total_legacy is the number of accounts with secp256k1 pubkey and non-zero balance.
+  // total_legacy is the number of accounts that still have legacy state.
   uint64 total_legacy              = 2;
   // total_legacy_staked is the subset of total_legacy with active delegations.
   uint64 total_legacy_staked       = 3;
@@ -187,6 +187,10 @@ message QueryMigrationStatsResponse {
   uint64 total_validators_migrated = 4;
   // total_validators_legacy is the number of validators with legacy operator address.
   uint64 total_validators_legacy   = 5;
+  // total_legacy_with_pubkey is the subset of total_legacy whose pubkey is already on-chain.
+  uint64 total_legacy_with_pubkey  = 6;
+  // total_legacy_without_pubkey is the subset of total_legacy whose pubkey is nil on-chain.
+  uint64 total_legacy_without_pubkey = 7;
 }
 
 // QueryLegacyAccountsRequest is the request type for the Query/LegacyAccounts RPC method.

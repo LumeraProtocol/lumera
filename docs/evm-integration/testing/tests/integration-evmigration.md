@@ -24,5 +24,6 @@ Additional real-node broadcast coverage for zero-signer `submit-proof` txs lives
 | `TestQueryMigrationRecord_Integration` | Query server returns record after real migration, nil before. |
 | `TestQueryMigrationEstimate_Integration` | Estimate query with real staking state reports correct values. |
 | `TestEVMigrationZeroSignerTxBroadcastSyncWithMempoolEnabled` | Mempool-suite regression: valid zero-signer migration tx passes real-node CheckTx with app-side mempool enabled. |
+| `TestEVMigrationProofValidNonexistentLegacyAccountRejectedByAnte` | Mempool-suite negative test: proof-valid zero-signer migration tx is rejected by ante state admission when the legacy account does not exist. |
 | `TestEVMigrationMalformedLegacyAddressRejectedByValidateBasic` | Mempool-suite negative test: malformed `legacy_address` is rejected by `ValidateBasic` in the ante chain on the real-node broadcast path (before mempool admission). |
 | `TestZeroSignerNonMigrationBroadcastSyncStillRejected` | Mempool-suite negative control: zero-signer non-migration tx remains rejected. |

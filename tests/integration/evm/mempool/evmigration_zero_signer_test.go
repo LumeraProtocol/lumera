@@ -6,7 +6,10 @@ package mempool_test
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +19,7 @@ import (
 	cmttypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
@@ -28,15 +32,32 @@ import (
 
 func TestEVMigrationZeroSignerTxBroadcastSyncWithMempoolEnabled(t *testing.T) {
 	node := evmtest.NewEVMNode(t, "lumera-evmigration-mempool", 20)
+	legacyPriv := secp256k1.GenPrivKey()
+	addGenesisLegacyAccount(t, node, sdk.AccAddress(legacyPriv.PubKey().Address().Bytes()))
 	node.StartAndWaitRPC()
 	defer node.Stop()
 	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
-	txBytes := validZeroSignerMigrationTxBytes(t, node.ChainID())
+	txBytes := validZeroSignerMigrationTxBytes(t, node.ChainID(), legacyPriv)
 	res := broadcastSync(t, node, txBytes)
 
 	require.Zero(t, res.Code, "zero-signer migration tx must pass CheckTx with app-side mempool enabled: %s", res.Log)
 	require.NotContains(t, res.Log, "tx must have at least one signer")
+}
+
+func TestEVMigrationProofValidNonexistentLegacyAccountRejectedByAnte(t *testing.T) {
+	node := evmtest.NewEVMNode(t, "lumera-evmigration-no-legacy", 20)
+	node.StartAndWaitRPC()
+	defer node.Stop()
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
+
+	txBytes := validZeroSignerMigrationTxBytes(t, node.ChainID(), secp256k1.GenPrivKey())
+	res := broadcastSync(t, node, txBytes)
+
+	require.NotZero(t, res.Code)
+	require.Contains(t, res.Log, "legacy account not found",
+		"proof-valid migration txs from nonexistent legacy accounts must fail before mempool admission")
+	require.NotContains(t, res.Log, "at least one signer")
 }
 
 // TestEVMigrationMalformedLegacyAddressRejectedByValidateBasic confirms that a
@@ -102,10 +123,9 @@ func TestZeroSignerNonMigrationBroadcastSyncStillRejected(t *testing.T) {
 	)
 }
 
-func validZeroSignerMigrationTxBytes(t *testing.T, chainID string) []byte {
+func validZeroSignerMigrationTxBytes(t *testing.T, chainID string, legacyPriv *secp256k1.PrivKey) []byte {
 	t.Helper()
 
-	legacyPriv := secp256k1.GenPrivKey()
 	newPriv, err := evmcryptotypes.GenerateKey()
 	require.NoError(t, err)
 
@@ -142,6 +162,45 @@ func validZeroSignerMigrationTxBytes(t *testing.T, chainID string) []byte {
 		}}},
 	}
 	return unsignedTxBytes(t, msg)
+}
+
+func addGenesisLegacyAccount(t *testing.T, node *evmtest.Node, legacyAddr sdk.AccAddress) {
+	t.Helper()
+
+	encCfg := lumeraapp.MakeEncodingConfig(t)
+	genesisPath := filepath.Join(node.HomeDir(), "config", "genesis.json")
+	genesisBytes, err := os.ReadFile(genesisPath)
+	require.NoError(t, err)
+
+	var genesisDoc map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(genesisBytes, &genesisDoc))
+
+	var appState map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(genesisDoc["app_state"], &appState))
+
+	authGenesis := authtypes.GetGenesisStateFromAppState(encCfg.Codec, appState)
+	accounts, err := authtypes.UnpackAccounts(authGenesis.Accounts)
+	require.NoError(t, err)
+	accounts = append(accounts, authtypes.NewBaseAccount(legacyAddr, nil, uint64(len(accounts)), 0))
+	authGenesis.Accounts, err = authtypes.PackAccounts(accounts)
+	require.NoError(t, err)
+	appState[authtypes.ModuleName] = encCfg.Codec.MustMarshalJSON(&authGenesis)
+
+	bankGenesis := banktypes.GetGenesisStateFromAppState(encCfg.Codec, appState)
+	coins := sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 1_000_000))
+	bankGenesis.Balances = append(bankGenesis.Balances, banktypes.Balance{
+		Address: legacyAddr.String(),
+		Coins:   coins,
+	})
+	bankGenesis.Supply = bankGenesis.Supply.Add(coins...)
+	appState[banktypes.ModuleName] = encCfg.Codec.MustMarshalJSON(bankGenesis)
+
+	genesisDoc["app_state"], err = json.Marshal(appState)
+	require.NoError(t, err)
+
+	updated, err := json.MarshalIndent(genesisDoc, "", "  ")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(genesisPath, updated, 0o644))
 }
 
 func unsignedTxBytes(t *testing.T, msgs ...sdk.Msg) []byte {

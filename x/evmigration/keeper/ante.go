@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
@@ -73,6 +75,9 @@ func (k Keeper) VerifyMigrationProofsForAnte(ctx sdk.Context, msg sdk.Msg) error
 	if params.MigrationEndTime > 0 && ctx.BlockTime().After(time.Unix(params.MigrationEndTime, 0)) {
 		return types.ErrMigrationWindowClosed
 	}
+	if err := k.verifyMigrationAdmissionState(ctx, msg, legacyAddr, newAddr); err != nil {
+		return err
+	}
 
 	if err := legacyProof.ValidateParams(params.MaxMultisigSubKeys); err != nil {
 		return err
@@ -95,4 +100,56 @@ func (k Keeper) VerifyMigrationProofsForAnte(ctx sdk.Context, msg sdk.Msg) error
 		legacyAddr, newAddr, newAddr,
 		newProof, sigverify.SubKeyTypeEthSecp256k1,
 	)
+}
+
+func (k Keeper) verifyMigrationAdmissionState(ctx sdk.Context, msg sdk.Msg, legacyAddr, newAddr sdk.AccAddress) error {
+	if legacyAddr.Equals(newAddr) {
+		return types.ErrSameAddress
+	}
+
+	has, err := k.MigrationRecords.Has(ctx, legacyAddr.String())
+	if err != nil {
+		return err
+	}
+	if has {
+		return types.ErrAlreadyMigrated
+	}
+
+	has, err = k.MigrationRecords.Has(ctx, newAddr.String())
+	if err != nil {
+		return err
+	}
+	if has {
+		return types.ErrNewAddressWasMigrated
+	}
+
+	has, err = k.MigrationRecordByNewAddress.Has(ctx, newAddr.String())
+	if err != nil {
+		return err
+	}
+	if has {
+		return types.ErrNewAddressAlreadyUsed
+	}
+
+	legacyAcc := k.accountKeeper.GetAccount(ctx, legacyAddr)
+	if legacyAcc == nil {
+		return types.ErrLegacyAccountNotFound
+	}
+	if _, ok := legacyAcc.(sdk.ModuleAccountI); ok {
+		return types.ErrCannotMigrateModuleAccount
+	}
+
+	if _, ok := msg.(*types.MsgMigrateValidator); !ok {
+		return nil
+	}
+
+	_, err = k.stakingKeeper.GetValidator(ctx, sdk.ValAddress(legacyAddr))
+	switch {
+	case err == nil:
+		return nil
+	case errorsmod.IsOf(err, stakingtypes.ErrNoValidatorFound):
+		return types.ErrNotValidator
+	default:
+		return fmt.Errorf("lookup source validator: %w", err)
+	}
 }

@@ -80,7 +80,9 @@ func TestNewAnteHandlerMigrationOnlyCosmosTxUsesReducedAntePath(t *testing.T) {
 		})
 
 	t.Run("migration-only unsigned zero-fee tx is accepted", func(t *testing.T) {
-		tx := newUnsignedMigrationTx(t, app, validMigrationMsg(t, anteMigrationTestChainID))
+		msg := validMigrationMsg(t, anteMigrationTestChainID)
+		seedLegacyAccountInCtx(t, app, ctx, msg.LegacyAddress)
+		tx := newUnsignedMigrationTx(t, app, msg)
 
 		_, err := anteHandler(ctx, tx, false)
 		require.NoError(t, err)
@@ -88,6 +90,10 @@ func TestNewAnteHandlerMigrationOnlyCosmosTxUsesReducedAntePath(t *testing.T) {
 
 	t.Run("migration-only invalid embedded proof is rejected in ante", func(t *testing.T) {
 		msg := validMigrationMsg(t, anteMigrationTestChainID)
+		// Seed the legacy account so the admission state-check passes and the
+		// corrupted proof is what actually triggers the rejection (the state
+		// check runs before proof verification).
+		seedLegacyAccountInCtx(t, app, ctx, msg.LegacyAddress)
 		msg.LegacyProof.GetSingle().Signature[0] ^= 0x01
 		tx := newUnsignedMigrationTx(t, app, msg)
 
@@ -116,6 +122,10 @@ func TestEVMigrationInvalidEmbeddedProofRejectedInCheckTx(t *testing.T) {
 	app := lumeraapp.Setup(t)
 
 	msg := validMigrationMsg(t, anteMigrationAppChainID)
+	// Seed the legacy account into the check-tx state so the admission
+	// state-check passes and the corrupted proof is what triggers rejection
+	// (the state check runs before proof verification).
+	seedLegacyAccountInCtx(t, app, app.BaseApp.NewContext(true), msg.LegacyAddress)
 	msg.NewProof.GetSingle().Signature[0] ^= 0x01
 
 	tx := newUnsignedMigrationTx(t, app, msg)
@@ -141,6 +151,20 @@ func newUnsignedMigrationTx(t *testing.T, app *lumeraapp.App, msgs ...sdk.Msg) s
 	txBuilder.SetGasLimit(100_000)
 
 	return txBuilder.GetTx()
+}
+
+// seedLegacyAccountInCtx creates the legacy base account in the given ctx's
+// state so the migration ante's legacy-account-exists admission gate
+// (VerifyMigrationProofsForAnte) passes, letting a test exercise the proof /
+// acceptance paths. NewAccountWithAddress assigns a fresh account number,
+// avoiding the uniqueness conflict a bare base account (number 0) would hit
+// against the genesis account.
+func seedLegacyAccountInCtx(t *testing.T, app *lumeraapp.App, ctx sdk.Context, legacyAddress string) {
+	t.Helper()
+
+	addr, err := sdk.AccAddressFromBech32(legacyAddress)
+	require.NoError(t, err)
+	app.AuthKeeper.SetAccount(ctx, app.AuthKeeper.NewAccountWithAddress(ctx, addr))
 }
 
 // validMigrationMsg builds a MsgClaimLegacyAccount whose embedded proofs pass

@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	abci "github.com/cometbft/cometbft/abci/types"
+	cmttypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
@@ -47,9 +49,10 @@ const testLegacyBech32 = "lumera1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc58av9gw"
 // This is a stronger test than calling app.GetMempool().Insert(...) directly
 // because it drives the same code path the live binary uses on broadcast.
 func TestEVMMempool_CheckTxAcceptsZeroSignerMigrationTx(t *testing.T) {
-	app := lumeraapp.Setup(t)
+	legacyPriv := secp256k1.GenPrivKey()
+	app := setupAppWithLegacyAccountForMempool(t, legacyPriv)
 
-	msg := validMigrationMsgForMempool(t, testChainID)
+	msg := validMigrationMsgForMempoolWithLegacy(t, testChainID, legacyPriv)
 	tx := newUnsignedMigrationTxForMempool(t, app, msg)
 
 	txBytes, err := app.TxConfig().TxEncoder()(tx)
@@ -75,6 +78,27 @@ func TestEVMMempool_CheckTxAcceptsZeroSignerMigrationTx(t *testing.T) {
 	require.Zero(t, resp.Code,
 		"CheckTx must accept a valid zero-signer migration tx (code=0); got code=%d log=%q",
 		resp.Code, resp.Log)
+}
+
+func TestEVMMempool_CheckTxRejectsProofValidNonexistentLegacyAccount(t *testing.T) {
+	app := lumeraapp.Setup(t)
+
+	msg := validMigrationMsgForMempool(t, testChainID)
+	tx := newUnsignedMigrationTxForMempool(t, app, msg)
+
+	txBytes, err := app.TxConfig().TxEncoder()(tx)
+	require.NoError(t, err)
+
+	resp, err := app.CheckTx(&abci.RequestCheckTx{
+		Tx:   txBytes,
+		Type: abci.CheckTxType_New,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotZero(t, resp.Code)
+	require.Contains(t, resp.Log, "legacy account not found",
+		"proof-valid migration txs from nonexistent legacy accounts must fail at ante admission")
+	require.NotContains(t, resp.Log, "at least one signer")
 }
 
 // TestEVMMempool_CheckTxRejectsZeroSignerNonMigrationTx is the end-to-end
@@ -261,9 +285,10 @@ func TestEVMMempool_DuplicateLegacyMigrationTxDoesNotGrowMempool(t *testing.T) {
 }
 
 func TestEVMMempool_PrepareProposalIncludesZeroSignerMigrationTx(t *testing.T) {
-	app := lumeraapp.Setup(t)
+	legacyPriv := secp256k1.GenPrivKey()
+	app := setupAppWithLegacyAccountForMempool(t, legacyPriv)
 
-	msg := validMigrationMsgForMempool(t, testChainID)
+	msg := validMigrationMsgForMempoolWithLegacy(t, testChainID, legacyPriv)
 	tx := newUnsignedMigrationTxForMempool(t, app, msg)
 	txBytes, err := app.TxConfig().TxEncoder()(tx)
 	require.NoError(t, err)
@@ -281,8 +306,8 @@ func TestEVMMempool_PrepareProposalIncludesZeroSignerMigrationTx(t *testing.T) {
 }
 
 // validMigrationMsgForMempool builds a MsgClaimLegacyAccount whose embedded
-// proofs pass ante-level cryptographic verification, so the only thing that
-// can reject the tx in CheckTx is the mempool's signer-extraction step.
+// proofs pass ante-level cryptographic verification. Tests that expect CheckTx
+// acceptance must also seed the legacy account so state admission passes.
 //
 // This mirrors validMigrationMsg in app/evm/ante_evmigration_fee_test.go but
 // lives here to avoid a cross-package test-only export.
@@ -290,6 +315,16 @@ func validMigrationMsgForMempool(t *testing.T, chainID string) *evmigrationtypes
 	t.Helper()
 
 	legacyPriv := secp256k1.GenPrivKey()
+	return validMigrationMsgForMempoolWithLegacy(t, chainID, legacyPriv)
+}
+
+func validMigrationMsgForMempoolWithLegacy(
+	t *testing.T,
+	chainID string,
+	legacyPriv *secp256k1.PrivKey,
+) *evmigrationtypes.MsgClaimLegacyAccount {
+	t.Helper()
+
 	newPriv, err := evmcryptotypes.GenerateKey()
 	require.NoError(t, err)
 
@@ -334,4 +369,33 @@ func newUnsignedMigrationTxForMempool(t *testing.T, app *lumeraapp.App, msgs ...
 	require.NoError(t, txBuilder.SetMsgs(msgs...))
 	txBuilder.SetGasLimit(200_000)
 	return txBuilder.GetTx()
+}
+
+func setupAppWithLegacyAccountForMempool(t *testing.T, legacyPriv *secp256k1.PrivKey) *lumeraapp.App {
+	t.Helper()
+
+	privVal := cmttypes.NewMockPV()
+	pubKey, err := privVal.GetPubKey()
+	require.NoError(t, err)
+
+	validator := cmttypes.NewValidator(pubKey, 1)
+	valSet := cmttypes.NewValidatorSet([]*cmttypes.Validator{validator})
+
+	legacyAddr := sdk.AccAddress(legacyPriv.PubKey().Address().Bytes())
+	legacyAcc := authtypes.NewBaseAccount(legacyAddr, legacyPriv.PubKey(), 0, 0)
+	genBals := []banktypes.Balance{
+		{
+			Address: legacyAddr.String(),
+			Coins:   sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 100_000_000_000_000)),
+		},
+	}
+
+	return lumeraapp.SetupWithGenesisValSet(
+		t,
+		valSet,
+		[]authtypes.GenesisAccount{legacyAcc},
+		testChainID,
+		sdk.DefaultPowerReduction,
+		genBals,
+	)
 }

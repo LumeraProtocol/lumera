@@ -631,8 +631,22 @@ BANNER
   [[ -n "$home_dir"    ]] && args+=(--home "$home_dir")
   (( yes == 1 )) && args+=(-y)
 
-  local broadcast_json tx_hash
-  broadcast_json=$("$BIN" "${args[@]}")
+  # Capture stdout, stderr, and exit code separately so a partial RPC failure
+  # (e.g. lumerad prints `EOF` to stderr after the CometBFT RPC stream drops)
+  # doesn't kill the script under `set -e` with no diagnostic. The tx may or
+  # may not have entered the mempool; before erroring out, probe chain state
+  # for the migration record so the operator gets a definitive answer instead
+  # of a bare `EOF` line.
+  local broadcast_json broadcast_err broadcast_rc=0 tx_hash
+  local stderr_file
+  stderr_file=$(mktemp)
+  broadcast_json=$("$BIN" "${args[@]}" 2>"$stderr_file") || broadcast_rc=$?
+  broadcast_err=$(<"$stderr_file")
+  rm -f "$stderr_file"
+  if (( broadcast_rc != 0 )); then
+    recover_submit_after_broadcast_error "$broadcast_rc" "$broadcast_err" "$legacy" "$new" "$snap"
+    return 0
+  fi
   tx_hash=$(assert_broadcast_accepted "$broadcast_json")
 
   log_info "broadcast tx $tx_hash; waiting for inclusion..."
@@ -650,6 +664,59 @@ BANNER
   log_info "  legacy: $(legacy_value "$legacy")"
   log_info "  new:    $(new_value "$new")"
   log_info "  tx:     $tx_hash"
+}
+
+recover_submit_after_broadcast_error() {
+  local broadcast_rc="$1" broadcast_err="$2" legacy="$3" new="$4" snap="$5"
+  local timeout="${LUMERA_TX_WAIT_TIMEOUT:-90}"
+  local started=$SECONDS
+  local logged_wait=0
+
+  log_error "broadcast command failed (rc=$broadcast_rc)"
+  [[ -n "$broadcast_err" ]] && log_error "lumerad stderr: $broadcast_err"
+  log_error "checking chain state — the tx may still have landed:"
+  log_error "  $BIN query evmigration migration-record $(legacy_value "$legacy") --node $NODE"
+
+  while true; do
+    local rec_json rec_legacy rec_new rec_height
+    if ! rec_json=$(lumerad_q_capture evmigration migration-record "$legacy"); then
+      log_error "could not query migration-record for $(legacy_value "$legacy"); cannot determine whether the tx landed"
+      log_lumerad_err
+      log_error "do not re-run submit until the migration record is checked manually"
+      exit 7
+    fi
+
+    rec_legacy=$(jq -r '.record.legacy_address // empty' <<<"$rec_json")
+    if [[ -n "$rec_legacy" ]]; then
+      rec_new=$(jq -r '.record.new_address // "<missing>"' <<<"$rec_json")
+      rec_height=$(jq -r '.record.migration_height // "<unknown>"' <<<"$rec_json")
+      if [[ "$rec_new" == "$new" ]]; then
+        log_info "on-chain migration record found for $(legacy_value "$legacy") -> $(new_value "$new") at height $rec_height"
+        log_info "broadcast appears to have succeeded despite the RPC error above; running post-broadcast verification"
+        verify_migration "$legacy" "$new" "$snap"
+        show_migration_summary "$legacy" "$new"
+        log_info "migration complete"
+        return 0
+      fi
+      log_error "migration record found for $(legacy_value "$legacy"), but it points to a DIFFERENT destination:"
+      log_error "  on-chain destination:  $(new_value "$rec_new") (migrated at height $rec_height)"
+      log_error "  destination you asked: $(new_value "$new")"
+      log_error "do not re-run submit until the destination mismatch is resolved"
+      exit 7
+    fi
+
+    if (( SECONDS - started >= timeout )); then
+      break
+    fi
+    if (( logged_wait == 0 )); then
+      log_info "no migration record visible yet; polling for up to ${timeout}s before giving retry guidance"
+      logged_wait=1
+    fi
+    sleep 1
+  done
+
+  log_error "no migration record found for $(legacy_value "$legacy") after ${timeout}s — tx did not land within the wait window; safe to re-run submit"
+  exit 2
 }
 
 main() {

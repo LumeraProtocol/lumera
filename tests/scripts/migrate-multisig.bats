@@ -71,6 +71,134 @@ setup() {
   rm -rf "$state_dir"
 }
 
+@test "submit recovers when broadcast prints EOF but tx actually landed" {
+  # Simulate the RPC dropping the connection mid-broadcast (lumerad prints
+  # 'EOF' to stderr and exits non-zero) AFTER the tx has been accepted into
+  # the mempool and committed. The wrapper should query the migration record,
+  # see that the migration actually completed, log a recovery message, run
+  # post-broadcast verification, and exit 0.
+  local state_dir; state_dir=$(mktemp -d)
+  local state_file="$state_dir/state"
+  # SHIM_SUBMIT_LANDED=1 makes the shim flip the state file to "after"
+  # right before exiting non-zero with EOF on stderr — i.e. the tx landed,
+  # but the operator only sees the RPC error.
+  run env \
+    SHIM_STATE_FILE="$state_file" \
+    SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    SHIM_RECORD_AFTER_FIXTURE=record-post-migration \
+    SHIM_BANK_AFTER_FIXTURE=bank-balances-empty \
+    SHIM_SUBMIT_EXIT=1 \
+    SHIM_SUBMIT_STDERR="EOF" \
+    SHIM_SUBMIT_LANDED=1 \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+      --binary "$SHIM" \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"broadcast command failed"* ]]
+  [[ "$output" == *"lumerad stderr: EOF"* ]]
+  [[ "$output" == *"on-chain migration record found"* ]]
+  [[ "$output" == *"migration complete"* ]]
+  rm -rf "$state_dir"
+}
+
+@test "submit exits 2 with clear retry guidance when broadcast fails and tx did not land" {
+  # Same RPC-EOF scenario, but the tx never made it into the mempool. The
+  # wrapper should query for a migration record, find none, tell the operator
+  # the tx did not land, and exit 2 (broadcast-rejected sentinel).
+  local state_dir; state_dir=$(mktemp -d)
+  local state_file="$state_dir/state"
+  run env \
+    LUMERA_TX_WAIT_TIMEOUT=1 \
+    SHIM_STATE_FILE="$state_file" \
+    SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    SHIM_SUBMIT_EXIT=1 \
+    SHIM_SUBMIT_STDERR="EOF" \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+      --binary "$SHIM" \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"broadcast command failed"* ]]
+  [[ "$output" == *"lumerad stderr: EOF"* ]]
+  [[ "$output" == *"tx did not land"* ]]
+  [[ "$output" == *"safe to re-run submit"* ]]
+  rm -rf "$state_dir"
+}
+
+@test "submit polls after broadcast EOF until a pending tx creates the migration record" {
+  local state_dir; state_dir=$(mktemp -d)
+  local state_file="$state_dir/state"
+  run env \
+    LUMERA_TX_WAIT_TIMEOUT=3 \
+    SHIM_STATE_FILE="$state_file" \
+    SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    SHIM_RECORD_AFTER_FIXTURE=record-post-migration \
+    SHIM_BANK_AFTER_FIXTURE=bank-balances-empty \
+    SHIM_SUBMIT_EXIT=1 \
+    SHIM_SUBMIT_STDERR="EOF" \
+    SHIM_SUBMIT_PENDING=1 \
+    SHIM_PENDING_RECORD_AFTER_QUERIES=2 \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+      --binary "$SHIM" \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no migration record visible yet; polling"* ]]
+  [[ "$output" == *"on-chain migration record found"* ]]
+  [[ "$output" == *"migration complete"* ]]
+  rm -rf "$state_dir"
+}
+
+@test "submit exits 7 when recovery query fails after broadcast EOF" {
+  local state_dir; state_dir=$(mktemp -d)
+  local state_file="$state_dir/state"
+  run env \
+    SHIM_STATE_FILE="$state_file" \
+    SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    SHIM_SUBMIT_EXIT=1 \
+    SHIM_SUBMIT_STDERR="EOF" \
+    SHIM_SUBMIT_PENDING=1 \
+    SHIM_RECORD_AFTER_SUBMIT_EXIT=1 \
+    SHIM_RECORD_AFTER_SUBMIT_STDERR="rpc unavailable" \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+      --binary "$SHIM" \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes
+  [ "$status" -eq 7 ]
+  [[ "$output" == *"could not query migration-record"* ]]
+  [[ "$output" == *"rpc unavailable"* ]]
+  [[ "$output" == *"do not re-run submit"* ]]
+  [[ "$output" != *"safe to re-run submit"* ]]
+  rm -rf "$state_dir"
+}
+
+@test "submit exits 7 when recovery finds a different destination record" {
+  local state_dir; state_dir=$(mktemp -d)
+  local state_file="$state_dir/state"
+  run env \
+    SHIM_STATE_FILE="$state_file" \
+    SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    SHIM_RECORD_AFTER_FIXTURE=record-found \
+    SHIM_SUBMIT_EXIT=1 \
+    SHIM_SUBMIT_STDERR="EOF" \
+    SHIM_SUBMIT_LANDED=1 \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+      --binary "$SHIM" \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes
+  [ "$status" -eq 7 ]
+  [[ "$output" == *"DIFFERENT destination"* ]]
+  [[ "$output" == *"destination you asked"* ]]
+  [[ "$output" != *"safe to re-run submit"* ]]
+  rm -rf "$state_dir"
+}
+
 @test "submit rejects non-multisig tx JSON (exit 3)" {
   run "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx-single.json" \
       --binary "$SHIM" \

@@ -1,6 +1,6 @@
 # Lumera EVM User Guides
 
-**Last updated**: 2026-05-09
+**Last updated**: 2026-06-17
 **Applies to**: Lumera chain post-EVM upgrade (`x/evmigration` enabled, Cosmos EVM v0.6.0)
 
 This directory holds the operator- and end-user-facing documentation for living on the EVM-enabled Lumera chain. Architecture, internals, and audit material live one level up under [main.md](../main.md); this set is the "what do I do, and in what order" layer.
@@ -14,6 +14,7 @@ This directory holds the operator- and end-user-facing documentation for living 
 | A supernode operator | [supernode-migration.md](supernode-migration.md) | [migration.md](migration.md) for chain-level mechanics |
 | A Hermes IBC relayer operator | [relayer-migration.md](relayer-migration.md) | [migration-scripts.md](migration-scripts.md) for the `migrate-account.sh` wrapper |
 | A node operator (full node, sentry, public RPC) | [node-evm-config-guide.md](node-evm-config-guide.md) | [tune-guide.md](tune-guide.md) for parameter sizing |
+| A MetaMask user or public-RPC operator | [metamask-configuration.md](metamask-configuration.md) | [node-evm-config-guide.md](node-evm-config-guide.md) for node-side JSON-RPC settings |
 | A governance participant or chain steward | [tune-guide.md](tune-guide.md) | [node-evm-config-guide.md](node-evm-config-guide.md) for what each knob controls |
 
 ## Guides
@@ -41,6 +42,10 @@ Migrating a Hermes relayer's Lumera signing account from legacy `secp256k1` to `
 ### [node-evm-config-guide.md](node-evm-config-guide.md) — Node Operator EVM Config
 
 Every EVM-relevant `app.toml` section explained: `[evm]`, `[evm.mempool]`, `[json-rpc]`, `[lumera.json-rpc-ratelimit]`, `[lumera.evm-mempool]`. Documents the chain-id namespace policy (mainnet rejects `debug`, `personal`, `admin`), the v1.20.0+ automatic config migration helper that fills in missing sections on first start, deployment-pattern checklists for validator / public-RPC / archive nodes, and the Prometheus metrics endpoints (`127.0.0.1:6065` for RPC, `127.0.0.1:8100` for the geth engine).
+
+### [metamask-configuration.md](metamask-configuration.md) — MetaMask Configuration
+
+End-user and operator guide for connecting MetaMask to Lumera EVM networks. Covers the public devnet MetaMask values, a full screenshot walkthrough of connecting the Lumera Portal to MetaMask (the `eth_chainId` → `wallet_switchEthereumChain` → `wallet_addEthereumChain` → `eth_requestAccounts` handshake, the `0x…`/`lumera1…` address mapping, importing a migrated EVM account, and verifying on the EVM Migration page), validator-local EVM ports, HTTPS reverse proxy setup, path-based proxy fallback, WSS proxying for dapps and tools, and `eth_chainId` troubleshooting.
 
 ### [tune-guide.md](tune-guide.md) — EVM Parameter Tuning
 

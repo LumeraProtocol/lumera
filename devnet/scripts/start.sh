@@ -336,8 +336,9 @@ start_lumera() {
 		EXTRA_START_FLAGS="--skip-claims-check=false --claims-path=${CLAIMS_LOCAL}"
 		echo "[BOOT] ${MONIKER}: Claims CSV found, loading claim records at genesis"
 	fi
+	echo "+ ${DAEMON} start --home ${DAEMON_HOME} ${EXTRA_START_FLAGS}"
 	# shellcheck disable=SC2086
-	run "${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
+	"${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
 	LUMERAD_PID=$!
 	echo "[BOOT] ${MONIKER}: lumerad started, pid=${LUMERAD_PID}"
 
@@ -356,9 +357,9 @@ tail_logs() {
 
 # Wait on the lumerad process and propagate its exit code as the container's
 # exit code. If lumerad dies (crash, SIGKILL on host that matches `pkill -f
-# 'lumerad start'`, OOM, etc.) the container exits non-zero. Combined with the
-# docker-compose `restart: unless-stopped` policy this auto-recovers from
-# silent zombification and surfaces real crashes to docker / observability.
+# 'lumerad start'`, OOM, etc.) PID 1 exits too. The docker-compose
+# `restart: unless-stopped` policy handles recovery on any container exit while
+# the propagated code keeps crash/kill status visible to docker / observability.
 #
 # History: 2026-06-02 — a host `pkill -9 -f 'lumerad start'` matched lumerad
 # inside the 5 validator containers. PID 1 was bash + tail -F, so containers

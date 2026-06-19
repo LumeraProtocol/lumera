@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -10,8 +11,22 @@ import (
 	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
 )
 
-// VerifyMigrationProofsForAnte performs the same proof checks as msg execution
-// before fee-free, unsigned migration txs are admitted to the mempool.
+// VerifyMigrationProofsForAnte gates fee-free, unsigned migration txs at the
+// ante — before they are admitted to the app mempool or selected for proposals.
+//
+// It enforces two things:
+//
+//  1. The migration admission window. Migration txs carry no fee and no
+//     envelope signature, so without this gate anyone could flood the mempool
+//     and proposals with zero-fee migration txs at any time. Rejecting txs at
+//     the ante when migration is disabled or the window has closed bounds that
+//     exposure to the operator-defined migration window. (Mirrors preChecks
+//     steps 1–2 in msg_server_claim_legacy.go; message execution re-checks
+//     against the canonical block time, so this is a best-effort mempool
+//     filter, not the authoritative gate.)
+//
+//  2. The same cryptographic proof checks message execution performs, so a tx
+//     with invalid embedded proofs never reaches the mempool.
 func (k Keeper) VerifyMigrationProofsForAnte(ctx sdk.Context, msg sdk.Msg) error {
 	var kind string
 	var legacyAddress string
@@ -49,6 +64,16 @@ func (k Keeper) VerifyMigrationProofsForAnte(ctx sdk.Context, msg sdk.Msg) error
 	if err != nil {
 		return err
 	}
+
+	// Admission gate: keep zero-fee, zero-signature migration txs out of the
+	// mempool once migration is switched off or the window has closed.
+	if !params.EnableMigration {
+		return types.ErrMigrationDisabled
+	}
+	if params.MigrationEndTime > 0 && ctx.BlockTime().After(time.Unix(params.MigrationEndTime, 0)) {
+		return types.ErrMigrationWindowClosed
+	}
+
 	if err := legacyProof.ValidateParams(params.MaxMultisigSubKeys); err != nil {
 		return err
 	}

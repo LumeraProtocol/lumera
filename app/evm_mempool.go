@@ -43,8 +43,7 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 	// upstream PriorityNonceMempool falls back to
 	// DefaultSignerExtractionAdapter, which calls tx.GetSignaturesV2() and
 	// refuses zero-signer migration txs with "tx must have at least one
-	// signer" *before* the migration-aware ante chain
-	// (app/evm/ante.go: migrationCosmosAnte) ever runs.
+	// signer" during mempool admission and proposal selection.
 	//
 	// Priority / Compare / MinValue mirror upstream defaults from
 	// evmmempool.NewExperimentalEVMMempool (mempool.go ~line 152) so this
@@ -158,13 +157,19 @@ func defaultCosmosPoolConfig(app *App) *sdkmempool.PriorityNonceMempoolConfig[sd
 					return sdkmath.ZeroInt()
 				}
 				// Short-circuit zero-fee / zero-gas txs without touching
-				// EVM keeper state. This matters for two reasons:
+				// EVM keeper state. This matters for three reasons:
 				//   1. Migration-only txs (MsgClaimLegacyAccount) carry no
 				//      fee — their priority is unambiguously zero and we
 				//      avoid an unnecessary KVStore read.
 				//   2. The SDK PriorityNonceMempool may invoke this with
 				//      a ctx that has no KVStore attached (e.g. some test
 				//      paths), in which case a state read panics.
+				//   3. The gas == 0 guard also hardens against a
+				//      division-by-zero panic in the final
+				//      coin.Amount.Quo(gas): upstream's default priority
+				//      function (cosmos/evm mempool.go ~line 152) divides by
+				//      GetGas() with no zero guard, so this is strictly safer
+				//      than the code it replicates.
 				fee := cosmosTxFee.GetFee()
 				gas := cosmosTxFee.GetGas()
 				if gas == 0 || fee.IsZero() {

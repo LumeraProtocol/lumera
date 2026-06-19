@@ -121,6 +121,23 @@ func TestEVMigrationSignerExtractionAdapter_MixedTx_DelegatesToFallback(t *testi
 	require.Equal(t, 1, fb.called)
 }
 
+func TestEVMigrationSignerExtractionAdapter_MultipleMigrationMessages_Rejected(t *testing.T) {
+	fb := &recordingFallback{}
+	adapter := newEVMigrationSignerExtractionAdapter(fb)
+
+	tx := stubMsgsTx{
+		msgs: []sdk.Msg{
+			&evmigrationtypes.MsgClaimLegacyAccount{LegacyAddress: testLegacyBech32},
+			&evmigrationtypes.MsgClaimLegacyAccount{LegacyAddress: testLegacyBech32},
+		},
+	}
+
+	_, err := adapter.GetSigners(tx)
+	require.Error(t, err, "migration txs must stay single-message so mempool identity is unambiguous")
+	require.Contains(t, err.Error(), "exactly one migration message")
+	require.Zero(t, fb.called)
+}
+
 func TestEVMigrationSignerExtractionAdapter_EmptyLegacyAddress_Rejected(t *testing.T) {
 	fb := &recordingFallback{}
 	adapter := newEVMigrationSignerExtractionAdapter(fb)

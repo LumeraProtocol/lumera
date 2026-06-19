@@ -18,10 +18,9 @@ import (
 // zero envelope signers. The Cosmos SDK mempool's default
 // DefaultSignerExtractionAdapter calls tx.GetSignaturesV2() and refuses any
 // tx whose signature set is empty (priority_nonce.go: "tx must have at
-// least one signer"). That refusal happens before the ante chain runs,
-// which means the migration-aware ante decorators
-// (EVMigrationValidateBasicDecorator, evmigrationProofVerificationDecorator
-// in app/evm/ante.go) never get a chance to admit the tx.
+// least one signer"). That refusal prevents valid migration txs from being
+// admitted to the app-side mempool or selected for proposals, even though
+// the migration ante decorators authenticate them by proof.
 //
 // For migration-only txs we synthesize a SignerData from the message's
 // legacy_address: that string is a deterministic, on-chain canonical bytes
@@ -63,15 +62,12 @@ func (s evmigrationSignerExtractionAdapter) GetSigners(tx sdk.Tx) ([]sdkmempool.
 		// msg sets, but keep the invariant local.
 		return s.fallback.GetSigners(tx)
 	}
+	if len(msgs) != 1 {
+		return nil, fmt.Errorf("evmigration tx must contain exactly one migration message for mempool signer derivation, got %d", len(msgs))
+	}
 
-	// All messages in a migration-only tx are evmigration messages with a
-	// legacy_address. We anchor the synthetic signer to the FIRST message's
-	// legacy_address; a well-formed migration tx is single-message (see
-	// EVMigrationValidateBasicDecorator) and submit-proof never bundles
-	// multiple migration messages today, so this is safe. If batching is
-	// ever introduced, each batch member must share the same legacy_address
-	// for the ordering to remain coherent, and a ValidateBasic check should
-	// enforce that.
+	// submit-proof produces a single-message tx. Keep the mempool identity
+	// equally narrow: one migration operation, one legacy_address bucket.
 	legacyAddr, err := legacyAddressOfMigrationMsg(msgs[0])
 	if err != nil {
 		return nil, err

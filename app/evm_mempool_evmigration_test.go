@@ -21,6 +21,8 @@ import (
 // testChainID matches the chain-id used by Setup(t) (see app/test_helpers.go).
 const testChainID = "testing"
 
+const testLegacyBech32 = "lumera1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc58av9gw"
+
 // TestEVMMempool_CheckTxAcceptsZeroSignerMigrationTx is the end-to-end
 // regression test for the production bug behind PR #167.
 //
@@ -40,11 +42,10 @@ const testChainID = "testing"
 // an empty []SignerData for a zero-signer migration tx, causing
 // PriorityNonceMempool.Insert to reject with
 // "tx must have at least one signer". This test goes through the EXACT same
-// CheckTx entry point an operator hits and asserts the response is non-zero.
+// CheckTx entry point an operator hits and asserts the response succeeds.
 //
 // This is a stronger test than calling app.GetMempool().Insert(...) directly
-// because it exercises the proposer-pool wiring as well, and because it
-// drives the same code path the live binary uses on broadcast.
+// because it drives the same code path the live binary uses on broadcast.
 func TestEVMMempool_CheckTxAcceptsZeroSignerMigrationTx(t *testing.T) {
 	app := lumeraapp.Setup(t)
 
@@ -76,16 +77,23 @@ func TestEVMMempool_CheckTxAcceptsZeroSignerMigrationTx(t *testing.T) {
 		resp.Code, resp.Log)
 }
 
-// TestEVMMempool_CheckTxRejectsZeroSignerNonMigrationTx is the security pin
-// Andrey asked for: the SignerExtractionAdapter fix MUST NOT loosen mempool
-// checks for any tx that isn't a payload-authenticated migration message.
-// A zero-signer banktypes.MsgSend submitted through the same CheckTx entry
-// point must still be rejected.
+// TestEVMMempool_CheckTxRejectsZeroSignerNonMigrationTx is the end-to-end
+// defense-in-depth pin: a zero-signer banktypes.MsgSend submitted through the
+// same CheckTx entry point an operator hits must still be rejected.
 //
-// If this test ever turns green, the adapter has widened the hole — every
-// non-migration message type would then be able to bypass mempool signer
-// extraction, which is exactly the security regression we promised would
-// not happen.
+// LAYERING NOTE: this rejection comes from the SDK signature-verification
+// decorator in the ante chain ("no signatures supplied", codespace "sdk",
+// code ErrNoSignatures=15), which runs BEFORE mempool admission. It therefore
+// does NOT exercise the signer-extraction adapter at all — the ante stops the
+// tx first. This test only proves the live path still rejects a malicious
+// zero-signer non-migration tx; it cannot, on its own, detect an adapter that
+// widened the hole, because the ante would mask such a regression here.
+//
+// The adapter-layer security guarantee — that a non-migration tx gets NO
+// synthetic signer and is rejected at mempool admission — is pinned directly,
+// bypassing the ante, by TestEVMMempool_InsertRejectsZeroSignerNonMigrationTx
+// below, and at the unit level by
+// TestEVMigrationSignerExtractionAdapter_NonMigrationTx_DelegatesToFallback.
 func TestEVMMempool_CheckTxRejectsZeroSignerNonMigrationTx(t *testing.T) {
 	app := lumeraapp.Setup(t)
 
@@ -110,7 +118,43 @@ func TestEVMMempool_CheckTxRejectsZeroSignerNonMigrationTx(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.NotZero(t, resp.Code,
-		"zero-signer NON-migration tx must be rejected by CheckTx; got code=0 (security regression — adapter widened the hole)")
+		"zero-signer NON-migration tx must be rejected by CheckTx; got code=0 log=%q", resp.Log)
+	// Pin the rejecting layer: the ante's signature verification, not the
+	// mempool. If this assertion starts failing, the rejection moved layers
+	// and the comment above (and the division of coverage with the Insert
+	// test) needs revisiting.
+	require.Contains(t, resp.Log, "no signatures supplied",
+		"expected ante signature-verification rejection; a different layer/message means the security coverage split has shifted")
+}
+
+// TestEVMMempool_InsertRejectsZeroSignerNonMigrationTx is the true adapter-layer
+// security pin. It drives app.GetMempool().Insert directly — bypassing the ante
+// — so the SignerExtractionAdapter is actually exercised. A zero-signer
+// non-migration tx must NOT receive a synthetic signer: IsEVMigrationOnlyTx is
+// false for a bank message, the adapter delegates to the SDK default extractor
+// (which yields zero signers), and PriorityNonceMempool.Insert then rejects
+// with "tx must have at least one signer".
+//
+// If this test ever turns green, the adapter HAS widened the hole — a
+// non-migration message type would be admitted to the mempool without envelope
+// signatures, which is exactly the security regression we promised would not
+// happen. This is the assertion the CheckTx test above cannot make, because the
+// ante masks the mempool layer there.
+func TestEVMMempool_InsertRejectsZeroSignerNonMigrationTx(t *testing.T) {
+	app := lumeraapp.Setup(t)
+
+	from := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address().Bytes())
+	to := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address().Bytes())
+	bankMsg := banktypes.NewMsgSend(from, to, sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 1)))
+	tx := newUnsignedMigrationTxForMempool(t, app, bankMsg)
+
+	ctx := sdk.Context{}.WithBlockHeight(1)
+	before := app.GetMempool().CountTx()
+	err := app.GetMempool().Insert(ctx, tx)
+	require.Error(t, err, "zero-signer non-migration tx must not be admitted to the mempool")
+	require.Contains(t, err.Error(), "tx must have at least one signer",
+		"adapter must delegate non-migration txs to the default extractor, not synthesize a signer")
+	require.Equal(t, before, app.GetMempool().CountTx())
 }
 
 // TestEVMigrationSignerAdapter_DefaultExtractor_PinsFailureMode pins the
@@ -131,6 +175,109 @@ func TestEVMigrationSignerAdapter_DefaultExtractor_PinsFailureMode(t *testing.T)
 	sigs, err := defaultAdapter.GetSigners(tx)
 	require.NoError(t, err, "default adapter returns no error on zero-sig tx — it just returns an empty slice")
 	require.Empty(t, sigs, "default adapter yields zero signers for migration tx — this is what makes PriorityNonceMempool.Insert reject with 'tx must have at least one signer'")
+}
+
+func TestEVMMempool_SDKPriorityNonceMempoolRejectsZeroSignerMigrationTx(t *testing.T) {
+	app := lumeraapp.Setup(t)
+
+	msg := validMigrationMsgForMempool(t, testChainID)
+	tx := newUnsignedMigrationTxForMempool(t, app, msg)
+
+	pool := sdkmempool.NewPriorityMempool(sdkmempool.PriorityNonceMempoolConfig[int64]{})
+	err := pool.Insert(sdk.Context{}.WithBlockHeight(1), tx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "tx must have at least one signer")
+	require.Zero(t, pool.CountTx())
+}
+
+func TestEVMMempool_InsertAcceptsZeroSignerValidatorMigrationTx(t *testing.T) {
+	app := lumeraapp.Setup(t)
+
+	msg := &evmigrationtypes.MsgMigrateValidator{
+		NewAddress:    "lumera1ttwdmmlqf8xu5mkufrh5zcck8v8yn42a5m0xpg",
+		LegacyAddress: testLegacyBech32,
+	}
+	tx := newUnsignedMigrationTxForMempool(t, app, msg)
+
+	ctx := sdk.Context{}.WithBlockHeight(1)
+	before := app.GetMempool().CountTx()
+	err := app.GetMempool().Insert(ctx, tx)
+	require.NoError(t, err)
+	require.Equal(t, before+1, app.GetMempool().CountTx())
+}
+
+func TestEVMMempool_InsertRejectsMalformedMigrationLegacyAddress(t *testing.T) {
+	app := lumeraapp.Setup(t)
+
+	msg := &evmigrationtypes.MsgClaimLegacyAccount{
+		NewAddress:    "lumera1ttwdmmlqf8xu5mkufrh5zcck8v8yn42a5m0xpg",
+		LegacyAddress: "not-a-bech32",
+	}
+	tx := newUnsignedMigrationTxForMempool(t, app, msg)
+
+	ctx := sdk.Context{}.WithBlockHeight(1)
+	before := app.GetMempool().CountTx()
+	err := app.GetMempool().Insert(ctx, tx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not a valid bech32")
+	require.Equal(t, before, app.GetMempool().CountTx())
+}
+
+func TestEVMMempool_InsertRejectsZeroSignerMixedMigrationTx(t *testing.T) {
+	app := lumeraapp.Setup(t)
+
+	from := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address().Bytes())
+	to := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address().Bytes())
+	bankMsg := banktypes.NewMsgSend(from, to, sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 1)))
+	migrationMsg := &evmigrationtypes.MsgClaimLegacyAccount{
+		NewAddress:    "lumera1ttwdmmlqf8xu5mkufrh5zcck8v8yn42a5m0xpg",
+		LegacyAddress: testLegacyBech32,
+	}
+	tx := newUnsignedMigrationTxForMempool(t, app, migrationMsg, bankMsg)
+
+	ctx := sdk.Context{}.WithBlockHeight(1)
+	before := app.GetMempool().CountTx()
+	err := app.GetMempool().Insert(ctx, tx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "tx must have at least one signer")
+	require.Equal(t, before, app.GetMempool().CountTx())
+}
+
+func TestEVMMempool_DuplicateLegacyMigrationTxDoesNotGrowMempool(t *testing.T) {
+	app := lumeraapp.Setup(t)
+
+	msg := &evmigrationtypes.MsgClaimLegacyAccount{
+		NewAddress:    "lumera1ttwdmmlqf8xu5mkufrh5zcck8v8yn42a5m0xpg",
+		LegacyAddress: testLegacyBech32,
+	}
+	tx := newUnsignedMigrationTxForMempool(t, app, msg)
+
+	ctx := sdk.Context{}.WithBlockHeight(1)
+	require.NoError(t, app.GetMempool().Insert(ctx, tx))
+	require.Equal(t, 1, app.GetMempool().CountTx())
+
+	require.NoError(t, app.GetMempool().Insert(ctx, tx))
+	require.Equal(t, 1, app.GetMempool().CountTx(), "same legacy_address + sequence must remain one mempool entry")
+}
+
+func TestEVMMempool_PrepareProposalIncludesZeroSignerMigrationTx(t *testing.T) {
+	app := lumeraapp.Setup(t)
+
+	msg := validMigrationMsgForMempool(t, testChainID)
+	tx := newUnsignedMigrationTxForMempool(t, app, msg)
+	txBytes, err := app.TxConfig().TxEncoder()(tx)
+	require.NoError(t, err)
+
+	require.NoError(t, app.GetMempool().Insert(sdk.Context{}.WithBlockHeight(1), tx))
+
+	resp, err := app.PrepareProposal(&abci.RequestPrepareProposal{
+		Height:     app.LastBlockHeight() + 1,
+		MaxTxBytes: int64(len(txBytes) + 1024),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Len(t, resp.Txs, 1)
+	require.Equal(t, txBytes, resp.Txs[0])
 }
 
 // validMigrationMsgForMempool builds a MsgClaimLegacyAccount whose embedded

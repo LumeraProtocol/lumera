@@ -39,6 +39,7 @@ Primary files:
 | `TestBlockedAddressesMatrix` | Verifies blocked-address set contains expected module/precompile addresses. |
 | `TestPrecompileSendRestriction` | Verifies bank send restriction blocks sends to EVM precompile addresses. |
 | `TestEVMMempoolWiringOnAppStartup` | Verifies app-side EVM mempool wiring occurs at startup with expected handlers. |
+| `TestEVMMempoolDisabledWhenMaxTxsIsNegative` | Verifies `mempool.max-txs = -1` leaves the app-side EVM mempool disabled and BaseApp on `NoOpMempool`. |
 | `TestEVMMempoolReentrantInsertBlocks` | Demonstrates mutex re-entry hazard that the async broadcast queue prevents. |
 | `TestConfigureEVMBroadcastOptionsFromAppOptions` | Verifies broadcast debug flag parsing from app options (bool, string, nil). |
 | `TestEVMTxBroadcastDispatcherDedupesQueuedAndInFlight` | Verifies dispatcher deduplicates queued and in-flight tx hashes. |

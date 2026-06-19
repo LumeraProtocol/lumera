@@ -3,6 +3,8 @@ package app
 import (
 	"testing"
 
+	sdkserver "github.com/cosmos/cosmos-sdk/server"
+	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
 	evmmempool "github.com/cosmos/evm/mempool"
 	"github.com/stretchr/testify/require"
 )
@@ -23,4 +25,18 @@ func TestEVMMempoolWiringOnAppStartup(t *testing.T) {
 	require.True(t, ok, "BaseApp mempool should be ExperimentalEVMMempool")
 
 	require.Same(t, getMempoolCasted, baseMempoolCasted, "App and BaseApp mempool references should match")
+}
+
+func TestEVMMempoolDisabledWhenMaxTxsIsNegative(t *testing.T) {
+	app, _ := setupWithAppOptionOverrides(
+		t,
+		"testing",
+		false,
+		5,
+		map[string]interface{}{sdkserver.FlagMempoolMaxTxs: -1},
+	)
+
+	require.Nil(t, app.GetMempool(), "App EVM mempool should not be configured when app-side mempool is disabled")
+	_, isNoOp := app.Mempool().(sdkmempool.NoOpMempool)
+	require.True(t, isNoOp, "BaseApp mempool should remain NoOp when app-side mempool is disabled")
 }

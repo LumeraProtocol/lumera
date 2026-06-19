@@ -4,6 +4,9 @@ Purpose: end-to-end integration tests for the `x/evmigration` module using real 
 File: `tests/integration/evmigration/migration_test.go`
 Run: `go test -tags=test ./tests/integration/evmigration/... -v`
 
+Additional real-node broadcast coverage for zero-signer `submit-proof` txs lives in the EVM mempool suite:
+`tests/integration/evm/mempool/evmigration_zero_signer_test.go`. Those tests start a `lumerad` node, wait for height 1, and submit encoded tx bytes through CometBFT `broadcast_tx_sync`.
+
 | Test | Description |
 | --- | --- |
 | `TestClaimLegacyAccount_Success` | End-to-end migration: balances move, migration record stored, counter incremented. |
@@ -20,3 +23,6 @@ Run: `go test -tags=test ./tests/integration/evmigration/... -v`
 | `TestMigrateValidator_JailedValidator` | Rejection when validator is jailed with real staking/auth state; asserts no migration record or destination validator is created. |
 | `TestQueryMigrationRecord_Integration` | Query server returns record after real migration, nil before. |
 | `TestQueryMigrationEstimate_Integration` | Estimate query with real staking state reports correct values. |
+| `TestEVMigrationZeroSignerTxBroadcastSyncWithMempoolEnabled` | Mempool-suite regression: valid zero-signer migration tx passes real-node CheckTx with app-side mempool enabled. |
+| `TestEVMigrationMalformedLegacyAddressRejectedByValidateBasic` | Mempool-suite negative test: malformed `legacy_address` is rejected by `ValidateBasic` in the ante chain on the real-node broadcast path (before mempool admission). |
+| `TestZeroSignerNonMigrationBroadcastSyncStillRejected` | Mempool-suite negative control: zero-signer non-migration tx remains rejected. |

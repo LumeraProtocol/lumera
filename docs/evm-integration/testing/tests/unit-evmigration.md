@@ -123,6 +123,33 @@ Files: `x/evmigration/keeper/verify_test.go`, `x/evmigration/keeper/migrate_test
 
 **Additional regression coverage**: `TestKeeper_GetSuperNodeByAccount` (in `x/supernode/v1/keeper/`) confirms `GetSuperNodeByAccount` returns the correct supernode for a given account address, exercising the index used by `MigrateSupernode`.
 
+## App-side mempool signer adapter tests
+
+Migration txs are intentionally zero-signer at the Cosmos tx envelope layer; authorization lives in the embedded legacy and new-address proofs. The app-level tests below cover the mempool-specific signer adapter that lets those txs pass app-side mempool admission without weakening non-migration tx validation.
+
+Files: `app/evmigration_signer_extraction_adapter_test.go`, `app/evm_mempool_evmigration_test.go`
+
+| Test | Description |
+| ---- | ----------- |
+| `TestEVMigrationSignerExtractionAdapter_ClaimLegacyAccount` | Extracts a deterministic synthetic signer from `legacy_address` for `MsgClaimLegacyAccount`. |
+| `TestEVMigrationSignerExtractionAdapter_MigrateValidator` | Extracts the same synthetic signer shape for `MsgMigrateValidator`. |
+| `TestEVMigrationSignerExtractionAdapter_NonMigration_DelegatesToFallback` | Non-migration txs keep the normal fallback signer extraction path. |
+| `TestEVMigrationSignerExtractionAdapter_MixedTx_DelegatesToFallback` | Mixed migration + non-migration txs are not treated as migration-only. |
+| `TestEVMigrationSignerExtractionAdapter_MultipleMigrationMessages_Rejected` | Multi-message migration txs are rejected so one tx cannot map to multiple synthetic signer buckets. |
+| `TestEVMigrationSignerExtractionAdapter_EmptyLegacyAddress_Rejected` | Empty `legacy_address` cannot produce a mempool signer. |
+| `TestEVMigrationSignerExtractionAdapter_InvalidLegacyAddress_Rejected` | Malformed bech32 `legacy_address` is rejected before mempool insertion. |
+| `TestEVMigrationSignerAdapter_DefaultExtractor_PinsFailureMode` | Pins the upstream SDK default extractor behavior: zero-signer migration txs produce no signers. |
+| `TestEVMMempool_SDKPriorityNonceMempoolRejectsZeroSignerMigrationTx` | Demonstrates the raw SDK `PriorityNonceMempool` rejection that the app adapter fixes. |
+| `TestEVMMempool_CheckTxAcceptsZeroSignerMigrationTx` | Full app CheckTx path accepts a valid zero-signer migration tx. |
+| `TestEVMMempool_CheckTxRejectsZeroSignerNonMigrationTx` | End-to-end pin: zero-signer non-migration txs are rejected on the live CheckTx path (by the ante's signature verification, before mempool admission). |
+| `TestEVMMempool_InsertRejectsZeroSignerNonMigrationTx` | Adapter-layer security pin: drives `mempool.Insert` directly (bypassing the ante) to prove a non-migration tx gets no synthetic signer and is rejected with "tx must have at least one signer". |
+| `TestEVMMempool_InsertAcceptsZeroSignerValidatorMigrationTx` | App mempool accepts zero-signer `MsgMigrateValidator`. |
+| `TestEVMMempool_InsertRejectsMalformedMigrationLegacyAddress` | App mempool rejects malformed migration `legacy_address`. |
+| `TestEVMMempool_InsertRejectsZeroSignerMixedMigrationTx` | Mixed migration/non-migration txs do not get synthetic signer treatment. |
+| `TestEVMMempool_DuplicateLegacyMigrationTxDoesNotGrowMempool` | Duplicate txs for the same synthetic legacy-address signer do not grow the mempool. |
+| `TestEVMMempool_PrepareProposalIncludesZeroSignerMigrationTx` | Accepted zero-signer migration txs are selected by `PrepareProposal`. |
+| `TestVerifyMigrationProofsForAnte_AdmissionGate` | Admission gate: proof-valid migration txs are rejected at the ante (`ErrMigrationDisabled` / `ErrMigrationWindowClosed`) when migration is off or the window has closed, bounding the zero-fee mempool-spam surface to the operator-defined window. |
+
 ## Multisig support tests
 
 ### Multisig verifier tests (`x/evmigration/keeper/verify_test.go`)

@@ -81,7 +81,7 @@ EVM-aware app-side mempool with deadlock prevention.
 | [x] | Broadcast worker `RegisterTxService` override | `app/evm_runtime.go` — local CometBFT client                    |
 | [x] | `Close()` override for graceful shutdown      | `app/evm_runtime.go`                                             |
 | [x] | `broadcast-debug` app.toml toggle             | `cmd/lumera/cmd/config.go`                                       |
-| [x] | Default `max_txs=5000`                        | App config defaults                                                |
+| [x] | Default `max_txs=10000`                       | App config defaults                                                |
 | [x] | Mempool eviction / capacity pressure testing    | `tests/integration/evm/mempool/capacity_pressure_test.go`        |
 | [x] | Mempool metrics / observability                 | `app/evm_mempool_metrics.go` — Prometheus gauges (size, pending, queued, broadcast\_queue\_depth) + labeled rejection counter (`rejections_total{source,reason}`) |
 

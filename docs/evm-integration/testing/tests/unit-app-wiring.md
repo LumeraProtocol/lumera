@@ -62,7 +62,7 @@ Primary files:
 | `TestIsInterchainAccountAddr` | Verifies ICA detection by address lookup through account keeper. |
 | `TestEVMAddPreinstallsMatrix` | Verifies preinstall contract registration matrix in VM keeper setup paths. |
 | `TestRegisterLumeraLegacyAminoCodecEnablesEthSecp256k1StdSignature` | Verifies legacy Amino registration covers eth_secp256k1 so SDK ante tx-size signature marshaling does not panic. |
-| `TestInitAppConfigEVMDefaults` | Verifies default app config enables EVM/JSON-RPC values expected by Lumera. |
+| `TestInitAppConfigEVMDefaults` | Verifies default app config enables EVM/JSON-RPC values expected by Lumera, including `mempool.max-txs = 10000` and the real Cosmos EVM v0.6.0 `[evm.mempool]` defaults (`global-slots = 5120`, `global-queue = 1024`, no `insert-queue-size`). |
 | `TestNeedsConfigMigration_LegacyConfig` | Empty Viper (pre-EVM app.toml with no EVM sections) triggers config migration. (Bug #19) |
 | `TestNeedsConfigMigration_UpstreamDefault` | Upstream cosmos/evm default chain ID (262144) triggers config migration even when other sections exist. (Bug #19) |
 | `TestNeedsConfigMigration_PartialManualEdit` | Correct evm-chain-id but missing [json-rpc] section still triggers migration. (Bug #19) |
@@ -70,6 +70,7 @@ Primary files:
 | `TestNeedsConfigMigration_OperatorDisabledJSONRPC` | Operator who explicitly set `json-rpc.enable = false` does NOT trigger migration — choice is respected. (Bug #19) |
 | `TestNeedsConfigMigration_FullyMigrated` | Fully migrated config with all sentinel keys set does NOT trigger migration. (Bug #19) |
 | `TestMigrateAppConfig_LegacyTomlOnDisk` | Full migration flow: writes legacy app.toml, runs migrator, verifies disk and in-memory Viper state contain correct EVM config while preserving operator settings. (Bug #19) |
+| `TestMigrateAppConfig_LegacyNegativeMaxTxsUsesNetworkDefault` | Verifies config migration rewrites legacy `mempool.max-txs = -1` to `5000` for devnet and `10000` for testnet/mainnet, while emitting only real Cosmos EVM mempool keys. |
 | `TestNewRootCmdStartWiresEVMFlags` | Verifies start/root command exposes key EVM JSON-RPC flags. |
 | `TestNewRootCmdDefaultKeyTypeOverridden` | Verifies root command default key algorithm is overridden to `eth_secp256k1`. |
 | `TestRevertToSnapshot_ProcessedEventsInvariant` | Adapted from cosmos/evm v0.6.0: verifies StateDB event-tracking invariant after snapshot reverts during precompile calls. |

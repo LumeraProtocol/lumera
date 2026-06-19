@@ -177,3 +177,67 @@ max-txs = 3000
 	assert.False(t, needsConfigMigration(v),
 		"after migration, needsConfigMigration must return false")
 }
+
+func TestMigrateAppConfig_LegacyNegativeMaxTxsUsesNetworkDefault(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		chainID    string
+		wantMaxTxs int64
+	}{
+		{name: "devnet", chainID: "lumera-devnet-1", wantMaxTxs: 5000},
+		{name: "testnet", chainID: "lumera-testnet-2", wantMaxTxs: 10000},
+		{name: "mainnet", chainID: "lumera-mainnet-1", wantMaxTxs: 10000},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tmpDir := t.TempDir()
+			configDir := filepath.Join(tmpDir, "config")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			legacyToml := `
+[api]
+enable = true
+
+[mempool]
+max-txs = -1
+`
+			appCfgPath := filepath.Join(configDir, "app.toml")
+			require.NoError(t, os.WriteFile(appCfgPath, []byte(legacyToml), 0o644))
+
+			v := viper.New()
+			v.SetConfigType("toml")
+			v.SetConfigName("app")
+			v.AddConfigPath(configDir)
+			v.Set("chain-id", tc.chainID)
+			require.NoError(t, v.MergeInConfig())
+			require.True(t, needsConfigMigration(v), "precondition: legacy config must need migration")
+
+			require.NoError(t, doMigrateAppConfig(v, appCfgPath))
+
+			v2 := viper.New()
+			v2.SetConfigType("toml")
+			v2.SetConfigName("app")
+			v2.AddConfigPath(configDir)
+			require.NoError(t, v2.MergeInConfig())
+
+			assert.Equal(t, tc.wantMaxTxs, v.GetInt64("mempool.max-txs"),
+				"in-memory legacy no-op mempool must be replaced for %s", tc.chainID)
+			assert.Equal(t, tc.wantMaxTxs, v2.GetInt64("mempool.max-txs"),
+				"disk legacy no-op mempool must be replaced for %s", tc.chainID)
+
+			migratedToml, err := os.ReadFile(appCfgPath)
+			require.NoError(t, err)
+			migratedTomlStr := string(migratedToml)
+			assert.Contains(t, migratedTomlStr, "[evm.mempool]")
+			assert.Contains(t, migratedTomlStr, "global-slots = 5120")
+			assert.Contains(t, migratedTomlStr, "global-queue = 1024")
+			assert.NotContains(t, migratedTomlStr, "insert-queue-size")
+		})
+	}
+}

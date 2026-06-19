@@ -26,6 +26,7 @@ Suites:
 | `TestPrometheusMetricsExposeMempoolGauges` | E2E: starts node with Prometheus telemetry, scrapes /metrics, verifies gauges. |
 | `TestPrometheusRejectionsCountedViaCometCheckTx` | E2E: submits malformed bytes via CometBFT broadcast_tx_sync, verifies rejection counter. |
 | `TestEVMigrationZeroSignerTxBroadcastSyncWithMempoolEnabled` | Real-node `broadcast_tx_sync`: a valid zero-signer `MsgClaimLegacyAccount` passes CheckTx with the app-side EVM mempool enabled. |
+| `TestEVMigrationZeroSignerTxBroadcastSyncAfterLegacyMainnetConfigMigration` | Real-node upgrade-profile check: starts from a pre-EVM `app.toml` with `mempool.max-txs = -1`, verifies migration rewrites it to `10000`, emits the real Cosmos EVM mempool defaults, and still admits a valid zero-signer `MsgClaimLegacyAccount`. |
 | `TestEVMigrationProofValidNonexistentLegacyAccountRejectedByAnte` | Real-node `broadcast_tx_sync`: a proof-valid zero-signer migration tx is rejected by ante state admission when the legacy account does not exist. |
 | `TestEVMigrationMalformedLegacyAddressRejectedByValidateBasic` | Real-node `broadcast_tx_sync`: malformed migration `legacy_address` is rejected by `ValidateBasic` in the ante chain, before mempool admission. |
 | `TestZeroSignerNonMigrationBroadcastSyncStillRejected` | Negative control: a zero-signer non-migration tx is still rejected, proving the evmigration adapter does not widen signer bypass behavior. |

@@ -73,6 +73,9 @@ func doMigrateAppConfig(v *viper.Viper, appCfgPath string) error {
 	// Force the EVM chain ID to the Lumera constant — an operator should
 	// never have a different value.
 	fullCfg.EVM.EVMChainID = lcfg.EVMChainID
+	if fullCfg.Mempool.MaxTxs < 0 {
+		fullCfg.Mempool.MaxTxs = migratedMempoolMaxTxs(v.GetString("chain-id"))
+	}
 
 	// Only enable JSON-RPC and indexer when the section was never written
 	// (i.e. the key is not present in Viper at all). If an operator
@@ -130,12 +133,22 @@ func doMigrateAppConfig(v *viper.Viper, appCfgPath string) error {
 // corrected by the v1.20.0 config migration. These keys are always force-set
 // into the live Viper after migration, overriding any stale in-memory values.
 func isEVMMigratedKey(key string) bool {
+	if key == "mempool.max-txs" {
+		return true
+	}
 	for _, prefix := range evmMigratedPrefixes {
 		if len(key) >= len(prefix) && key[:len(prefix)] == prefix {
 			return true
 		}
 	}
 	return false
+}
+
+func migratedMempoolMaxTxs(chainID string) int {
+	if lcfg.IsDevnetChainID(chainID) {
+		return 5000
+	}
+	return 10000
 }
 
 var evmMigratedPrefixes = []string{

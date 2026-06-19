@@ -34,6 +34,10 @@ func SetMempoolMaxTxsInAppToml(t *testing.T, homeDir string, maxTxs int) {
 	setMempoolMaxTxsInAppToml(t, homeDir, maxTxs)
 }
 
+func WriteLegacyPreEVMAppToml(t *testing.T, homeDir string, maxTxs int) {
+	writeLegacyPreEVMAppToml(t, homeDir, maxTxs)
+}
+
 func SetCometMempoolSize(t *testing.T, homeDir string, size int) {
 	setCometMempoolSize(t, homeDir, size)
 }

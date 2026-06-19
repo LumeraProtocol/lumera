@@ -365,7 +365,7 @@ func setupGenesisWithGentx(t *testing.T, repoRoot, binPath, homeDir, chainID str
 		t.Fatalf("json-rpc defaults not written to app.toml:\n%s", appTomlStr)
 	}
 	if !strings.Contains(appTomlStr, "[mempool]") ||
-		!strings.Contains(appTomlStr, "max-txs = 5000") {
+		!strings.Contains(appTomlStr, "max-txs = 10000") {
 		t.Fatalf("app-side mempool defaults not written to app.toml:\n%s", appTomlStr)
 	}
 
@@ -473,6 +473,30 @@ func setMempoolMaxTxsInAppToml(t *testing.T, homeDir string, maxTxs int) {
 
 	if err := os.WriteFile(appTomlPath, []byte(updated), 0o644); err != nil {
 		t.Fatalf("write app.toml: %v", err)
+	}
+}
+
+// writeLegacyPreEVMAppToml replaces app.toml with the minimal shape an
+// upgraded pre-EVM home can have: normal SDK sections, but no [evm],
+// [evm.mempool], [json-rpc], [tls], or [lumera.*] sections.
+func writeLegacyPreEVMAppToml(t *testing.T, homeDir string, maxTxs int) {
+	t.Helper()
+
+	appTomlPath := filepath.Join(homeDir, "config", "app.toml")
+	legacyToml := fmt.Sprintf(`
+[api]
+enable = true
+address = "tcp://127.0.0.1:1317"
+
+[grpc]
+enable = false
+
+[mempool]
+max-txs = %d
+`, maxTxs)
+
+	if err := os.WriteFile(appTomlPath, []byte(legacyToml), 0o644); err != nil {
+		t.Fatalf("write legacy app.toml: %v", err)
 	}
 }
 

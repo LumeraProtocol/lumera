@@ -45,6 +45,31 @@ func TestEVMigrationZeroSignerTxBroadcastSyncWithMempoolEnabled(t *testing.T) {
 	require.NotContains(t, res.Log, "tx must have at least one signer")
 }
 
+func TestEVMigrationZeroSignerTxBroadcastSyncAfterLegacyMainnetConfigMigration(t *testing.T) {
+	node := evmtest.NewEVMNode(t, "lumera-mainnet-1", 20)
+	evmtest.WriteLegacyPreEVMAppToml(t, node.HomeDir(), -1)
+	legacyPriv := secp256k1.GenPrivKey()
+	addGenesisLegacyAccount(t, node, sdk.AccAddress(legacyPriv.PubKey().Address().Bytes()))
+	node.StartAndWaitRPC()
+	defer node.Stop()
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
+
+	appTomlBytes, err := os.ReadFile(filepath.Join(node.HomeDir(), "config", "app.toml"))
+	require.NoError(t, err)
+	appToml := string(appTomlBytes)
+	require.Contains(t, appToml, "max-txs = 10000")
+	require.Contains(t, appToml, "[evm.mempool]")
+	require.Contains(t, appToml, "global-slots = 5120")
+	require.Contains(t, appToml, "global-queue = 1024")
+	require.NotContains(t, appToml, "insert-queue-size")
+
+	txBytes := validZeroSignerMigrationTxBytes(t, node.ChainID(), legacyPriv)
+	res := broadcastSync(t, node, txBytes)
+
+	require.Zero(t, res.Code, "zero-signer migration tx must pass CheckTx after legacy config migration: %s", res.Log)
+	require.NotContains(t, res.Log, "tx must have at least one signer")
+}
+
 func TestEVMigrationProofValidNonexistentLegacyAccountRejectedByAnte(t *testing.T) {
 	node := evmtest.NewEVMNode(t, "lumera-evmigration-no-legacy", 20)
 	node.StartAndWaitRPC()

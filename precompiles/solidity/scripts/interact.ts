@@ -1,4 +1,6 @@
-import { ethers } from "hardhat";
+import { network } from "hardhat";
+import type {} from "@nomicfoundation/hardhat-ethers";
+import type { HardhatEthers } from "@nomicfoundation/hardhat-ethers/types";
 
 // Contract addresses — set via env vars or paste after deployment.
 const ACTION_CLIENT = process.env.ACTION_CLIENT || "";
@@ -10,6 +12,7 @@ const ACTION_PRECOMPILE = "0x0000000000000000000000000000000000000901";
 const SUPERNODE_PRECOMPILE = "0x0000000000000000000000000000000000000902";
 
 async function main() {
+  const { ethers } = await network.create();
   const [signer] = await ethers.getSigners();
   console.log("Interacting as:", signer.address);
   console.log(
@@ -23,25 +26,25 @@ async function main() {
   // -----------------------------------------------------------------------
   console.log("=== Direct Precompile Calls ===\n");
 
-  await directActionQueries();
-  await directSupernodeQueries();
+  await directActionQueries(ethers);
+  await directSupernodeQueries(ethers);
 
   // -----------------------------------------------------------------------
   // 2) Calls via deployed contracts (if addresses provided)
   // -----------------------------------------------------------------------
   if (ACTION_CLIENT) {
     console.log("\n=== ActionClient Contract ===\n");
-    await actionClientQueries(ACTION_CLIENT);
+    await actionClientQueries(ethers, ACTION_CLIENT);
   }
 
   if (SUPERNODE_CLIENT) {
     console.log("\n=== SupernodeClient Contract ===\n");
-    await supernodeClientQueries(SUPERNODE_CLIENT);
+    await supernodeClientQueries(ethers, SUPERNODE_CLIENT);
   }
 
   if (DASHBOARD) {
     console.log("\n=== LumeraDashboard Contract ===\n");
-    await dashboardQueries(DASHBOARD);
+    await dashboardQueries(ethers, DASHBOARD);
   }
 
   if (!ACTION_CLIENT && !SUPERNODE_CLIENT && !DASHBOARD) {
@@ -56,7 +59,7 @@ async function main() {
 // Direct precompile interactions
 // ---------------------------------------------------------------------------
 
-async function directActionQueries() {
+async function directActionQueries(ethers: HardhatEthers) {
   const abi = [
     "function getParams() view returns (uint256, uint256, uint64, uint64, int64, string, string)",
     "function getActionFee(uint64) view returns (uint256, uint256, uint256)",
@@ -82,7 +85,7 @@ async function directActionQueries() {
   console.log("  totalFee: ", ethers.formatUnits(fee[2], 6), "LUME");
 }
 
-async function directSupernodeQueries() {
+async function directSupernodeQueries(ethers: HardhatEthers) {
   const abi = [
     "function getParams() view returns (uint256, uint64, uint64, string, uint64, uint64, uint64)",
     "function listSuperNodes(uint64, uint64) view returns (tuple(string, string, uint8, int64, string, string, string, uint64)[], uint64)",
@@ -123,7 +126,7 @@ async function directSupernodeQueries() {
 // Contract-mediated interactions
 // ---------------------------------------------------------------------------
 
-async function actionClientQueries(addr: string) {
+async function actionClientQueries(ethers: HardhatEthers, addr: string) {
   const ActionClient = await ethers.getContractFactory("ActionClient");
   const client = ActionClient.attach(addr);
 
@@ -139,7 +142,7 @@ async function actionClientQueries(addr: string) {
   console.log("Module params via contract:", params[5], "/", params[6], "fee split");
 }
 
-async function supernodeClientQueries(addr: string) {
+async function supernodeClientQueries(ethers: HardhatEthers, addr: string) {
   const SupernodeClient = await ethers.getContractFactory("SupernodeClient");
   const client = SupernodeClient.attach(addr);
 
@@ -157,7 +160,7 @@ async function supernodeClientQueries(addr: string) {
   console.log("Min version:", params[3]);
 }
 
-async function dashboardQueries(addr: string) {
+async function dashboardQueries(ethers: HardhatEthers, addr: string) {
   const Dashboard = await ethers.getContractFactory("LumeraDashboard");
   const dashboard = Dashboard.attach(addr);
 

@@ -26,6 +26,16 @@
 #   SHIM_SUBMIT_LANDED=1      — combined with SHIM_SUBMIT_EXIT, simulate the case
 #                                where the tx actually landed before the RPC dropped
 #                                (record/bank queries flip to their *_AFTER fixtures).
+#   SHIM_SUBMIT_PENDING=1     — combined with SHIM_SUBMIT_EXIT, mark the tx as
+#                                accepted but not visible in chain state yet.
+#   SHIM_PENDING_RECORD_AFTER_QUERIES=<n>
+#                              — when pending, flip to landed after n
+#                                migration-record queries.
+#   SHIM_RECORD_AFTER_SUBMIT_EXIT=<n>
+#                              — when pending, force migration-record to fail
+#                                with this exit code.
+#   SHIM_RECORD_AFTER_SUBMIT_STDERR=<msg>
+#                              — stderr for SHIM_RECORD_AFTER_SUBMIT_EXIT.
 
 set -u
 
@@ -34,6 +44,14 @@ if [[ -n "${SHIM_STDERR:-}" ]]; then
 fi
 
 fixtures_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+pending_file() {
+  printf '%s.pending\n' "${SHIM_STATE_FILE:-}"
+}
+
+record_query_count_file() {
+  printf '%s.record_queries\n' "${SHIM_STATE_FILE:-}"
+}
 
 emit() {
   local name="$1"
@@ -77,6 +95,23 @@ fi
 case "$*" in
   "query evmigration migration-estimate "*)               emit "${SHIM_ESTIMATE_FIXTURE:-estimate-ok}" ;;
   "query evmigration migration-record "*)
+    if [[ -n "${SHIM_STATE_FILE:-}" && -f "$(pending_file)" ]]; then
+      if [[ -n "${SHIM_RECORD_AFTER_SUBMIT_EXIT:-}" ]]; then
+        [[ -n "${SHIM_RECORD_AFTER_SUBMIT_STDERR:-}" ]] && printf '%s\n' "$SHIM_RECORD_AFTER_SUBMIT_STDERR" >&2
+        exit "$SHIM_RECORD_AFTER_SUBMIT_EXIT"
+      fi
+      if [[ -n "${SHIM_PENDING_RECORD_AFTER_QUERIES:-}" ]]; then
+        count_file="$(record_query_count_file)"
+        count=0
+        [[ -f "$count_file" ]] && count=$(<"$count_file")
+        count=$((count + 1))
+        printf '%s\n' "$count" > "$count_file"
+        if (( count >= SHIM_PENDING_RECORD_AFTER_QUERIES )); then
+          touch "$SHIM_STATE_FILE"
+          rm -f "$(pending_file)"
+        fi
+      fi
+    fi
     if [[ -n "${SHIM_STATE_FILE:-}" && -f "${SHIM_STATE_FILE}" && -n "${SHIM_RECORD_AFTER_FIXTURE:-}" ]]; then
       emit "$SHIM_RECORD_AFTER_FIXTURE"
     else
@@ -208,6 +243,8 @@ ADDR
       # on-chain migration record on retry.
       if [[ -n "${SHIM_STATE_FILE:-}" && "${SHIM_SUBMIT_LANDED:-0}" == "1" ]]; then
         touch "$SHIM_STATE_FILE"
+      elif [[ -n "${SHIM_STATE_FILE:-}" && "${SHIM_SUBMIT_PENDING:-0}" == "1" ]]; then
+        touch "$(pending_file)"
       fi
       exit "$SHIM_SUBMIT_EXIT"
     fi

@@ -131,13 +131,14 @@ Files: `app/evmigration_signer_extraction_adapter_test.go`, `app/evm_mempool_evm
 
 | Test | Description |
 | ---- | ----------- |
-| `TestEVMigrationSignerExtractionAdapter_ClaimLegacyAccount` | Extracts a deterministic synthetic signer from `legacy_address` for `MsgClaimLegacyAccount`. |
-| `TestEVMigrationSignerExtractionAdapter_MigrateValidator` | Extracts the same synthetic signer shape for `MsgMigrateValidator`. |
-| `TestEVMigrationSignerExtractionAdapter_NonMigration_DelegatesToFallback` | Non-migration txs keep the normal fallback signer extraction path. |
+| `TestEVMigrationSignerExtractionAdapter_MigrationOnlyTx_SyntheticSigner` | Extracts a deterministic synthetic signer from `legacy_address` for `MsgClaimLegacyAccount`. |
+| `TestEVMigrationSignerExtractionAdapter_MigrationOnlyTx_MigrateValidator` | Extracts the same synthetic signer shape for `MsgMigrateValidator`. |
+| `TestEVMigrationSignerExtractionAdapter_NonMigrationTx_DelegatesToFallback` | Non-migration txs keep the normal fallback signer extraction path. |
 | `TestEVMigrationSignerExtractionAdapter_MixedTx_DelegatesToFallback` | Mixed migration + non-migration txs are not treated as migration-only. |
 | `TestEVMigrationSignerExtractionAdapter_MultipleMigrationMessages_Rejected` | Multi-message migration txs are rejected so one tx cannot map to multiple synthetic signer buckets. |
 | `TestEVMigrationSignerExtractionAdapter_EmptyLegacyAddress_Rejected` | Empty `legacy_address` cannot produce a mempool signer. |
-| `TestEVMigrationSignerExtractionAdapter_InvalidLegacyAddress_Rejected` | Malformed bech32 `legacy_address` is rejected before mempool insertion. |
+| `TestEVMigrationSignerExtractionAdapter_InvalidBech32_Rejected` | Malformed bech32 `legacy_address` is rejected before mempool insertion. |
+| `TestEVMigrationSignerExtractionAdapter_NilFallback_FallsBackToDefault` | Nil fallback is replaced with the SDK default adapter without panicking. |
 | `TestEVMigrationSignerAdapter_DefaultExtractor_PinsFailureMode` | Pins the upstream SDK default extractor behavior: zero-signer migration txs produce no signers. |
 | `TestEVMMempool_SDKPriorityNonceMempoolRejectsZeroSignerMigrationTx` | Demonstrates the raw SDK `PriorityNonceMempool` rejection that the app adapter fixes. |
 | `TestEVMMempool_CheckTxAcceptsZeroSignerMigrationTx` | Full app CheckTx path accepts a valid zero-signer migration tx. |

@@ -30,8 +30,8 @@ It covers:
 
 The implementation is already beyond the design phase. The current baseline before network rollout is:
 
-- approximately `~397` unit tests across app wiring, ante, feemarket, precisebank, JSON-RPC, ERC20 policy, cross-runtime bridge, and `x/evmigration`
-- approximately `~146` integration tests across contracts, JSON-RPC/indexer, mempool, fee market, IBC ERC20, precompiles, VM state, and `x/evmigration`
+- approximately `~399` unit tests across app wiring, ante, feemarket, precisebank, JSON-RPC, ERC20 policy, cross-runtime bridge, and `x/evmigration`
+- approximately `~150` integration tests across contracts, JSON-RPC/indexer, mempool, fee market, IBC ERC20, precompiles, VM state, and `x/evmigration`
 - multi-validator devnet tests for EVM behavior and cross-peer visibility
 - dedicated devnet EVM migration tests with `7` operational modes and full upgrade rehearsal:
   - `prepare`

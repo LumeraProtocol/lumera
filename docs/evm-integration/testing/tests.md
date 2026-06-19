@@ -7,7 +7,7 @@ See [main.md](main.md) for architecture, app changes, and operational details.
 
 ## Executive Summary
 
-Lumera ships **~470 EVM-related tests** spanning unit, integration, and devnet levels — the most comprehensive pre-mainnet EVM test suite in the Cosmos ecosystem. For context:
+Lumera ships **~570 EVM-related tests** spanning unit, integration, and devnet levels — the most comprehensive pre-mainnet EVM test suite in the Cosmos ecosystem. For context:
 
 - **Evmos** — the first Cosmos EVM chain — launched mainnet with primarily unit tests and a handful of end-to-end scripts; their integration test suite was built incrementally *after* mainnet issues surfaced (e.g., the zero-base-fee spam incident).
 - **Kava** — relied heavily on simulation tests and manual QA for their EVM launch; structured integration tests came later.
@@ -18,14 +18,14 @@ Lumera's suite goes beyond any of these baselines **before** mainnet:
 | Capability                                                                       | Lumera                                  | Typical Cosmos EVM chain at launch        |
 | -------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------- |
 | Dual-route ante handler tests (EVM + Cosmos path)                                | 28 unit + 3 integration                 | Rarely tested separately                  |
-| App-side mempool (ordering, nonce gaps, replacement, capacity, WS subscriptions, metrics) | 16 integration + 10 unit (metrics)      | None (relies on CometBFT mempool)         |
+| App-side mempool (ordering, nonce gaps, replacement, capacity, WS subscriptions, metrics, evmigration zero-signer admission) | 20 integration + 10 unit (metrics)      | None (relies on CometBFT mempool)         |
 | Async broadcast queue (deadlock prevention)                                      | 4 unit                                  | Not applicable (novel to Lumera)          |
 | JSON-RPC batching, persistence across restart                                    | 23 integration                          | Basic RPC smoke tests                     |
 | ERC20/IBC middleware (v1 + v2 stacks)                                            | 7 integration + 14 unit (policy)        | Partial or post-launch                    |
 | Precisebank (6↔18 decimal bridge)                                               | 39 unit + 6 integration                 | Not applicable (novel to Lumera)          |
 | Feemarket (EIP-1559)                                                             | 9 unit + 8 integration                  | Inherited from upstream, rarely augmented |
 | Precompile coverage (11 precompiles + gas metering + action + supernode + wasm)   | 42+ integration                         | Smoke-level                               |
-| Account migration (coin-type 118→60)                                            | 117 unit + 15 integration + devnet tool | Not applicable (novel to Lumera)          |
+| Account migration (coin-type 118→60)                                            | 150+ keeper/CLI unit + app-level mempool regression tests + 18 integration + devnet tool | Not applicable (novel to Lumera) |
 | OpenRPC discovery + spec sync                                                    | 15 unit + 2 integration                 | No chain has this                         |
 | WebSocket subscriptions (newHeads, logs, pending)                                | 4 integration                           | Untested or manual                        |
 | Cross-runtime bridge (CosmWasm ↔ EVM)                                           | 12 integration + 31 unit + 15 crossruntime unit | No chain has this              |
@@ -43,7 +43,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 
 | Category        | Area                                 | Tests | Coverage quality |
 | --------------- | ------------------------------------ | ----- | ---------------- |
-| **Unit**        | App wiring/config/genesis/commands   | 72    | Excellent — [details](tests/unit-app-wiring.md) |
+| **Unit**        | App wiring/config/genesis/commands   | 73    | Excellent — [details](tests/unit-app-wiring.md) |
 | **Unit**        | EVM ante decorators                  | 28    | Excellent — [details](tests/unit-ante.md) |
 | **Unit**        | EVM module/config guard/genesis      | 7     | High — [details](tests/unit-evm-config.md) |
 | **Unit**        | Fee market                           | 9     | Excellent — [details](tests/unit-feemarket.md) |
@@ -51,7 +51,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Unit**        | OpenRPC / generator                  | 15    | High — [details](tests/unit-openrpc.md) |
 | **Unit**        | JSON-RPC rate limiting               | 25    | High — right-to-left XFF parsing, trusted-hop skipping, CIDR parsing |
 | **Unit**        | ERC20 policy                         | 14    | High — 3 modes, base denom + exact ibc/ allowlist CRUD |
-| **Unit**        | EVMigration keeper                   | 117+  | Excellent — [details](tests/unit-evmigration.md) |
+| **Unit**        | EVMigration keeper                   | 124+  | Excellent — [details](tests/unit-evmigration.md) |
 | **Unit**        | EVMigration types (proof)            | 6     | High — `TestMultisigProof_ValidateBasic`, `TestMultisigProof_ValidateParams_SizeCap`, `TestLegacyProof_ValidateBasic_Dispatch`, `TestSingleKeyProof_ValidateBasic` and variants |
 | **Unit**        | EVMigration CLI                      | 26    | High — [details](tests/unit-evmigration-cli.md) |
 | **Unit**        | Cross-runtime bridge (plugin helpers + crossruntime) | 46 | High — [details](tests/integration-precompiles.md#cosmwasm---evm-plugin-unit-tests) |
@@ -61,16 +61,16 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Integration** | Fee market                           | 8     | Excellent — [details](tests/integration-feemarket.md) |
 | **Integration** | IBC ERC20                            | 7     | High — [details](tests/integration-ibc-erc20.md) |
 | **Integration** | JSON-RPC / indexer                   | 23    | Very high — [details](tests/integration-jsonrpc.md) |
-| **Integration** | Mempool                              | 16    | High — [details](tests/integration-mempool.md) |
+| **Integration** | Mempool                              | 20    | High — [details](tests/integration-mempool.md) |
 | **Integration** | Precisebank                          | 6     | High — [details](tests/integration-precisebank.md) |
 | **Integration** | Precompiles (standard + custom + wasm) | 42   | High — [details](tests/integration-precompiles.md) |
 | **Integration** | VM queries / state                   | 12    | High — [details](tests/integration-vm.md) |
-| **Integration** | EVMigration                          | 15+   | High — [details](tests/integration-evmigration.md) |
+| **Integration** | EVMigration                          | 14 core + 4 mempool broadcast regressions | High — [details](tests/integration-evmigration.md) |
 |                 |                                      |       |                  |
 | **Devnet**      | EVM / fee market / cross-peer / IBC  | 12+   | High — [details](tests/devnet.md) |
 | **Devnet**      | EVMigration tool                     | 7 modes | High — [details](tests/devnet.md#evm-migration-devnet-tests) |
 |                 |                                      |       |                  |
-|                 | **Totals**                           | **Unit: ~398 · Integration: ~147 · Devnet: 12+ · Total: ~557** | |
+|                 | **Totals**                           | **Unit: ~407 · Integration: ~150 · Devnet: 12+ · Total: ~569** | |
 
 ### Gaps and next steps
 
@@ -109,13 +109,13 @@ Each area has its own detailed file with per-test descriptions:
 
 | Area | File | Tests |
 | ---- | ---- | ----- |
-| App wiring, config, genesis, commands | [unit-app-wiring.md](tests/unit-app-wiring.md) | 72 |
+| App wiring, config, genesis, commands | [unit-app-wiring.md](tests/unit-app-wiring.md) | 73 |
 | EVM ante decorators | [unit-ante.md](tests/unit-ante.md) | 28 |
 | EVM module/config guard/genesis | [unit-evm-config.md](tests/unit-evm-config.md) | 7 |
 | Fee market (EIP-1559) | [unit-feemarket.md](tests/unit-feemarket.md) | 9 |
 | Precisebank (6↔18 bridge) | [unit-precisebank.md](tests/unit-precisebank.md) | 39 |
 | OpenRPC & generator | [unit-openrpc.md](tests/unit-openrpc.md) | 15 |
-| EVMigration keeper | [unit-evmigration.md](tests/unit-evmigration.md) | 117+ |
+| EVMigration keeper | [unit-evmigration.md](tests/unit-evmigration.md) | 124+ |
 | EVMigration types (proof) | `x/evmigration/types/proof_test.go` | 6 |
 | EVMigration CLI | [unit-evmigration-cli.md](tests/unit-evmigration-cli.md) | 26 |
 
@@ -128,11 +128,11 @@ Each area has its own detailed file with per-test descriptions:
 | Fee market (EIP-1559) | [integration-feemarket.md](tests/integration-feemarket.md) | 8 |
 | IBC ERC20 middleware | [integration-ibc-erc20.md](tests/integration-ibc-erc20.md) | 7 |
 | JSON-RPC & indexer | [integration-jsonrpc.md](tests/integration-jsonrpc.md) | 23 |
-| Mempool | [integration-mempool.md](tests/integration-mempool.md) | 16 |
+| Mempool | [integration-mempool.md](tests/integration-mempool.md) | 20 |
 | Precisebank | [integration-precisebank.md](tests/integration-precisebank.md) | 6 |
 | Precompiles (standard + custom + wasm + crossruntime) | [integration-precompiles.md](tests/integration-precompiles.md) | 42 |
 | VM queries / state | [integration-vm.md](tests/integration-vm.md) | 12 |
-| EVMigration | [integration-evmigration.md](tests/integration-evmigration.md) | 15+ |
+| EVMigration | [integration-evmigration.md](tests/integration-evmigration.md) | 14 core + 4 mempool broadcast regressions |
 
 ### Devnet Tests
 

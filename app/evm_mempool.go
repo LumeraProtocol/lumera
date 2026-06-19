@@ -1,7 +1,10 @@
 package app
 
 import (
+	"context"
+
 	"cosmossdk.io/log"
+	sdkmath "cosmossdk.io/math"
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
@@ -35,6 +38,21 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 	app.configureEVMBroadcastOptions(appOpts, broadcastLogger)
 	app.startEVMBroadcastWorker(broadcastLogger)
 
+	// Build the Cosmos-side mempool config explicitly so we can install a
+	// migration-aware SignerExtractionAdapter. Without this override, the
+	// upstream PriorityNonceMempool falls back to
+	// DefaultSignerExtractionAdapter, which calls tx.GetSignaturesV2() and
+	// refuses zero-signer migration txs with "tx must have at least one
+	// signer" during mempool admission and proposal selection.
+	//
+	// Priority / Compare / MinValue mirror upstream defaults from
+	// evmmempool.NewExperimentalEVMMempool (mempool.go ~line 152) so this
+	// override changes only signer extraction, nothing else.
+	cosmosPoolConfig := defaultCosmosPoolConfig(app)
+	cosmosPoolConfig.SignerExtractor = newEVMigrationSignerExtractionAdapter(
+		sdkmempool.NewDefaultSignerExtractionAdapter(),
+	)
+
 	// Use cosmos/evm config readers so app.toml/flags values map 1:1
 	// with upstream EVM behavior.
 	// BroadCastTxFn is overridden to use app.clientCtx at runtime (after
@@ -42,6 +60,7 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 	mempoolConfig := &evmmempool.EVMMempoolConfig{
 		AnteHandler:      app.AnteHandler(),
 		LegacyPoolConfig: evmconfig.GetLegacyPoolConfig(appOpts, logger),
+		CosmosPoolConfig: cosmosPoolConfig,
 		BlockGasLimit:    evmconfig.GetBlockGasLimit(appOpts, logger),
 		MinTip:           evmconfig.GetMinTip(appOpts, logger),
 		BroadCastTxFn:    app.broadcastEVMTransactions,
@@ -90,11 +109,17 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 	})
 
 	// PrepareProposal must use EVM-aware signer extraction so Ethereum txs are
-	// ordered by (sender, nonce) correctly in proposal selection.
+	// ordered by (sender, nonce) correctly in proposal selection. The
+	// evmigration-aware adapter is layered underneath so migration-only txs
+	// — which have zero envelope signers and would otherwise be skipped
+	// during proposal building — get a synthetic signer derived from
+	// legacy_address.
 	abciProposalHandler := baseapp.NewDefaultProposalHandler(evmMempool, app)
 	abciProposalHandler.SetSignerExtractionAdapter(
 		evmmempool.NewEthSignerExtractionAdapter(
-			sdkmempool.NewDefaultSignerExtractionAdapter(),
+			newEVMigrationSignerExtractionAdapter(
+				sdkmempool.NewDefaultSignerExtractionAdapter(),
+			),
 		),
 	)
 	app.SetPrepareProposal(abciProposalHandler.PrepareProposalHandler())
@@ -112,4 +137,57 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 	}
 
 	return nil
+}
+
+// defaultCosmosPoolConfig replicates the upstream default Cosmos-side mempool
+// config that evmmempool.NewExperimentalEVMMempool builds when
+// EVMMempoolConfig.CosmosPoolConfig is nil (cosmos/evm mempool.go ~line 152).
+//
+// We reproduce it here so we can inject our own SignerExtractionAdapter
+// (newEVMigrationSignerExtractionAdapter) without changing the priority,
+// compare, or min-value semantics. Keep this function aligned with upstream
+// when bumping the cosmos/evm dependency.
+func defaultCosmosPoolConfig(app *App) *sdkmempool.PriorityNonceMempoolConfig[sdkmath.Int] {
+	return &sdkmempool.PriorityNonceMempoolConfig[sdkmath.Int]{
+		TxPriority: sdkmempool.TxPriority[sdkmath.Int]{
+			GetTxPriority: func(goCtx context.Context, tx sdk.Tx) sdkmath.Int {
+				ctx := sdk.UnwrapSDKContext(goCtx)
+				cosmosTxFee, ok := tx.(sdk.FeeTx)
+				if !ok {
+					return sdkmath.ZeroInt()
+				}
+				// Short-circuit zero-fee / zero-gas txs without touching
+				// EVM keeper state. This matters for three reasons:
+				//   1. Migration-only txs (MsgClaimLegacyAccount) carry no
+				//      fee — their priority is unambiguously zero and we
+				//      avoid an unnecessary KVStore read.
+				//   2. The SDK PriorityNonceMempool may invoke this with
+				//      a ctx that has no KVStore attached (e.g. some test
+				//      paths), in which case a state read panics.
+				//   3. The gas == 0 guard also hardens against a
+				//      division-by-zero panic in the final
+				//      coin.Amount.Quo(gas): upstream's default priority
+				//      function (cosmos/evm mempool.go ~line 152) divides by
+				//      GetGas() with no zero guard, so this is strictly safer
+				//      than the code it replicates.
+				fee := cosmosTxFee.GetFee()
+				gas := cosmosTxFee.GetGas()
+				if gas == 0 || fee.IsZero() {
+					return sdkmath.ZeroInt()
+				}
+				if app.EVMKeeper == nil {
+					return sdkmath.ZeroInt()
+				}
+				found, coin := fee.Find(app.EVMKeeper.GetEvmCoinInfo(ctx).Denom)
+				if !found {
+					return sdkmath.ZeroInt()
+				}
+				return coin.Amount.Quo(sdkmath.NewIntFromUint64(gas))
+			},
+			Compare: func(a, b sdkmath.Int) int {
+				return a.BigInt().Cmp(b.BigInt())
+			},
+			MinValue: sdkmath.ZeroInt(),
+		},
+	}
 }

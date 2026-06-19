@@ -6,6 +6,7 @@ Suites:
 - `tests/integration/evm/mempool/suite_test.go`
 - `tests/integration/evm/mempool/metrics_txpool_status_test.go`
 - `tests/integration/evm/mempool/metrics_prometheus_e2e_test.go`
+- `tests/integration/evm/mempool/evmigration_zero_signer_test.go`
 
 | Test | Description |
 | --- | --- |
@@ -24,3 +25,7 @@ Suites:
 | `TestTxPoolStatusOverflowKeepsPoolBounded` | Verifies flooding a low-capacity mempool results in rejections and bounded pool size. |
 | `TestPrometheusMetricsExposeMempoolGauges` | E2E: starts node with Prometheus telemetry, scrapes /metrics, verifies gauges. |
 | `TestPrometheusRejectionsCountedViaCometCheckTx` | E2E: submits malformed bytes via CometBFT broadcast_tx_sync, verifies rejection counter. |
+| `TestEVMigrationZeroSignerTxBroadcastSyncWithMempoolEnabled` | Real-node `broadcast_tx_sync`: a valid zero-signer `MsgClaimLegacyAccount` passes CheckTx with the app-side EVM mempool enabled. |
+| `TestEVMigrationProofValidNonexistentLegacyAccountRejectedByAnte` | Real-node `broadcast_tx_sync`: a proof-valid zero-signer migration tx is rejected by ante state admission when the legacy account does not exist. |
+| `TestEVMigrationMalformedLegacyAddressRejectedByValidateBasic` | Real-node `broadcast_tx_sync`: malformed migration `legacy_address` is rejected by `ValidateBasic` in the ante chain, before mempool admission. |
+| `TestZeroSignerNonMigrationBroadcastSyncStillRejected` | Negative control: a zero-signer non-migration tx is still rejected, proving the evmigration adapter does not widen signer bypass behavior. |

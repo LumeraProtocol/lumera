@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cosmos/cosmos-sdk/server"
 	serverconfig "github.com/cosmos/cosmos-sdk/server/config"
+	"github.com/cosmos/cosmos-sdk/x/genutil/types"
 	cosmosevmserverconfig "github.com/cosmos/evm/server/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -74,7 +76,7 @@ func doMigrateAppConfig(v *viper.Viper, appCfgPath string) error {
 	// never have a different value.
 	fullCfg.EVM.EVMChainID = lcfg.EVMChainID
 	if fullCfg.Mempool.MaxTxs < 0 {
-		fullCfg.Mempool.MaxTxs = migratedMempoolMaxTxs(v.GetString("chain-id"))
+		fullCfg.Mempool.MaxTxs = migratedMempoolMaxTxs(migrationChainID(v, appCfgPath))
 	}
 
 	// Only enable JSON-RPC and indexer when the section was never written
@@ -151,6 +153,26 @@ func migratedMempoolMaxTxs(chainID string) int {
 	return 10000
 }
 
+func migrationChainID(v *viper.Viper, appCfgPath string) string {
+	if chainID := strings.TrimSpace(v.GetString("chain-id")); chainID != "" {
+		return chainID
+	}
+
+	genesisPath := filepath.Join(filepath.Dir(appCfgPath), "genesis.json")
+	reader, err := os.Open(genesisPath)
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = reader.Close() }()
+
+	chainID, err := types.ParseChainIDFromGenesis(reader)
+	if err != nil {
+		return ""
+	}
+
+	return chainID
+}
+
 var evmMigratedPrefixes = []string{
 	"evm.",
 	"json-rpc.",
@@ -170,6 +192,10 @@ func needsConfigMigration(v viperGetter) bool {
 	// Wrong or missing EVM chain ID (0 = absent, 262144 = upstream default).
 	chainID := v.GetUint64("evm.evm-chain-id")
 	if chainID != lcfg.EVMChainID {
+		return true
+	}
+
+	if v.GetInt("mempool.max-txs") < 0 {
 		return true
 	}
 
@@ -199,6 +225,7 @@ func needsConfigMigration(v viperGetter) bool {
 type viperGetter interface {
 	GetUint64(key string) uint64
 	GetBool(key string) bool
+	GetInt(key string) int
 	GetString(key string) string
 	IsSet(key string) bool
 }

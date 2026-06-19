@@ -12,32 +12,20 @@ This guide walks through deploying and interacting with a simple smart contract 
 
 ### MetaMask network configuration
 
-Add Lumera as a custom network in MetaMask. Settings differ between the public testnet and a local devnet:
+Add Lumera as a custom network in MetaMask. MetaMask connects over **EVM JSON-RPC**, so the RPC URL is always an `evm-rpc.*` endpoint — never the Cosmos LCD/REST (`lcd.*`) or CometBFT RPC (`rpc.*`) host, which cannot answer `eth_chainId`. The chain ID is the same (`76857769`) across every environment.
 
-**Lumera Testnet** (public)
-
-| Field              | Value                                     |
-| ------------------ | ----------------------------------------- |
-| Network Name       | Lumera Testnet                            |
-| RPC URL            | `https://rpc.testnet.lumera.io`         |
-| Chain ID           | `76857769`                              |
-| Currency Symbol    | LUME                                      |
-| Block Explorer URL | `https://testnet.ping.pub/lumera/block` |
+| Network                  | RPC URL (EVM JSON-RPC)            | Chain ID     | Currency | Block Explorer                          |
+| ------------------------ | --------------------------------- | ------------ | -------- | --------------------------------------- |
+| Lumera Mainnet           | `https://evm-rpc.lumera.io`       | `76857769`   | LUME     | —                                       |
+| Lumera Testnet           | `https://evm-rpc.testnet.lumera.io` | `76857769` | LUME     | `https://testnet.ping.pub/lumera/block` |
+| Lumera Devnet (public)   | `https://evm-rpc.pastel.network`  | `76857769`   | LUME     | —                                       |
+| Local devnet node        | `http://localhost:8545`           | `76857769`   | LUME     | —                                       |
 
 > Testnet LUME can be obtained from the faucet at `https://testnet.ping.pub/lumera`.
 
-**Local Devnet** (Docker-based, for development)
+**Local devnet ports**: use the public devnet endpoint `https://evm-rpc.pastel.network`, or — if you run the Docker devnet yourself — the per-validator local EVM JSON-RPC port: validator 1 = `8545`, validator 2 = `8555`, validator 3 = `8565`, validator 4 = `8575`, validator 5 = `8585`. See [openrpc-playground.md](openrpc-playground.md) for the full port mapping table.
 
-| Field           | Value (validator 2 example) |
-| --------------- | --------------------------- |
-| Network Name    | Lumera Devnet               |
-| RPC URL         | `http://localhost:8555`   |
-| Chain ID        | `76857769`                |
-| Currency Symbol | LUME                        |
-
-The chain ID is the same across all environments. For other devnet validators, use the corresponding JSON-RPC port (see [openrpc-playground.md](openrpc-playground.md) for the port mapping table).
-
-> **WSL2 users**: `localhost` port forwarding to Windows works automatically on recent builds. If not, use the WSL IP address (`hostname -I | awk '{print $1}'`) as the RPC URL host.
+> **WSL2 users**: when targeting a local node, `localhost` port forwarding to Windows works automatically on recent builds. If not, use the WSL IP address (`hostname -I | awk '{print $1}'`) as the RPC URL host.
 
 ---
 

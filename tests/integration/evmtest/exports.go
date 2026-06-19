@@ -50,6 +50,11 @@ func EnablePrometheusMetrics(t *testing.T, homeDir string, apiAddress string) {
 	enablePrometheusMetrics(t, homeDir, apiAddress)
 }
 
+func EnableAPIInAppToml(t *testing.T, homeDir string, apiAddress string) {
+	appToml := enableAPIInAppToml(t, homeDir, apiAddress)
+	writeAppToml(t, homeDir, appToml)
+}
+
 func FreePort(t *testing.T) int {
 	return freePort(t)
 }

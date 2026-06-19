@@ -26,15 +26,13 @@ import (
 // /metrics?format=prometheus endpoint exposes the lumera_evm_mempool_* gauge
 // metrics end-to-end: a real node reads live mempool state on each HTTP GET.
 func TestPrometheusMetricsExposeMempoolGauges(t *testing.T) {
-	apiPort := evmtest.FreePort(t)
-	apiAddr := fmt.Sprintf("tcp://127.0.0.1:%d", apiPort)
-	metricsURL := fmt.Sprintf("http://127.0.0.1:%d/metrics?format=prometheus", apiPort)
-
 	node := evmtest.NewEVMNode(t, "lumera-mempool-prom", 600)
 	node.AppendStartArgs("--json-rpc.api", "eth,txpool,net,web3")
-	evmtest.EnablePrometheusMetrics(t, node.HomeDir(), apiAddr)
+	evmtest.EnablePrometheusMetrics(t, node.HomeDir(), node.APIListenAddress())
 	node.StartAndWaitRPC()
 	defer node.Stop()
+
+	metricsURL := node.APIURL() + "/metrics?format=prometheus"
 
 	// Wait for the API/telemetry server to be ready.
 	waitForHTTP(t, metricsURL, 30*time.Second)
@@ -121,15 +119,13 @@ func TestPrometheusMetricsExposeMempoolGauges(t *testing.T) {
 // increases when malformed tx bytes are submitted via CometBFT broadcast_tx_sync.
 // This exercises the exact path instrumented in the wrapped CheckTxHandler.
 func TestPrometheusRejectionsCountedViaCometCheckTx(t *testing.T) {
-	apiPort := evmtest.FreePort(t)
-	apiAddr := fmt.Sprintf("tcp://127.0.0.1:%d", apiPort)
-	metricsURL := fmt.Sprintf("http://127.0.0.1:%d/metrics?format=prometheus", apiPort)
-
 	node := evmtest.NewEVMNode(t, "lumera-mempool-rej-prom", 600)
 	node.AppendStartArgs("--json-rpc.api", "eth,txpool,net,web3")
-	evmtest.EnablePrometheusMetrics(t, node.HomeDir(), apiAddr)
+	evmtest.EnablePrometheusMetrics(t, node.HomeDir(), node.APIListenAddress())
 	node.StartAndWaitRPC()
 	defer node.Stop()
+
+	metricsURL := node.APIURL() + "/metrics?format=prometheus"
 
 	waitForHTTP(t, metricsURL, 30*time.Second)
 

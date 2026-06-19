@@ -28,8 +28,6 @@ type openRPCDoc struct {
 	} `json:"methods"`
 }
 
-const defaultAPIURL = "http://127.0.0.1:1317"
-
 // testOpenRPCDiscoverMethodCatalog verifies `rpc_discover` returns a populated
 // method catalog with expected namespace coverage.
 //
@@ -135,11 +133,11 @@ func TestOpenRPCHTTPDocumentEndpoint(t *testing.T) {
 	t.Helper()
 
 	node := evmtest.NewEVMNode(t, "lumera-openrpc-http", 120)
-	node.AppendStartArgs("--api.enable=true")
+	evmtest.EnableAPIInAppToml(t, node.HomeDir(), node.APIListenAddress())
 	node.StartAndWaitRPC()
 	defer node.Stop()
 
-	httpDoc := mustFetchOpenRPCDocOverHTTP(t, defaultAPIURL+appopenrpc.HTTPPath, 20*time.Second)
+	httpDoc := mustFetchOpenRPCDocOverHTTP(t, node.APIURL()+appopenrpc.HTTPPath, 20*time.Second)
 	rpcDoc := mustDiscoverOpenRPCDoc(t, node)
 
 	httpMethods := methodNameSet(httpDoc)
@@ -164,7 +162,7 @@ func TestOpenRPCHTTPPOSTProxy(t *testing.T) {
 	t.Helper()
 
 	node := evmtest.NewEVMNode(t, "lumera-openrpc-http-proxy", 120)
-	node.AppendStartArgs("--api.enable=true")
+	evmtest.EnableAPIInAppToml(t, node.HomeDir(), node.APIListenAddress())
 	node.StartAndWaitRPC()
 	defer node.Stop()
 
@@ -172,7 +170,7 @@ func TestOpenRPCHTTPPOSTProxy(t *testing.T) {
 	node.MustJSONRPC(t, "eth_chainId", []any{}, &directChainID)
 
 	body := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}`)
-	req, err := http.NewRequest(http.MethodPost, defaultAPIURL+appopenrpc.HTTPPath, body)
+	req, err := http.NewRequest(http.MethodPost, node.APIURL()+appopenrpc.HTTPPath, body)
 	if err != nil {
 		t.Fatalf("build /openrpc.json POST request: %v", err)
 	}
@@ -207,12 +205,12 @@ func TestOpenRPCHTTPPOSTProxyRPCDiscoverAlias(t *testing.T) {
 	t.Helper()
 
 	node := evmtest.NewEVMNode(t, "lumera-openrpc-http-discover-alias", 120)
-	node.AppendStartArgs("--api.enable=true")
+	evmtest.EnableAPIInAppToml(t, node.HomeDir(), node.APIListenAddress())
 	node.StartAndWaitRPC()
 	defer node.Stop()
 
 	body := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"rpc.discover","params":[]}`)
-	req, err := http.NewRequest(http.MethodPost, defaultAPIURL+appopenrpc.HTTPPath, body)
+	req, err := http.NewRequest(http.MethodPost, node.APIURL()+appopenrpc.HTTPPath, body)
 	if err != nil {
 		t.Fatalf("build /openrpc.json rpc.discover request: %v", err)
 	}

@@ -48,6 +48,8 @@ Full EVM integration documentation: [docs/evm-integration/main.md](docs/evm-inte
 - Added `make devnet-evm-upgrade` and versioned 1.11.1 devnet targets to exercise the on-chain `v1.11.1 → v1.20.0` upgrade path end-to-end against the multi-validator devnet.
 - Renamed the devnet upload service from `network-maker` to `lumera-uploader` across docs, dockerfile, and lifecycle scripts; legacy binary names are still recognized by `devnet/scripts/stop.sh` for backwards compatibility.
 - Updated transitive Go dependencies (CosmWasm, go-ethereum, and others) to address critical and high-severity security vulnerabilities surfaced by Go module audit.
+- Bumped transitive Go modules `github.com/go-chi/chi/v5` (5.2.3 → 5.2.4) and `github.com/quic-go/quic-go` (0.54.1 → 0.59.1, with `quic-go/qpack` 0.5.1 → 0.6.0) from Dependabot; verified with `go build ./...`, `make lint`, and a live multi-validator devnet run.
+- Migrated the `precompiles/solidity` example/dev toolchain from Hardhat 2 to Hardhat 3 (`@nomicfoundation/hardhat-toolbox-mocha-ethers`, ESM, `network.create()` connection API, ethers-v6-native typechain) and pinned patched transitives (`lodash-es`, `serialize-javascript`, `diff`) via npm `overrides`, cutting `npm audit` findings from 50 to 11 with 0 critical/high/moderate remaining. All 11 precompile integration tests pass against the live devnet.
 
 ---
 

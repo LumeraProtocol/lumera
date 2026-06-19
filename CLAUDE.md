@@ -62,7 +62,7 @@ make devnet-stop              # Stop containers (keep state)
 make devnet-start             # Start stopped containers
 make devnet-clean             # Remove all devnet data (/tmp/lumera-devnet-1/)
 make devnet-refresh-bin       # Build lumerad + copy it (and libwasmvm) into devnet/bin/
-make devnet-update-binaries   # One-shot: build lumerad, stage to shared/release, restart containers (START_MODE=run, preserves chain state)
+make devnet-update-binaries   # Stage already-built ${BUILD_DIR}/lumerad (+libwasmvm) into /shared/release and restart containers (START_MODE=run, preserves chain state; errors if lumerad is missing — run `make build` first)
 make devnet-update-binaries-default # Stage an already-built devnet/bin/ into containers + restart (run devnet-refresh-bin first)
 make devnet-update-scripts    # Update devnet scripts in containers
 make devnet-reset             # Reset chain state, keep config

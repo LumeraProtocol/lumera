@@ -131,14 +131,14 @@ If MetaMask has never seen the Lumera EVM chain, it shows an **Add network**
 request. Confirm that:
 
 - **Request from** is your Portal host (e.g. `p1p2p3p4.pastel.network`).
-- **Network** is `lumera-devnet-evm`.
+- **Network** is `Lumera-Devnet-Evm`.
 - **RPC** is `evm-rpc.pastel.network` (an EVM JSON-RPC endpoint, not LCD/CometBFT).
 
 Click **Confirm**. The Portal supplies the currency symbol `LUME` and **18
 decimals** (the EVM side uses 18-decimal `alume`, the 1:1 EVM representation of
 6-decimal `ulume`).
 
-![MetaMask Add lumera-devnet-evm network confirmation popup](../assets/metamask-3.png)
+![MetaMask Add Lumera-Devnet-Evm network confirmation popup](../assets/metamask-3.png)
 
 > If MetaMask is already on the Lumera chain this popup is skipped — the Portal
 > only reaches `wallet_addEthereumChain` when the chain ID is unrecognized.
@@ -161,7 +161,7 @@ The Portal navbar wallet now shows both representations of your account — the
 `lumera1…` Bech32 address and the `0x…` hex address — plus **SWITCH METAMASK
 ACCOUNT** and **Disconnect** actions. The dashboard fills in your balance,
 staking, rewards, and delegations. In MetaMask the account is on the
-**lumera-devnet-evm** network.
+**Lumera-Devnet-Evm** network.
 
 ![Portal connected with balances populated and the MetaMask account dropdown open](../assets/metamask-10.png)
 
@@ -306,7 +306,7 @@ server {
         if ($request_method = 'OPTIONS') {
             add_header 'Access-Control-Allow-Origin' '*' always;
             add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
-            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,x-metamask-clientid' always;
             add_header 'Access-Control-Max-Age' 3600 always;
             add_header 'Content-Type' 'text/plain; charset=utf-8' always;
             add_header 'Content-Length' 0 always;
@@ -315,7 +315,7 @@ server {
 
         add_header 'Access-Control-Allow-Origin' '*' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
-        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,x-metamask-clientid' always;
         add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
 
         proxy_hide_header Access-Control-Allow-Origin;
@@ -382,7 +382,7 @@ server {
         if ($request_method = 'OPTIONS') {
             add_header 'Access-Control-Allow-Origin' '*' always;
             add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
-            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,x-metamask-clientid' always;
             add_header 'Access-Control-Max-Age' 3600 always;
             add_header 'Content-Type' 'text/plain; charset=utf-8' always;
             add_header 'Content-Length' 0 always;
@@ -391,7 +391,7 @@ server {
 
         add_header 'Access-Control-Allow-Origin' '*' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
-        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,x-metamask-clientid' always;
         add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
 
         proxy_http_version 1.1;

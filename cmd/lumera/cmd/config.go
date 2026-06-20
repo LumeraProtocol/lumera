@@ -126,7 +126,7 @@ func initAppConfig() (string, interface{}) {
 	// Enable app-side mempool by default so EVM mempool integration paths
 	// (pending tx subscriptions, nonce-gap handling, replacement rules) work
 	// out-of-the-box without extra start flags.
-	srvCfg.Mempool.MaxTxs = 5000
+	srvCfg.Mempool.MaxTxs = 10000
 	evmCfg := cosmosevmserverconfig.DefaultEVMConfig()
 	evmCfg.EVMChainID = lcfg.EVMChainID
 

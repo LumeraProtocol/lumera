@@ -20,10 +20,11 @@ Nodes upgrading from a pre-EVM binary (< v1.20.0) will have an `app.toml` that l
 
 Starting with v1.20.0, `lumerad` includes a **config migration helper** (`cmd/lumera/cmd/config_migrate.go`) that runs on every startup:
 
-1. Checks whether `evm.evm-chain-id` in the loaded config matches the Lumera constant (`76857769`).
-2. If it does not match (absent section defaults to the upstream cosmos/evm value `262144`, or `0` for entirely missing keys):
+1. Checks whether the loaded config has the required EVM-era sections and sentinel values: the Lumera EVM chain ID (`76857769`), `[json-rpc]`, `[tls]`, and `[lumera.*]`.
+2. If any required section is missing, or if `evm.evm-chain-id` is absent/wrong (absent section defaults to the upstream cosmos/evm value `262144`, or `0` for entirely missing keys):
    - Reads all existing settings from the current `app.toml` via Viper.
    - Merges them with Lumera's EVM defaults (correct chain ID, JSON-RPC enabled, indexer enabled, `rpc` namespace for OpenRPC).
+   - Rewrites legacy `mempool.max-txs = -1` no-op settings to an enabled mempool default (`5000` on devnet, `10000` on testnet/mainnet).
    - Regenerates `app.toml` with the full template, preserving all operator customizations.
 3. Logs an `INFO` message when migration occurs.
 
@@ -50,8 +51,8 @@ max-tx-gas-wanted = 0
 # Only useful for certain debugging/tracing scenarios.
 cache-preimage = false
 
-# EIP-155 chain ID. Must match the network's genesis chain ID.
-# Do NOT change this on an existing chain.
+# Numeric EIP-155 chain ID. This is separate from the Cosmos chain-id
+# string (for example, "lumera-mainnet-1"). Do NOT change this.
 evm-chain-id = 76857769
 
 # Minimum priority fee (tip) for mempool acceptance, in wei.
@@ -100,7 +101,8 @@ lifetime = "3h0m0s"
 
 ### Tuning notes
 
-- **`global-slots`**: The primary knob for mempool capacity. Increase for high-throughput validators; decrease on resource-constrained sentries. The app-level `mempool.max-txs` (default `5000`) also bounds total mempool size.
+- **`global-slots`**: The primary knob for mempool capacity. Increase for high-throughput validators; decrease on resource-constrained sentries. The app-level `mempool.max-txs` (default `10000`) also bounds total mempool size.
+- Cosmos EVM v0.6.0 exposes the keys listed above. There is no `[evm.mempool] insert-queue-size` setting.
 - **`account-slots`**: Increase if you expect DeFi bots or relayers sending many txs per block from a single account.
 - **`price-bump`**: The 10% default means a replacement tx must pay ≥110% of the original gas price. Increase to reduce churn from frequent replacements.
 - **`lifetime`**: Shorten on public RPC nodes to reduce stale tx accumulation; lengthen on private validators that batch txs.
@@ -127,7 +129,7 @@ ws-address = "127.0.0.1:8546"
 ws-origins = ["127.0.0.1", "localhost"]
 
 # Enabled JSON-RPC namespaces (comma-separated).
-# Available: eth, net, web3, rpc, debug, personal, admin, txpool, miner
+# Available: eth, net, web3, rpc, debug, personal, txpool, miner
 api = "eth,net,web3,rpc"
 
 # Gas cap for eth_call and eth_estimateGas. 0 = unlimited.
@@ -188,7 +190,7 @@ enable-profiling = false
 
 - **`address` / `ws-address`**: Bind to `0.0.0.0` only if behind a reverse proxy or firewall. Never expose raw JSON-RPC to the public internet without rate limiting.
 - **`ws-origins`**: Controls allowed origins for both WebSocket connections **and** the `/openrpc.json` HTTP endpoint CORS. On production nodes, set this to your specific domains (e.g., `["https://explorer.lumera.io", "https://app.lumera.io"]`). The default `["127.0.0.1", "localhost"]` is safe but will block browser-based dApps on other origins. An empty list or `["*"]` allows all origins (suitable for dev/testnet only).
-- **`api`**: On mainnet, `debug`, `personal`, and `admin` namespaces are **automatically rejected** at startup by `jsonrpc_policy.go`. On testnets all namespaces are allowed. To enable tracing on testnet, use `api = "eth,net,web3,rpc,debug"` and set `[evm] tracer`.
+- **`api`**: On mainnet, `debug`, `personal`, and `admin` entries are **automatically rejected** at startup by `jsonrpc_policy.go` (`admin` is not implemented by Cosmos EVM, but is still rejected if present). On testnets all implemented namespaces are allowed. To enable tracing on testnet, use `api = "eth,net,web3,rpc,debug"` and set `[evm] tracer`.
 - **`gas-cap`**: Limits compute for `eth_call`. Reduce if public-facing nodes are hit with expensive view calls.
 - **`evm-timeout`**: Reduce to `2s` or `3s` on public RPC nodes to prevent slow `eth_call` from tying up resources.
 - **`logs-cap` / `block-range-cap`**: Reduce on public nodes to prevent expensive `eth_getLogs` scans. Values of `1000`–`2000` are common for public endpoints.
@@ -209,8 +211,8 @@ Lumera-specific reverse proxy that sits in front of JSON-RPC with per-IP token b
 # Enable the rate-limiting proxy.
 enable = false
 
-# Address the proxy listens on.
-# Clients connect here; proxy forwards to [json-rpc] address.
+# Standalone fallback proxy listen address. In the default alias-proxy
+# topology, rate limiting wraps [json-rpc] address directly and this is unused.
 proxy-address = "0.0.0.0:8547"
 
 # Sustained requests per second per IP.
@@ -230,7 +232,7 @@ trusted-proxies = ""
 
 ### Tuning notes
 
-- **Recommended for public RPC nodes**: Enable this and point external traffic to the proxy port (`8547`), while keeping the real JSON-RPC port (`8545`) on localhost.
+- **Recommended for public RPC nodes**: Enable this before exposing JSON-RPC. In the default startup topology, rate limiting is injected directly into the public `json-rpc.address` listener. Keep that listener behind a firewall or reverse proxy if you do not want it publicly reachable.
 - **`requests-per-second`**: 50 rps is generous for individual users. Reduce to `10`–`20` for heavily loaded public endpoints.
 - **`burst`**: Allows short spikes. Set to 2–3× `requests-per-second` for a reasonable burst window.
 - **`entry-ttl`**: Controls memory usage. Shorter TTL frees memory faster but may re-admit recently limited IPs sooner.
@@ -244,7 +246,7 @@ When the JSON-RPC alias proxy is active (the default), rate limiting is injected
 Internet → [alias proxy + rate-limit @ :8545] → [internal cosmos/evm server @ loopback]
 ```
 
-When the alias proxy is disabled, a standalone rate-limit proxy listens on `proxy-address`:
+When the alias proxy is not active, a standalone rate-limit proxy listens on `proxy-address`:
 
 ```
 Internet → [lumera.json-rpc-ratelimit @ :8547] → [json-rpc @ 127.0.0.1:8545]
@@ -352,8 +354,8 @@ Lumera enforces namespace restrictions based on chain ID at node startup (`cmd/l
 
 | Chain type | Allowed | Blocked |
 |-----------|---------|---------|
-| Mainnet (`lumera-mainnet*`) | `eth`, `net`, `web3`, `rpc`, `txpool`, `miner` | `admin`, `debug`, `personal` |
-| Testnet / Local | All namespaces | None |
+| Mainnet (`lumera-mainnet*`) | `eth`, `net`, `web3`, `rpc`, `txpool`, `miner` | `admin` entries, `debug`, `personal` |
+| Testnet / Local | All implemented namespaces | None |
 
 If a mainnet node's `app.toml` includes a blocked namespace, the node **refuses to start** with a clear error message. This is a safety net — not a substitute for firewall rules.
 
@@ -418,7 +420,7 @@ enable = false                   # not needed on localhost
 ```toml
 [json-rpc]
 enable = true
-address = "127.0.0.1:8545"      # behind rate-limit proxy
+address = "127.0.0.1:8545"      # reverse proxy should connect here
 ws-address = "127.0.0.1:8546"
 api = "eth,net,web3,rpc"
 gas-cap = 10000000               # reduced for public safety
@@ -432,8 +434,8 @@ max-open-connections = 200
 tracer = ""
 
 [lumera.json-rpc-ratelimit]
-enable = true
-proxy-address = "0.0.0.0:8547"  # public-facing port
+enable = true                    # wraps json-rpc.address in the default topology
+proxy-address = "0.0.0.0:8547"  # fallback only when alias proxy is inactive
 requests-per-second = 20
 burst = 50
 entry-ttl = "5m"

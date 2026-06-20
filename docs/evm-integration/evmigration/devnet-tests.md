@@ -255,6 +255,8 @@ The `make devnet-evm-upgrade` target runs the **complete end-to-end EVM upgrade 
 
 Each stage has error handling — if any stage fails, the pipeline aborts with a clear error message identifying which stage failed. Validators are migrated before regular accounts because `MsgMigrateValidator` atomically re-keys the validator record and all its delegations, which must happen before delegators attempt their own migration.
 
+For release qualification, prefer this upgrade pipeline over fresh EVM devnet init. The upgrade path keeps the legacy `app.toml` on disk until `lumerad start` runs the config migration, so it exercises production-like startup behavior including `[evm.mempool]` section creation and legacy `mempool.max-txs = -1` repair.
+
 Usage:
 
 ```bash

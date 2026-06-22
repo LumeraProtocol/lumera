@@ -69,7 +69,7 @@ Common flags:
 |---|---|
 | `--target <name>` | Process only the named target. Use this for the first run. |
 | `--funder <key>` | Operator-keyring key that pays fees for zero-balance targets. |
-| `--top-up-amount <coins>` | How much to send to a zero-balance target. Default `100000ulume`. |
+| `--top-up-amount <coins>` | How much to send to a zero-balance target. Default `200000ulume` (covers the 100000ulume self-send + 5000ulume fee + headroom). |
 | `--funder-keyring-{backend,dir,home}` | How to reach the funder key. Defaults: `test` backend, lumerad's default home / keyring dir. |
 | `--log-file <path>` | Append one JSONL audit record per lifecycle milestone (batch_start, target_start, classify, keyring_setup, reconstructed, funding_*, self_send_*, ceremony_start, target_done, batch_done). Mode 0600 on create, append-only, correlated by per-run `batch_id`. Operator handles rotation. |
 | `--dry-run` | Stop after read-only steps + address reconstruction; no broadcasts. |
@@ -106,7 +106,7 @@ never by name suffix.
   --mnemonics output.json \
   --target seed_sale_1 \
   --chain-id lumera-testnet-2 \
-  --funder ops-funder --top-up-amount 100000ulume \
+  --funder ops-funder --top-up-amount 200000ulume \
   --dry-run
 
 # 4. Execute one target for real, then expand.
@@ -114,13 +114,13 @@ never by name suffix.
   --mnemonics output.json \
   --target seed_sale_1 \
   --chain-id lumera-testnet-2 \
-  --funder ops-funder --top-up-amount 100000ulume
+  --funder ops-funder --top-up-amount 200000ulume
 
 # 5. Full batch (with confirmation prompt).
 ./scripts/migrate-batch.sh execute \
   --mnemonics output.json \
   --chain-id lumera-testnet-2 \
-  --funder ops-funder --top-up-amount 100000ulume
+  --funder ops-funder --top-up-amount 200000ulume
 ```
 
 ## Safety properties

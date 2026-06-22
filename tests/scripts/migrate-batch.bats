@@ -185,6 +185,29 @@ JSON
   [ "$status" -eq 9 ]
 }
 
+@test "report: rejects entry with non-JSON-object pubkey (exit 9)" {
+  # Operators occasionally hand-edit the mnemonics file and end up with a
+  # pubkey field that is a stray string instead of a serialized JSON object.
+  # The classifier must catch this structurally (exit 9 with the entry name),
+  # NOT let jq blow up later inside _mb_load_plan's pubkey | fromjson step
+  # (which would surface as a jq-RC exit with no actionable error).
+  local fix="$TMPDIR/fix.json"
+  cat >"$fix" <<'JSON'
+{
+  "bad_pubkey": {
+    "address": "lumera1bad",
+    "mnemonic": "",
+    "pubkey": "not-json-at-all",
+    "type": "local"
+  }
+}
+JSON
+
+  run "$MIGRATE_BATCH" report --mnemonics "$fix"
+  [ "$status" -eq 9 ]
+  [[ "$output" == *"bad_pubkey"* ]]
+}
+
 @test "report: rejects entry missing address (exit 9)" {
   local fix="$TMPDIR/fix.json"
   cat >"$fix" <<'JSON'

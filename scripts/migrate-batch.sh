@@ -103,6 +103,10 @@ USAGE
 # Emits the same JSON plan structure as `report` to stdout. Fail-closed.
 _mb_load_plan() {
   local mfile="$1"
+  if [[ ! -r "$mfile" ]]; then
+    log_error "cannot read mnemonics file: $mfile"
+    exit 9
+  fi
   if ! jq -e 'type == "object"' "$mfile" >/dev/null 2>&1; then
     log_error "mnemonics file is not a JSON object: $mfile"
     exit 9
@@ -115,6 +119,7 @@ _mb_load_plan() {
         or (.value.type // "" | (. != "local" and . != "multi"))
         or (.value.address // "" | startswith("lumera1") | not)
         or ((.value.pubkey // "") == "")
+        or ((.value.pubkey | try fromjson catch null | type) != "object")
       ))
     | map(.key) | join(", ")
   ' "$mfile")
@@ -429,10 +434,13 @@ S_USAGE
     kind=$(jq -r '.kind'    <<<"$row")
     status_lines=$(_mb_classify_target "$addr")
     status=$(awk 'NR==1' <<<"$status_lines")
-    balance=$(awk -F= 'NR==2 {print $2}' <<<"$status_lines")
+    # Parse extras by key, not by line number — _mb_classify_target emits
+    # `balance=...` for non-migrated statuses and `new_address=...` when
+    # migrated. Positional parsing would mis-label one as the other.
+    balance=$(awk -F= 'NR>1 && $1=="balance" {print $2}' <<<"$status_lines")
     extra=""
     if [[ "$status" == "migrated" ]]; then
-      extra=" -> $(awk -F= 'NR==2 {print $2}' <<<"$status_lines")"
+      extra=" -> $(awk -F= 'NR>1 && $1=="new_address" {print $2}' <<<"$status_lines")"
       balance=""
     fi
     case "$status" in
@@ -687,18 +695,26 @@ _mb_execute_one() {
   _mb_log_event target_start target "$name" kind "$kind" address "$addr"
 
   # ---- 1. classify -----------------------------------------------------------
-  local cls cls_status balance
+  # _mb_classify_target emits status on line 1, then zero or more `key=value`
+  # lines. For status=migrated the extra line is `new_address=...` (no balance).
+  # For other statuses the extra line is `balance=...`. Parse by key so we
+  # don't mis-label new_address as balance in the operator log + JSONL audit.
+  local cls cls_status balance new_addr_cls
   cls=$(_mb_classify_target "$addr")
   cls_status=$(awk 'NR==1' <<<"$cls")
-  balance=$(awk -F= 'NR==2 {print $2}' <<<"$cls")
-  log_info "  on-chain status: $cls_status  (balance=${balance}ulume)"
-  _mb_log_event classify target "$name" status "$cls_status" balance "$balance"
+  balance=$(awk -F= 'NR>1 && $1=="balance" {print $2}' <<<"$cls")
+  new_addr_cls=$(awk -F= 'NR>1 && $1=="new_address" {print $2}' <<<"$cls")
 
   if [[ "$cls_status" == "migrated" ]]; then
+    log_info "  on-chain status: migrated  (new_address=$(new_value "$new_addr_cls"))"
+    _mb_log_event classify target "$name" status "$cls_status" new_address "$new_addr_cls"
     log_info "  already migrated; skipping"
     _mb_log_event target_done target "$name" outcome skipped_already_migrated
     return 0
   fi
+  log_info "  on-chain status: $cls_status  (balance=${balance}ulume)"
+  _mb_log_event classify target "$name" status "$cls_status" balance "$balance"
+
   if [[ "$cls_status" == "unknown" ]]; then
     log_error "  could not classify on-chain state; check RPC and re-run"
     _mb_log_event target_done target "$name" outcome failed reason rpc_unknown
@@ -948,7 +964,10 @@ _mb_execute() {
   _MB_DRY_RUN=0
   local yes=0
   _MB_FUNDER=""
-  _MB_TOP_UP_AMOUNT="100000ulume"
+  # Must cover the self-send (100000ulume) + its fee (5000ulume) with headroom.
+  # 200000ulume = self-send + fee + ~2x headroom. Lower defaults will make the
+  # downstream self-send fail with insufficient funds on a freshly-funded target.
+  _MB_TOP_UP_AMOUNT="200000ulume"
   _MB_FUNDER_KEYRING_BACKEND="test"
   _MB_FUNDER_KEYRING_DIR=""
   _MB_FUNDER_HOME=""
@@ -1004,7 +1023,8 @@ Optional:
                              with zero balance. Lives in the OPERATOR's main
                              keyring (NOT the ephemeral one).
   --top-up-amount <coins>    Amount to send to a zero-balance target before
-                             self-send. Default: 100000ulume.
+                             self-send. Default: 200000ulume (covers the
+                             100000ulume self-send + 5000ulume fee + headroom).
   --funder-keyring-*         How to reach the funder key (defaults: backend=test,
                              dir=$HOME default).
   --log-file <path>          Append JSONL audit records (one event per line)
@@ -1132,8 +1152,11 @@ E_USAGE
     dry_run "$_MB_DRY_RUN"
 
   # Install the trap once. _mb_cleanup_ephemeral is a no-op when there's
-  # nothing to clean.
-  trap _mb_cleanup_ephemeral EXIT
+  # nothing to clean. We CHAIN to the EXIT trap already installed by
+  # evmigration-common.sh (which calls cleanup_mnemonic_keys + removes the
+  # lumerad_q_capture stderr scratch file). Overwriting that trap would
+  # silently leak the scratch file and lose the original exit-code propagation.
+  trap 'rc=$?; _mb_cleanup_ephemeral; cleanup_mnemonic_keys; exit "$rc"' EXIT
 
   local i=0 ok=0 failed=0
   while (( i < n_rows )); do

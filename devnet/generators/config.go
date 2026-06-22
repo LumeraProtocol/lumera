@@ -9,12 +9,14 @@ const (
 	DefaultSupernodePort             = 4444
 	DefaultSupernodeP2PPort          = 4445
 	DefaultSupernodeGatewayPort      = 8002
-	DefaultLumeraUploaderGRPCPort      = 50051
-	DefaultLumeraUploaderHTTPPort      = 8080
-	DefaultLumeraUploaderUIPort        = 8088
+	DefaultLumeraUploaderGRPCPort    = 50051
+	DefaultLumeraUploaderHTTPPort    = 8080
+	DefaultLumeraUploaderUIPort      = 8088
 	DefaultGRPCWebPort               = 9091
 	DefaultJSONRPCPort               = 8545
 	DefaultJSONRPCWSPort             = 8546
+	DefaultJSONRPCMetricsPort        = 6065
+	DefaultGethMetricsPort           = 8100
 	DefaultHermesSimdHostP2PPort     = 36656
 	DefaultHermesSimdHostRPCPort     = 36657
 	DefaultHermesSimdHostAPIPort     = 31317

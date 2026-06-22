@@ -335,6 +335,16 @@ start_lumera() {
 	if [ -n "${EXTRA_START_FLAGS}" ]; then
 		echo "[BOOT] ${MONIKER}: Claims CSV found, loading claim records at genesis"
 	fi
+	# The EVM JSON-RPC metrics server is enabled by the --metrics start flag and
+	# only exists on EVM-enabled builds; pre-EVM lumerad does not know the flag.
+	if lumera_supports_evm; then
+		local enable_metrics
+		enable_metrics="$(jq -r '.["json-rpc"].enable_metrics // true' "${CFG_CHAIN}" 2>/dev/null || echo true)"
+		if [ "${enable_metrics}" = "true" ]; then
+			EXTRA_START_FLAGS="${EXTRA_START_FLAGS} --metrics"
+			echo "[BOOT] ${MONIKER}: EVM build detected, enabling JSON-RPC metrics (--metrics)"
+		fi
+	fi
 	echo "+ ${DAEMON} start --home ${DAEMON_HOME} ${EXTRA_START_FLAGS}"
 	# shellcheck disable=SC2086
 	"${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &

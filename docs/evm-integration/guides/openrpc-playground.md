@@ -20,8 +20,8 @@ Both return the same embedded spec (~743 methods, ~5000 lines). The spec is rege
 ### Via JSON-RPC (`rpc_discover` or `rpc.discover`)
 
 ```bash
-# From any machine that can reach the JSON-RPC port:
-curl -s -X POST http://localhost:8545 \
+# From any machine that can reach the JSON-RPC port (validator_1 host port):
+curl -s -X POST http://localhost:8645 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"rpc_discover","params":[],"id":1}' | jq '.result.info'
 ```
@@ -64,7 +64,7 @@ https://playground.open-rpc.org/?url=http://localhost:1317/openrpc.json
 You can also point it directly at the **JSON-RPC** port, which now supports both discovery names and works with **Try It**:
 
 ```text
-https://playground.open-rpc.org/?url=http://localhost:8555
+https://playground.open-rpc.org/?url=http://localhost:8745
 ```
 
 For a devnet validator, use the corresponding host-mapped REST API or JSON-RPC port (see devnet section below).
@@ -88,11 +88,15 @@ Each devnet validator maps its container ports to unique host ports. The relevan
 
 | Validator | JSON-RPC (8545) | REST API (1317) | WebSocket (8546) |
 |-----------|-----------------|-----------------|------------------|
-| validator_1 | `localhost:8545` | `localhost:1327` | `localhost:8546` |
-| validator_2 | `localhost:8555` | `localhost:1337` | `localhost:8556` |
-| validator_3 | `localhost:8565` | `localhost:1347` | `localhost:8566` |
-| validator_4 | `localhost:8575` | `localhost:1357` | `localhost:8576` |
-| validator_5 | `localhost:8585` | `localhost:1367` | `localhost:8586` |
+| validator_1 | `localhost:8645` | `localhost:1327` | `localhost:8646` |
+| validator_2 | `localhost:8745` | `localhost:1337` | `localhost:8746` |
+| validator_3 | `localhost:8845` | `localhost:1347` | `localhost:8846` |
+| validator_4 | `localhost:8945` | `localhost:1357` | `localhost:8946` |
+| validator_5 | `localhost:9045` | `localhost:1367` | `localhost:9046` |
+
+> Host EVM ports follow a contiguous per-validator block `8645/8646/8647(metrics)/8648(geth) + i*100`,
+> and are published only for EVM-enabled chain versions (cutover `v1.20.0`).
+> See [lumera-ports.md](../../lumera-ports.md#devnet-docker-host-port-scheme) for the full scheme.
 
 > Port mappings are defined in `devnet/docker-compose.yml`. Verify with:
 >
@@ -109,7 +113,7 @@ Each devnet validator maps its container ports to unique host ports. The relevan
 
 ```bash
 # rpc_discover via JSON-RPC
-curl -s -X POST http://localhost:8555 \
+curl -s -X POST http://localhost:8745 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"rpc_discover","params":[],"id":1}' | jq '.result.methods | length'
 # Expected: 743 (or similar)
@@ -127,7 +131,7 @@ If port forwarding is not working, use the WSL IP address:
 ```bash
 # Find the WSL IP
 hostname -I | awk '{print $1}'
-# Then use http://<wsl-ip>:8555 in the playground
+# Then use http://<wsl-ip>:8745 in the playground
 ```
 
 ---
@@ -193,19 +197,19 @@ The spec is also regenerated automatically as a dependency of `make build`.
 
 ```bash
 # List all available methods
-curl -s -X POST http://localhost:8555 \
+curl -s -X POST http://localhost:8745 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"rpc_discover","params":[],"id":1}' \
   | jq '[.result.methods[].name] | sort'
 
 # List methods by namespace
-curl -s -X POST http://localhost:8555 \
+curl -s -X POST http://localhost:8745 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"rpc_discover","params":[],"id":1}' \
   | jq '[.result.methods[].name] | group_by(split("_")[0]) | map({namespace: .[0] | split("_")[0], count: length})'
 
 # Get details for a specific method
-curl -s -X POST http://localhost:8555 \
+curl -s -X POST http://localhost:8745 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"rpc_discover","params":[],"id":1}' \
   | jq '.result.methods[] | select(.name == "eth_sendRawTransaction")'

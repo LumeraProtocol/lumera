@@ -622,6 +622,7 @@ configure_node_config() {
 	local grpc_port="${LUMERA_GRPC_PORT:-9090}"
 	local rpc_port="${LUMERA_RPC_PORT:-26657}"
 	local api_enable_unsafe_cors jsonrpc_enable jsonrpc_address jsonrpc_ws_address jsonrpc_api jsonrpc_enable_indexer rpc_cors_allowed_origins
+	local jsonrpc_metrics_address jsonrpc_geth_metrics_address
 
 	api_enable_unsafe_cors="$(jq -r '.api.enable_unsafe_cors // true' "${CFG_CHAIN}")"
 	# Compact JSON array ("[…]"); valid TOML inline-array syntax, so crudini can write it verbatim.
@@ -631,6 +632,8 @@ configure_node_config() {
 	jsonrpc_ws_address="$(jq -r '.["json-rpc"].ws_address // "0.0.0.0:8546"' "${CFG_CHAIN}")"
 	jsonrpc_api="$(jq -r '.["json-rpc"].api // "web3,eth,personal,net,txpool,debug,rpc"' "${CFG_CHAIN}")"
 	jsonrpc_enable_indexer="$(jq -r '.["json-rpc"].enable_indexer // true' "${CFG_CHAIN}")"
+	jsonrpc_metrics_address="$(jq -r '.["json-rpc"].metrics_address // "0.0.0.0:6065"' "${CFG_CHAIN}")"
+	jsonrpc_geth_metrics_address="$(jq -r '.["json-rpc"].geth_metrics_address // "0.0.0.0:8100"' "${CFG_CHAIN}")"
 	jsonrpc_api="${jsonrpc_api// /}"
 	if [[ ",${jsonrpc_api}," != *",rpc,"* ]]; then
 		jsonrpc_api="${jsonrpc_api},rpc"
@@ -657,6 +660,14 @@ configure_node_config() {
 		run crudini --set "${APP_TOML}" json-rpc ws-address "\"${jsonrpc_ws_address}\""
 		run crudini --set "${APP_TOML}" json-rpc api "\"${jsonrpc_api}\""
 		run crudini --set "${APP_TOML}" json-rpc enable-indexer "${jsonrpc_enable_indexer}"
+		# EVM JSON-RPC / geth metrics endpoints only exist on EVM-enabled builds.
+		# The JSON-RPC metrics server is enabled via the --metrics start flag
+		# (see start.sh); geth metrics binds when [telemetry] enabled = true.
+		if lumera_supports_evm; then
+			run crudini --set "${APP_TOML}" json-rpc metrics-address "\"${jsonrpc_metrics_address}\""
+			run crudini --set "${APP_TOML}" evm geth-metrics-address "\"${jsonrpc_geth_metrics_address}\""
+			run crudini --set "${APP_TOML}" telemetry enabled "true"
+		fi
 		echo "[SETUP] Updated ${APP_TOML} with API/GRPC configuration."
 	else
 		echo "[SETUP] WARNING: ${APP_TOML} not found; skipping app.toml update"

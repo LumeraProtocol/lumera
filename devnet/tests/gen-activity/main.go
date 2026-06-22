@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"gen/tests/common"
@@ -63,6 +64,14 @@ func resolveConfig(cfg *Config, fs *flag.FlagSet) (wizard bool, setFlags map[str
 	setFlags = map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { setFlags[f.Name] = true })
 
+	// When -config is not passed, prefer a config next to the executable so the
+	// binary works from any cwd (e.g. /shared/release/tests-gen-activity invoked
+	// with cwd=/root). Only the default relative path is rewritten; an explicit
+	// -config is honored as-is.
+	if !setFlags["config"] {
+		cfg.ConfigPath = resolveConfigPath(cfg.ConfigPath, false, executableDir())
+	}
+
 	fc, err := LoadFileConfig(cfg.ConfigPath)
 	if err != nil {
 		return false, setFlags, err
@@ -70,12 +79,47 @@ func resolveConfig(cfg *Config, fs *flag.FlagSet) (wizard bool, setFlags map[str
 	if fc == nil && setFlags["config"] {
 		return false, setFlags, fmt.Errorf("config file %q not found", cfg.ConfigPath)
 	}
+	// Make a missing default config visible rather than silently falling back to
+	// flag defaults (a common source of "it ignored my chain-id" confusion).
+	if fc == nil {
+		log.Printf("no config file found at %q; using flag defaults only", cfg.ConfigPath)
+	} else {
+		log.Printf("loaded config from %s", cfg.ConfigPath)
+	}
 	if err := ApplyFileConfig(cfg, fc, cfg.Chain, setFlags); err != nil {
 		return false, setFlags, err
 	}
 
 	wizard = cfg.Wizard || fs.NFlag() == 0
 	return wizard, setFlags, nil
+}
+
+// executableDir returns the directory containing the running binary, or "" if it
+// cannot be determined.
+func executableDir() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Dir(exe)
+}
+
+// resolveConfigPath picks the config path to load when -config was not passed
+// explicitly. It prefers a file named like configPath sitting next to the
+// executable (exeDir) so the tool finds its config regardless of the current
+// working directory; otherwise it returns configPath unchanged (resolved against
+// the cwd by the loader). An explicit -config path is returned as-is.
+func resolveConfigPath(configPath string, explicit bool, exeDir string) string {
+	if explicit || configPath == "" {
+		return configPath
+	}
+	if exeDir != "" {
+		alt := filepath.Join(exeDir, filepath.Base(configPath))
+		if _, err := os.Stat(alt); err == nil {
+			return alt
+		}
+	}
+	return configPath
 }
 
 func configureFlags(fs *flag.FlagSet, c *Config) {

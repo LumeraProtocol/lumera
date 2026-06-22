@@ -94,6 +94,18 @@
             "lumera_uploader": {
                 "tag": ""
             }
+        },
+        "v1.20.0": {
+            "bin_dir": "bin-v1.20.0",
+            "lumera": {
+                "tag": "v1.20.0-rc5"
+            },
+            "supernode": {
+                "tag": "v2.6.0-rc1"
+            },
+            "lumera_uploader": {
+                "tag": ""
+            }
         }
     }
 }

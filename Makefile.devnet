@@ -1,6 +1,6 @@
 .PHONY: devnet-build devnet-tests-build _devnet-stage-migration-scripts devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start devnet-evm-upgrade
 .PHONY: devnet-build-default _devnet-select-default-genesis devnet-refresh-bin devnet-update-binaries devnet-update-binaries-default devnet-update-scripts
-.PHONY: devnet-build-version devnet-new-version devnet-upgrade-version devnet-stage-external-version devnet-new-remote-version
+.PHONY: devnet-build-version devnet-new-version devnet-upgrade-version devnet-stage-external-version devnet-new-remote-version devnet-remote-upgrade-version
 .PHONY: _check-devnet-version-bin _check-devnet-build-version-cfg _check-devnet-external-version-cfg
 .PHONY: devnet-download-binaries
 .PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-estimate devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-verify devnet-evmigration-cleanup
@@ -26,6 +26,7 @@
 # -- Remote execution from downloaded binaries -----------------
 #   make devnet-stage-external-version VERSION=v1.12.0   # local staging only, no Docker build, Hermes disabled
 #   make devnet-new-remote-version VERSION=v1.12.0       # stage locally, run on REMOTE_DEVNET_HOST
+#   make devnet-remote-upgrade-version VERSION=v1.20.0   # in-place upgrade of the running REMOTE_DEVNET_HOST devnet
 #
 # -- Lifecycle (on an already-built devnet) --------------------
 #   make devnet-up                                  # start containers (foreground)
@@ -290,11 +291,67 @@ devnet-new-remote-version: devnet-stage-external-version
 	@$(REMOTE_DEVNET_RSYNC) --delete \
 		$(REMOTE_DEVNET_STAGE_DIR)/shared/ \
 		$(REMOTE_DEVNET_HOST):$(SHARED_DIR)/
+	@# Stage the gen-activity tool config into the shared release dir, but only if
+	@# it is missing on the host (--ignore-existing), so an edited config survives.
+	@$(REMOTE_DEVNET_SSH) $(REMOTE_DEVNET_HOST) 'mkdir -p $(SHARED_RELEASE_DIR)'
+	@$(REMOTE_DEVNET_RSYNC) --ignore-existing \
+		devnet/config/gen-activity-config.toml \
+		$(REMOTE_DEVNET_HOST):$(SHARED_RELEASE_DIR)/gen-activity-config.toml
 	@$(REMOTE_DEVNET_SSH) $(REMOTE_DEVNET_HOST) 'set -e; \
 		cd $(REMOTE_DEVNET_DIR)/devnet; \
 		docker compose build; \
 		START_MODE=auto docker compose up -d --remove-orphans; \
 		docker compose ps'
+
+# In-place upgrade of a devnet already running on REMOTE_DEVNET_HOST (started via
+# devnet-new-remote-version) to a pre-downloaded lumera version. Pushes the new
+# binaries (devnet/bin-<VERSION>/) and current scripts to the host, then runs the
+# governance software-upgrade flow (scripts/upgrade.sh) there. Chain state is
+# preserved (no clean, no genesis staging, no Docker rebuild).
+#
+# EVM cutover handling: if this upgrade crosses the pre-EVM -> EVM boundary
+# (old version < EVM_CUTOVER_VERSION <= new version), it additionally regenerates
+# docker-compose.yml for the new version (which now publishes the EVM host ports),
+# rsyncs only that compose, and runs scripts/apply-evm-ports.sh on the host to
+# reapply the metrics/geth bind config and recreate the containers. Chain data
+# lives in host bind mounts, so it is preserved across the recreate.
+#
+# Requires devnet/bin-<VERSION>/lumerad locally (run devnet-download-binaries first)
+# and a running remote devnet.
+#
+# Usage: make devnet-remote-upgrade-version VERSION=v1.20.0
+devnet-remote-upgrade-version: _check-devnet-version-bin
+	@set -e; \
+	ver_ge() { printf '%s\n' "$$2" "$$1" | sort -V | head -n1 | grep -q "^$$2$$"; }; \
+	new_ver="$(VERSION)"; case "$$new_ver" in v*) ;; *) new_ver="v$$new_ver";; esac; \
+	cutover="$(EVM_CUTOVER_VERSION)"; case "$$cutover" in v*) ;; *) cutover="v$$cutover";; esac; \
+	echo "==> Querying current remote devnet version..."; \
+	old_ver="$$($(REMOTE_DEVNET_SSH) $(REMOTE_DEVNET_HOST) 'cd $(REMOTE_DEVNET_DIR)/devnet 2>/dev/null && docker compose exec -T supernova_validator_1 lumerad version 2>/dev/null | head -n1 | tr -d "\r"' 2>/dev/null || true)"; \
+	case "$$old_ver" in v*|"") ;; *) old_ver="v$$old_ver";; esac; \
+	echo "==> Remote running version: $${old_ver:-unknown}; upgrading to $$new_ver"; \
+	$(REMOTE_DEVNET_SSH) $(REMOTE_DEVNET_HOST) 'set -e; \
+		command -v docker >/dev/null; \
+		docker compose version >/dev/null; \
+		if [ ! -f $(REMOTE_DEVNET_DIR)/devnet/docker-compose.yml ]; then \
+			echo "No remote devnet found at $(REMOTE_DEVNET_DIR)/devnet; run devnet-new-remote-version first" >&2; \
+			exit 1; \
+		fi; \
+		mkdir -p $(REMOTE_DEVNET_DIR)/devnet/bin-$(VERSION)'; \
+	$(REMOTE_DEVNET_RSYNC) --delete devnet/bin-$(VERSION)/ $(REMOTE_DEVNET_HOST):$(REMOTE_DEVNET_DIR)/devnet/bin-$(VERSION)/; \
+	$(REMOTE_DEVNET_RSYNC) --delete devnet/scripts $(REMOTE_DEVNET_HOST):$(REMOTE_DEVNET_DIR)/devnet/; \
+	$(REMOTE_DEVNET_SSH) $(REMOTE_DEVNET_HOST) 'set -e; cd $(REMOTE_DEVNET_DIR)/devnet/scripts; ./upgrade.sh $(VERSION) auto-height ../bin-$(VERSION)'; \
+	if ver_ge "$$new_ver" "$$cutover" && { [ -z "$$old_ver" ] || ! ver_ge "$$old_ver" "$$cutover"; }; then \
+		echo "==> EVM cutover crossed ($${old_ver:-pre-EVM} -> $$new_ver); exposing EVM host ports (data preserved)..."; \
+		tmp_cfg="$$(mktemp)"; \
+		jq '.hermes.enabled = false | .chain.version = "'"$$new_ver"'"' devnet/config/config.json > "$$tmp_cfg"; \
+		( cd devnet && CONFIG_JSON="$$tmp_cfg" VALIDATORS_JSON="config/validators.json" EXTERNAL_GENESIS_FILE=0 $(GO) run . ); \
+		rm -f "$$tmp_cfg"; \
+		$(REMOTE_DEVNET_RSYNC) devnet/docker-compose.yml $(REMOTE_DEVNET_HOST):$(REMOTE_DEVNET_DIR)/devnet/docker-compose.yml; \
+		$(REMOTE_DEVNET_SSH) $(REMOTE_DEVNET_HOST) 'set -e; cd $(REMOTE_DEVNET_DIR)/devnet/scripts; ./apply-evm-ports.sh'; \
+		echo "==> EVM host ports applied."; \
+	else \
+		echo "==> No EVM cutover crossing (old=$${old_ver:-unknown}, new=$$new_ver, cutover=$$cutover); compose/ports unchanged."; \
+	fi
 
 _check-devnet-version-bin:
 	@if [ -z "$(VERSION)" ]; then \

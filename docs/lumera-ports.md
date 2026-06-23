@@ -28,7 +28,7 @@ This document lists network ports used by `lumerad`, with:
 > Notes:
 >
 > - Some services are disabled by default and only bind when enabled (e.g., API, gRPC, gRPC-Web, JSON-RPC depending on config).
-> - Lumera app defaults enable EVM JSON-RPC and indexer in app config initialization; runtime can still override via flags or`app.toml`.
+> - Lumera app defaults enable EVM JSON-RPC and indexer in app config initialization; runtime can still override via flags or `app.toml`.
 
 ---
 
@@ -269,7 +269,7 @@ curl -s http://127.0.0.1:6065/metrics | head
 ## 9) EVM JSON-RPC rate-limit proxy
 
 - **Purpose:** Per-IP token bucket rate limiting for the EVM JSON-RPC endpoint. Reverse-proxies requests to the internal JSON-RPC server (`:8545`).
-- **Default:**`0.0.0.0:8547` (disabled by default — must set`enable = true`)
+- **Default:**`0.0.0.0:8547` (disabled by default — must set `enable = true`)
 - **Config:**`app.toml` →`[lumera.json-rpc-ratelimit]`
   - `enable` — toggle (default:`false`)
   - `proxy-address` — listen address
@@ -277,7 +277,7 @@ curl -s http://127.0.0.1:6065/metrics | head
   - `burst` — max burst per IP (default:`100`)
   - `entry-ttl` — inactivity TTL for per-IP state (default:`5m`)
 - **CLI:** none (config-only)
-- **Note:** When enabled, external clients should connect to this port; keep`:8545` on loopback for internal/trusted access.
+- **Note:** When enabled, external clients should connect to this port; keep `:8545` on loopback for internal/trusted access.
 
 ## 10) CometBFT pprof listener
 
@@ -346,8 +346,8 @@ For validator index `i` (0-based):
 - JSON-RPC metrics:`8647 + i*100` → container `:6065`
 - geth metrics:    `8648 + i*100` → container `:8100`
 
-| Validator | http | ws | metrics | geth |
-| --------- | ---- | -- | ------- | ---- |
+| Validator   | http     | ws       | metrics  | geth     |
+| ----------- | -------- | -------- | -------- | -------- |
 | validator_1 | `8645` | `8646` | `8647` | `8648` |
 | validator_2 | `8745` | `8746` | `8747` | `8748` |
 | validator_3 | `8845` | `8846` | `8847` | `8848` |
@@ -373,9 +373,9 @@ For validator index `i` (0-based):
   - `--json-rpc.address 127.0.0.1:8545`
   - `--json-rpc.ws-address 127.0.0.1:8546`
 - Expose P2P publicly only when operating a network node.
-- Avoid`--rpc.unsafe` on public interfaces.
+- Avoid `--rpc.unsafe` on public interfaces.
 - If exposing API/gRPC publicly, place behind firewall/reverse proxy/TLS.
-- For public EVM JSON-RPC access, enable the rate-limiting proxy (`[lumera.json-rpc-ratelimit] enable = true`) and expose`:8547` instead of`:8545` directly.
+- For public EVM JSON-RPC access, enable the rate-limiting proxy (`[lumera.json-rpc-ratelimit] enable = true`) and expose `:8547` instead of `:8545` directly.
 
 ---
 

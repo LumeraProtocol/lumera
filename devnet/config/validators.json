@@ -13,8 +13,10 @@
       "gateway_port": 18001
     },
     "json-rpc": {
-      "port": 8545,
-      "ws_port": 8546
+      "port": 8645,
+      "ws_port": 8646,
+      "metrics_port": 8647,
+      "geth_metrics_port": 8648
     },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",
@@ -35,8 +37,10 @@
       "gateway_port": 18002
     },
     "json-rpc": {
-      "port": 8555,
-      "ws_port": 8556
+      "port": 8745,
+      "ws_port": 8746,
+      "metrics_port": 8747,
+      "geth_metrics_port": 8748
     },
     "multisig": {
       "enabled": true,
@@ -69,8 +73,10 @@
       "gateway_port": 18003
     },
     "json-rpc": {
-      "port": 8565,
-      "ws_port": 8566
+      "port": 8845,
+      "ws_port": 8846,
+      "metrics_port": 8847,
+      "geth_metrics_port": 8848
     },
     "lumera-uploader": {
       "enabled": true,
@@ -96,8 +102,10 @@
       "gateway_port": 18004
     },
     "json-rpc": {
-      "port": 8575,
-      "ws_port": 8576
+      "port": 8945,
+      "ws_port": 8946,
+      "metrics_port": 8947,
+      "geth_metrics_port": 8948
     },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",
@@ -123,8 +131,10 @@
       "gateway_port": 18005
     },
     "json-rpc": {
-      "port": 8585,
-      "ws_port": 8586
+      "port": 9045,
+      "ws_port": 9046,
+      "metrics_port": 9047,
+      "geth_metrics_port": 9048
     },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",

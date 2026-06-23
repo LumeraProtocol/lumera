@@ -61,7 +61,10 @@
         "address": "0.0.0.0:8545",
         "ws_address": "0.0.0.0:8546",
         "api": "web3,eth,personal,net,txpool,debug,rpc",
-        "enable_indexer": true
+        "enable_indexer": true,
+        "enable_metrics": true,
+        "metrics_address": "0.0.0.0:6065",
+        "geth_metrics_address": "0.0.0.0:8100"
     },
     "lumera-uploader": {
         "enabled": true,

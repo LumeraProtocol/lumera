@@ -328,16 +328,79 @@ log_lumerad_err() {
   done <"$_LUMERAD_ERR_FILE"
 }
 
+# Gas sizing for migration txs. Migration fees are waived AND the chain runs
+# block.max_gas=-1 (unlimited) on devnet and mainnet, so the gas value is an
+# execution limit only and over-estimating is free — size it to the work
+# (delegation/unbonding/redelegation re-keys), not the 200000 CLI default.
+# `--gas auto` (in lumerad_tx) is the accurate path; these constants only feed
+# the fallback used when the auto-simulate fails (e.g. RPC timeout on a large
+# validator). They are deliberately conservative (over-estimate) so the fallback
+# never under-runs: calibrated from live devnet migrations (2026-06-23) where the
+# observed cost was ~6M base + ~688k/record (validator) / ~1.33M/record (account);
+# we use the higher account marginal with margin. Env-overridable.
+MIGRATION_GAS_BASE="${MIGRATION_GAS_BASE:-6000000}"
+MIGRATION_GAS_PER_RECORD="${MIGRATION_GAS_PER_RECORD:-1500000}"
+MIGRATION_GAS_ADJUSTMENT="${MIGRATION_GAS_ADJUSTMENT:-1.5}"
+
+# migration_gas_for_records <records> — fallback fixed gas when --gas auto fails.
+migration_gas_for_records() {
+  local records="${1:-0}"
+  [[ "$records" =~ ^[0-9]+$ ]] || records=0
+  echo $(( MIGRATION_GAS_BASE + MIGRATION_GAS_PER_RECORD * records ))
+}
+
+# gas_exceeds_block_limit <gas> <block_max_gas> — true (0) only when block_max_gas
+# is a positive integer and gas strictly exceeds it. Unlimited (-1), empty, or
+# non-numeric limits are treated as "no limit" (returns 1).
+gas_exceeds_block_limit() {
+  local gas="${1:-0}" limit="${2:-}"
+  [[ "$limit" =~ ^[0-9]+$ ]] || return 1
+  (( gas > limit ))
+}
+
 lumerad_tx() {
   if [[ -z "${CHAIN_ID:-}" ]]; then
     log_error "chain ID is required for tx commands; pass --chain-id or set \$LUMERA_CHAIN_ID / \$CHAIN_ID"
     exit 1
   fi
   _read_keyring_flags
+
+  # Primary: let the chain simulate the exact gas (migration fees are waived, so
+  # the resulting limit is free). Capture stdout (the tx JSON) separately from
+  # stderr (gas-estimate notes / errors) so callers receive clean JSON to parse.
+  local err_file out rc=0
+  err_file="$(mktemp)"
+  out="$("$BIN" tx "$@" \
+    --node "$NODE" \
+    --chain-id "$CHAIN_ID" \
+    "${_KRF[@]}" \
+    --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT" \
+    --output json 2>"$err_file")" || rc=$?
+  if (( rc == 0 )); then
+    rm -f "$err_file"
+    printf '%s\n' "$out"
+    return 0
+  fi
+
+  log_warn "  --gas auto failed (rc=${rc}); falling back to record-count gas formula"
+  local _line
+  while IFS= read -r _line; do [[ -n "$_line" ]] && log_warn "    $_line"; done <"$err_file"
+  rm -f "$err_file"
+
+  # Fallback: fixed gas from the record-count formula, clamped to block max_gas.
+  local fallback_gas block_max_gas
+  fallback_gas="$(migration_gas_for_records "${MIGRATION_RECORD_COUNT:-0}")"
+  block_max_gas="$(lumerad_q consensus params 2>/dev/null | jq -r '.params.block.max_gas // .block.max_gas // "-1"' 2>/dev/null || echo -1)"
+  if gas_exceeds_block_limit "$fallback_gas" "$block_max_gas"; then
+    log_error "estimated migration gas ${fallback_gas} exceeds block max_gas ${block_max_gas}"
+    log_error "this account/validator has too many delegation records to migrate in a single tx"
+    exit 1
+  fi
   "$BIN" tx "$@" \
     --node "$NODE" \
     --chain-id "$CHAIN_ID" \
     "${_KRF[@]}" \
+    --gas "$fallback_gas" \
     --output json
 }
 
@@ -655,12 +718,33 @@ snapshot_bank_balances() {
   lumerad_q bank balances "$addr"
 }
 
+_handle_tx_query_json() {
+  local hash="$1" json="$2" started="$3"
+  local code height raw_log
+
+  code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null || true)
+  if [[ "$code" == "0" ]]; then
+    height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null || printf '<unknown>')
+    log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+    return 0
+  fi
+  if [[ -n "$code" ]]; then
+    raw_log=$(jq -r '.raw_log // "<no raw_log>"' <<<"$json" 2>/dev/null || printf '<no raw_log>')
+    log_error "tx $hash failed with code $code: $raw_log"
+    return 1
+  fi
+  return 2
+}
+
 # wait_for_tx <hash>
-# Waits for the tx to commit using two paths in order:
+# Waits for the tx to commit using three paths in order:
 #   1. Fast path — `query tx <hash>`. Catches the case where the tx was
 #      already committed by the time we got here.
 #   2. Slow path — `query wait-tx <hash> --timeout`. Subscribes to the
 #      CometBFT WebSocket and waits for the commit event.
+#   3. Fallback path — repeated `query tx <hash>` until the timeout expires.
+#      This covers RPC/WebSocket paths where wait-tx returns immediately even
+#      though the tx later commits and becomes queryable.
 #
 # Important: the slow-path call goes DIRECTLY to $BIN, NOT through lumerad_q.
 # Cosmos SDK's wait-tx accepts --keyring-backend without warning but then
@@ -679,7 +763,7 @@ snapshot_bank_balances() {
 wait_for_tx() {
   local hash="$1"
   local timeout="${LUMERA_TX_WAIT_TIMEOUT:-90}"
-  local json code height
+  local json rc elapsed remaining next_progress
   local started=$SECONDS
 
   # Fast path: tx may already be committed.
@@ -687,33 +771,56 @@ wait_for_tx() {
   # stderr). So a "found" check is "stdout is non-empty AND parseable JSON",
   # not just "exit 0". Empty json → both nested ifs are false → fall through.
   if json=$(lumerad_q tx "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
-    code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null)
-    if [[ "$code" == "0" ]]; then
-      height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null)
-      log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+    if _handle_tx_query_json "$hash" "$json" "$started"; then
       return 0
-    fi
-    if [[ -n "$code" ]]; then
-      log_error "tx $hash failed with code $code: $(jq -r '.raw_log // "<no raw_log>"' <<<"$json")"
-      return 1
+    else
+      rc=$?
+      if (( rc == 1 )); then
+        return 1
+      fi
     fi
   fi
 
   # Slow path: subscribe and wait. Bypass lumerad_q so we don't pass
   # --keyring-backend, which silently breaks wait-tx (see header comment).
   if json=$("$BIN" query wait-tx "$hash" --node "$NODE" --output json --timeout "${timeout}s" 2>/dev/null) && [[ -n "$json" ]]; then
-    code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null)
-    if [[ "$code" == "0" ]]; then
-      height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null)
-      log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+    if _handle_tx_query_json "$hash" "$json" "$started"; then
       return 0
-    fi
-    if [[ -n "$code" ]]; then
-      log_error "tx $hash failed with code $code: $(jq -r '.raw_log // "<no raw_log>"' <<<"$json")"
-      return 1
+    else
+      rc=$?
+      if (( rc == 1 )); then
+        return 1
+      fi
     fi
   fi
-  local elapsed=$(( SECONDS - started ))
+
+  elapsed=$(( SECONDS - started ))
+  remaining=$(( timeout - elapsed ))
+  if (( remaining > 0 )); then
+    log_info "tx $hash not indexed yet; polling query tx for up to ${remaining}s"
+    next_progress=10
+    while (( SECONDS - started < timeout )); do
+      sleep 1
+      if json=$(lumerad_q tx "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
+        if _handle_tx_query_json "$hash" "$json" "$started"; then
+          return 0
+        else
+          rc=$?
+          if (( rc == 1 )); then
+            return 1
+          fi
+        fi
+      fi
+
+      elapsed=$(( SECONDS - started ))
+      if (( elapsed >= next_progress && elapsed < timeout )); then
+        log_info "still waiting for tx $hash to be indexed (${elapsed}s elapsed, timeout ${timeout}s)"
+        next_progress=$(( next_progress + 10 ))
+      fi
+    done
+  fi
+
+  elapsed=$(( SECONDS - started ))
 
   log_warn "tx $hash not indexed after ${elapsed}s (timeout was ${timeout}s); it may still land on chain"
   log_warn "  check status manually: $BIN q tx $hash"
@@ -1203,6 +1310,35 @@ key_multisig_sub_pub_keys_csv() {
     exit 1
   fi
   printf '%s\n' "$keys_csv"
+}
+
+log_signer_order_json_array() {
+  local title="$1" threshold="$2" keys_json="$3"
+  local count
+  count=$(jq -r 'length' <<<"$keys_json" 2>/dev/null || printf '0')
+  log_info "$title (${threshold}-of-${count})"
+  log_info "  signer index is part of the multisig address; keep this order unchanged"
+  local i key
+  for (( i=0; i<count; i++ )); do
+    key=$(jq -r ".[$i]" <<<"$keys_json")
+    log_info "  index $i: $key"
+  done
+}
+
+log_signer_order_csv() {
+  local title="$1" threshold="$2" keys_csv="$3"
+  local old_ifs="$IFS"
+  IFS=','
+  read -r -a _evmig_order_keys <<<"$keys_csv"
+  IFS="$old_ifs"
+  local keys_json
+  keys_json=$(printf '%s\n' "${_evmig_order_keys[@]}" | jq -R . | jq -cs .)
+  log_signer_order_json_array "$title" "$threshold" "$keys_json"
+}
+
+pubkey_index_in_json_array() {
+  local key="$1" keys_json="$2"
+  jq -r --arg key "$key" 'index($key) // empty' <<<"$keys_json"
 }
 
 # key_pubkey_b64 <key-name>

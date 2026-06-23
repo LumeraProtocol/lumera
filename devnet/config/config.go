@@ -82,8 +82,10 @@ type Validator struct {
 		GatewayPort int `json:"gateway_port,omitempty"`
 	} `json:"supernode,omitempty"`
 	JSONRPC struct {
-		Port   int `json:"port,omitempty"`
-		WSPort int `json:"ws_port,omitempty"`
+		Port            int `json:"port,omitempty"`
+		WSPort          int `json:"ws_port,omitempty"`
+		MetricsPort     int `json:"metrics_port,omitempty"`
+		GethMetricsPort int `json:"geth_metrics_port,omitempty"`
 	} `json:"json-rpc,omitempty"`
 
 	InitialDistribution struct {

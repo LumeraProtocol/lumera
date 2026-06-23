@@ -682,12 +682,11 @@ _mb_multisig_self_send() {
 # migrated; non-zero on failure (caller decides whether to stop or continue).
 _mb_execute_one() {
   local row="$1"
-  local name addr kind threshold n
+  local name addr kind threshold
   name=$(jq -r '.name'      <<<"$row")
   addr=$(jq -r '.address'   <<<"$row")
   kind=$(jq -r '.kind'      <<<"$row")
   threshold=$(jq -r '.threshold' <<<"$row")
-  n=$(jq -r '.n'           <<<"$row")
 
   log_info ""
   log_info "──── target: $name ($kind) ────"

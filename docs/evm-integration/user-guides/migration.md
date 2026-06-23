@@ -54,6 +54,56 @@ After migration:
 
 ---
 
+## Validator migration
+
+Migrating a validator's operator account (legacy coin-type 118 → EVM coin-type
+60) changes its valoper address, so the chain re-keys **every delegation,
+unbonding, and redelegation** pointing at the validator from the old valoper to
+the new one. The work — and therefore the gas — scales with the validator's
+record count.
+
+- **Stop the node first.** The migration requires the validator node to be
+  stopped before broadcasting (`--i-have-stopped-the-node`). The validator will
+  miss blocks during the migration and may be jailed; unjail it afterward
+  (`lumerad tx slashing unjail`).
+- **Fees are waived.** Migration txs pay no fee, so the gas value is only an
+  execution limit. The migration helper scripts size it automatically:
+  `migrate-account.sh` and `migrate-validator.sh` use `--gas auto` (with a
+  record-count fallback), and `migrate-multisig.sh combine` simulates gas at
+  combine time.
+- **Gas formula** (fallback if submitting by hand or if `--gas auto` simulate
+  fails):
+  `gas ≈ 6,000,000 + 1,500,000 × (delegations + unbondings + redelegations)`.
+  `--gas auto` computes the exact value and is the preferred path.
+- **Block gas is not a constraint.** Both devnet and mainnet run
+  `block.max_gas = -1` (unlimited); fees are waived → gas is not a blocker.
+  The `max_validator_delegations` parameter (default 2500) is a safety guard,
+  not a gas-fit requirement; a validator above the cap cannot migrate in a
+  single tx.
+- **Raise the RPC simulate timeout — required for large validators.**
+  `--gas auto` runs the full migration handler inside a simulate call; for a
+  validator with thousands of records this takes tens of seconds to ~2 minutes,
+  past CometBFT's default `timeout_broadcast_tx_commit = 10s`, which aborts the
+  simulate with an `EOF` error. **Before migrating**, on the node you broadcast
+  through, edit `~/.lumera/config/config.toml` under the `[rpc]` section and
+  **restart the node** for it to take effect:
+
+  ```toml
+  [rpc]
+  timeout_broadcast_tx_commit = "600s"   # default "10s"; set ≥ your expected simulate time
+  ```
+
+  Revert it to `"10s"` (and restart again) once the migration is done.
+  Alternatively, skip the simulate entirely by broadcasting with a high fixed
+  `--gas` from the formula above. Account and small-validator migrations finish
+  well within 10s and don't need this change. Validators: see the dedicated step
+  in [validator-migration.md](validator-migration.md) — your own node is stopped
+  during broadcast, so this change goes on the **trusted external RPC** node.
+
+For step-by-step instructions see [§ Single-sig validator migration](#single-sig-validator-migration) (Method 2) and [§ Post-Migration for Validators](#5-post-migration-for-validators) (Method 3). For maintenance-window planning, consensus-key safety, and the multisig variant, see [validator-migration.md](validator-migration.md).
+
+---
+
 ## Method 1: Portal + Keplr (Recommended)
 
 This is the easiest method. The Lumera Portal provides a guided wizard that handles address derivation, signing, and broadcasting, plus an on-page status card that walks you through the post-migration follow-up.
@@ -356,7 +406,7 @@ Use `--mnemonic-file <path>` (file must be mode 0600) to import both keys from a
 
 The CLI requires both keys (legacy and new) in the keyring. It handles address derivation, proof signing, gas simulation, and broadcasting automatically.
 
-### Prerequisites
+### CLI Prerequisites
 
 - `lumerad` binary (post-EVM upgrade version)
 - Your mnemonic (recovery phrase)
@@ -528,7 +578,7 @@ The following chain parameters govern migration behavior. These are set by gover
 | `enable_migration`          | `true`            | Master on/off switch. When `false`, all migration messages are rejected.                                          |
 | `migration_end_time`        | `0` (no deadline) | Optional Unix timestamp deadline. If non-zero and current block time is past this, migration is rejected.           |
 | `max_migrations_per_block`  | `50`              | Rate limit for `MsgClaimLegacyAccount` per block. Prevents excessive gas consumption.                             |
-| `max_validator_delegations` | `2000`            | Safety cap for `MsgMigrateValidator`. Rejects if total delegation + unbonding + redelegation records exceed this. |
+| `max_validator_delegations` | `2500`            | Safety cap for `MsgMigrateValidator`. Rejects if total delegation + unbonding + redelegation records exceed this. |
 
 ---
 
@@ -583,7 +633,7 @@ Check the `migration_end_time` parameter. If it's `0`, there is no deadline (onl
 
 **Q: My validator has too many delegators and migration is rejected. What do I do?**
 
-The `max_validator_delegations` parameter (default 2000) limits how many records can be re-keyed in one transaction. If your validator exceeds this, governance may increase the limit, or delegators can redelegate before validator migration.
+The `max_validator_delegations` parameter (default 2500) limits how many records can be re-keyed in one transaction. If your validator exceeds this, governance may increase the limit, or delegators can redelegate before validator migration.
 
 ---
 
@@ -595,8 +645,8 @@ Multisig legacy accounts (flat K-of-N `secp256k1`) use an offline, coordinator-d
 
 > **Consensus invariants (multisig).** These are enforced at `ValidateBasic` before the tx reaches the msg server; a violation rejects the transaction on-chain.
 >
-> - **Shape + K/N must mirror.** A K-of-N legacy multisig migrates to a K-of-N`eth_secp256k1` multisig — same K, same N. Different K, different N, or single↔multisig shape mismatch is rejected with`ErrMirrorSourceMismatch` (code 1121).
-> - **Same K signer positions sign both halves.**`legacy_proof.signer_indices` must equal`new_proof.signer_indices`. Co-signers who sign only one side don't count toward the K-of-K threshold on the other.
+> - **Shape + K/N must mirror.** A K-of-N legacy multisig migrates to a K-of-N `eth_secp256k1` multisig — same K, same N. Different K, different N, or single↔multisig shape mismatch is rejected with `ErrMirrorSourceMismatch` (code 1121).
+> - **Same K signer positions sign both halves.** `legacy_proof.signer_indices` must equal `new_proof.signer_indices`. Co-signers who sign only one side don't count toward the K-of-K threshold on the other.
 > - **Sub-key uniqueness.** Each side's`sub_pub_keys` must have pairwise-distinct entries.
 > - **Zero-signer submit.**`submit-proof` takes no`--from`, no fee flags, no envelope signature — authorization is the proof bytes. Mempool acceptance of zero-signer migration txs requires `app/evmigration_signer_extraction_adapter.go` to be wired into the EVM mempool's `CosmosPoolConfig.SignerExtractor`; without it, `ExperimentalEVMMempool` falls back to the SDK's default extractor and rejects the tx with `tx must have at least one signer` during app-side mempool admission/proposal selection.
 >
@@ -661,6 +711,8 @@ Re-run the `auth account` query and confirm `pub_key` is now a `LegacyAminoPubKe
 
 Either way the *signatures* must still come from K multisig members; only the gas source changes.
 
+When using raw `lumerad tx broadcast`, inspect the returned JSON `code`. The CLI process can exit `0` even when CheckTx rejected the tx, for example `code: 13` with `raw_log: "fee not provided... insufficient fee"`. For the seed transaction, `code: 0` means accepted; nonzero means fix the error and broadcast a corrected tx before continuing.
+
 ### Step 1: Coordinator generates the proof payload template
 
 The destination of a K-of-N legacy multisig is **also** a K-of-N multisig, built from fresh `eth_secp256k1` sub-keys (mirror-source rule — see [evmigration/main.md → Multisig account migration](../evmigration/main.md#multisig-account-migration)). Each co-signer generates their own eth sub-key; the coordinator collects the N eth pubkeys (or local key-names) and runs:
@@ -689,6 +741,8 @@ lumerad tx evmigration generate-proof-payload \
   > ```
   >
   > where the `<eth-sub-i>` order matches the legacy multisig's on-chain `public_keys` order.
+
+- For same-mnemonic migrations, signer index 0's legacy mnemonic should be used to recover signer index 0's EVM sub-key, signer index 1's legacy mnemonic should be used for signer index 1's EVM sub-key, and so on. Reordering the same EVM sub-keys produces a different destination multisig address.
 - `--new <bech32>` is optional; the CLI derives the new multisig address from the sub-keys/threshold and cross-checks `--new` if supplied.
 - `--kind claim` targets `MsgClaimLegacyAccount`; `--kind validator` targets `MsgMigrateValidator`.
 - `--chain-id` is **required**: the payload string `lumera-evm-migration:<chain-id>:<evm-chain-id>:<kind>:<legacy>:<new>` embeds the chain ID. An empty or wrong `--chain-id` makes every sub-signature fail verification with `sub-sig 0 invalid`.
@@ -743,8 +797,8 @@ lumerad query evmigration migration-record <multisig-legacy-address>
 
 ### Notes
 
-- **Legacy-side threshold and members** are defined by the on-chain`LegacyAminoPubKey` and read automatically; you don't pass them as flags.**New-side threshold and members** are supplied by`--new-sub-pub-keys` +`--new-threshold` because the destination multisig doesn't exist on-chain yet.
-- **Cold-wallet / nil-pubkey single-sig accounts**: if a*single-key* (non-multisig) legacy account has never signed a transaction, use`generate-proof-payload --legacy-key <local-keyring-key>` to seed the pubkey from a local key. This is distinct from the multisig flow — multisig accounts must have their multisig pubkey already populated on-chain.
-- **Non-EVM-addressable destination.** The new multisig bech32 can perform Cosmos-side operations (staking, supernode, IBC, authz) but cannot originate`MsgEthereumTx`. Operators who want EVM DeFi access for rewards should configure a separate single-EOA withdraw address via`MsgSetWithdrawAddress`.
-- **Supernode operators** have their own step-by-step walkthrough for both the single-sig automatic path and the multisig manual path — see[supernode-migration.md](supernode-migration.md).
+- **Legacy-side threshold and members** are defined by the on-chain `LegacyAminoPubKey` and read automatically; you don't pass them as flags. **New-side threshold and members** are supplied by `--new-sub-pub-keys` + `--new-threshold` because the destination multisig doesn't exist on-chain yet.
+- **Cold-wallet / nil-pubkey single-sig accounts**: if a *single-key* (non-multisig) legacy account has never signed a transaction, use `generate-proof-payload --legacy-key <local-keyring-key>` to seed the pubkey from a local key. This is distinct from the multisig flow — multisig accounts must have their multisig pubkey already populated on-chain.
+- **Non-EVM-addressable destination.** The new multisig bech32 can perform Cosmos-side operations (staking, supernode, IBC, authz) but cannot originate `MsgEthereumTx`. Operators who want EVM DeFi access for rewards should configure a separate single-EOA withdraw address via `MsgSetWithdrawAddress`.
+- **Supernode operators** have their own step-by-step walkthrough for both the single-sig automatic path and the multisig manual path — see [supernode-migration.md](supernode-migration.md).
 - **After a successful migration** follow the same post-migration steps as for any other account (add the new Lumera EVM chain definition to Keplr, verify balances at the new address, etc.).

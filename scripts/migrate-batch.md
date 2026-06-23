@@ -30,7 +30,7 @@ triggered failures).
 
 ## Subcommands
 
-```
+```bash
 migrate-batch.sh report   --mnemonics <file> [--plan-out <file>]
 migrate-batch.sh status   --mnemonics <file> [--node <url>] [--chain-id <id>] [--target <name>]
 migrate-batch.sh execute  --mnemonics <file> [...]

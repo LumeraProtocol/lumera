@@ -157,7 +157,7 @@ G_USAGE
   # Check on-chain pubkey BEFORE estimate so a nil-pubkey multisig gets
   # the exit-8 "seed the pubkey first" remediation, not a confusing
   # downstream error.
-  local pk_type
+  local pk_type legacy_pubkey_json legacy_sub_pub_keys_json
   pk_type=$(auth_pubkey_type "$legacy")
   case "$pk_type" in
     none)
@@ -171,8 +171,10 @@ G_USAGE
     *) log_error "unexpected pubkey type for $(legacy_value "$legacy"): $pk_type"; exit 2 ;;
   esac
   local legacy_threshold legacy_subkey_count
-  legacy_threshold=$(auth_multisig_threshold "$legacy")
-  legacy_subkey_count=$(auth_multisig_subkey_count "$legacy")
+  legacy_pubkey_json=$(auth_multisig_pubkey_json "$legacy")
+  legacy_threshold=$(jq -r '.threshold // empty' <<<"$legacy_pubkey_json")
+  legacy_subkey_count=$(jq -r '.public_keys | length' <<<"$legacy_pubkey_json")
+  legacy_sub_pub_keys_json=$(jq -c '[.public_keys[]?.key]' <<<"$legacy_pubkey_json")
   if [[ -z "$legacy_threshold" || ! "$legacy_threshold" =~ ^[0-9]+$ || "$legacy_threshold" == "0" ]]; then
     log_error "could not read legacy multisig threshold from chain for $(legacy_value "$legacy")"
     exit 2
@@ -235,6 +237,16 @@ G_USAGE
   log_info "  legacy: $(legacy_value "$legacy")"
   [[ -n "$new" ]] && log_info "  new:    $(new_value "$new")"
   "$BIN" "${args[@]}"
+  if [[ -f "$out" ]]; then
+    local proof_json proof_new_threshold proof_new_keys_json
+    proof_json=$(read_proof_file "$out")
+    proof_new_threshold=$(jq -r '.new.threshold' <<<"$proof_json")
+    proof_new_keys_json=$(jq -c '.new.sub_pub_keys' <<<"$proof_json")
+    log_signer_order_json_array "On-chain legacy signer order" "$legacy_threshold" "$legacy_sub_pub_keys_json"
+    log_signer_order_json_array "Destination signer order" "$proof_new_threshold" "$proof_new_keys_json"
+    log_info "Signing instruction: co-signers should sign the same signer index on both legacy and new sides"
+    log_info "For same-mnemonic migrations: recover each EVM sub-key from the matching legacy mnemonic, then build the destination multisig with --nosort in the legacy order above"
+  fi
   log_info "done — distribute $out to the K co-signers"
 }
 _mms_sign() {
@@ -348,6 +360,7 @@ S_USAGE
       exit 1
     fi
     from_idx=$(jq -r --arg pk "$from_pubkey" '.legacy.sub_pub_keys | index($pk) // empty' <<<"$pjson")
+    log_info "legacy signer index $from_idx: $(legacy_value "$from")"
   fi
   if [[ -n "$new_key" ]]; then
     local new_pubkey listed_new
@@ -358,7 +371,9 @@ S_USAGE
       exit 1
     fi
     new_idx=$(jq -r --arg pk "$new_pubkey" '.new.sub_pub_keys | index($pk) // empty' <<<"$pjson")
+    log_info "new signer index $new_idx: $(new_value "$new_key")"
   fi
+  log_info "Signing instruction: sign the same signer index on both legacy and new sides; combine only counts matching indices"
 
   # Multisig-to-multisig signer-index alignment pre-check. When a co-signer
   # passes BOTH --from and --new-key, the two keys must occupy the same signer
@@ -418,14 +433,17 @@ S_USAGE
 }
 _mms_combine() {
   local out="" binary="lumerad"
+  local node="${LUMERA_NODE:-tcp://localhost:26657}"
   local positional=()
   while (( $# > 0 )); do
     case "$1" in
       --out)     _require_value "$1" "$#" "${2-}"; out="$2"; shift 2 ;;
+      --node)    _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
       --binary)  _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
       -h|--help)
         cat >&2 <<'C_USAGE'
-Usage: migrate-multisig.sh combine <partial1.json> <partial2.json> [...] --out <tx.json> [--binary <path>]
+Usage: migrate-multisig.sh combine <partial1.json> <partial2.json> [...] --out <tx.json> \
+  [--node <url>] [--binary <path>]
 
 Purpose:
   The coordinator merges co-signer partial JSON files into a final tx.json
@@ -434,6 +452,12 @@ Purpose:
 Required:
   <partial*.json>       One or more partial files returned by co-signers.
   --out <tx.json>       Output transaction file.
+
+Optional:
+  --node <url>          RPC endpoint for gas simulation (default $LUMERA_NODE or
+                        tcp://localhost:26657). combine now simulates gas (--gas auto)
+                        and therefore requires connectivity to a node; the coordinator
+                        already needs a node for the subsequent submit step.
 
 Validation before combine:
   - all partials are valid multisig proof/partial files
@@ -467,6 +491,8 @@ C_USAGE
 
   # shellcheck disable=SC2034
   BIN="$binary"
+  # shellcheck disable=SC2034
+  NODE="$node"
 
   require_multisig_binary
   require_jq
@@ -483,7 +509,9 @@ C_USAGE
 
   # Pass through to lumerad combine-proof. If lumerad reports fewer valid
   # signatures than the threshold, map its exit to exit 4.
-  local args=(tx evmigration combine-proof "${positional[@]}" --out "$out")
+  local args=(tx evmigration combine-proof "${positional[@]}" --out "$out" \
+    --node "$node" --chain-id "$CHAIN_ID" \
+    --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT")
   local combine_out combine_rc=0
   combine_out=$("$BIN" "${args[@]}" 2>&1) || combine_rc=$?
   printf '%s\n' "$combine_out" >&2

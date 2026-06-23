@@ -19,11 +19,11 @@ Add Lumera as a custom network in MetaMask. MetaMask connects over **EVM JSON-RP
 | Lumera Mainnet           | `https://evm-rpc.lumera.io`       | `76857769`   | LUME     | —                                       |
 | Lumera Testnet           | `https://evm-rpc.testnet.lumera.io` | `76857769` | LUME     | `https://testnet.ping.pub/lumera/block` |
 | Lumera Devnet (public)   | `https://evm-rpc.pastel.network`  | `76857769`   | LUME     | —                                       |
-| Local devnet node        | `http://localhost:8545`           | `76857769`   | LUME     | —                                       |
+| Local devnet node        | `http://localhost:8645`           | `76857769`   | LUME     | —                                       |
 
 > Testnet LUME can be obtained from the faucet at `https://testnet.ping.pub/lumera`.
 
-**Local devnet ports**: use the public devnet endpoint `https://evm-rpc.pastel.network`, or — if you run the Docker devnet yourself — the per-validator local EVM JSON-RPC port: validator 1 = `8545`, validator 2 = `8555`, validator 3 = `8565`, validator 4 = `8575`, validator 5 = `8585`. See [openrpc-playground.md](openrpc-playground.md) for the full port mapping table.
+**Local devnet ports**: use the public devnet endpoint `https://evm-rpc.pastel.network`, or — if you run the Docker devnet yourself — the per-validator local EVM JSON-RPC host port (`8645 + i*100`, EVM-enabled versions only): validator 1 = `8645`, validator 2 = `8745`, validator 3 = `8845`, validator 4 = `8945`, validator 5 = `9045`. See [openrpc-playground.md](openrpc-playground.md) for the full port mapping table.
 
 > **WSL2 users**: when targeting a local node, `localhost` port forwarding to Windows works automatically on recent builds. If not, use the WSL IP address (`hostname -I | awk '{print $1}'`) as the RPC URL host.
 
@@ -196,7 +196,7 @@ Use the JSON-RPC endpoint to query transaction receipts:
 
 ```bash
 # Replace TX_HASH with the actual transaction hash from Remix
-curl -s -X POST http://localhost:8555 \
+curl -s -X POST http://localhost:8745 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["TX_HASH"],"id":1}' | jq '.'
 ```
@@ -207,7 +207,7 @@ The `CountChanged` event is emitted on every state change. Query logs for the co
 
 ```bash
 # Replace CONTRACT_ADDRESS with the deployed contract address
-curl -s -X POST http://localhost:8555 \
+curl -s -X POST http://localhost:8745 \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc":"2.0",
@@ -240,7 +240,7 @@ MetaMask may cache nonces. Go to **MetaMask > Settings > Advanced > Clear activi
 Check that the node is producing blocks:
 
 ```bash
-curl -s -X POST http://localhost:8555 \
+curl -s -X POST http://localhost:8745 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' | jq '.result'
 ```

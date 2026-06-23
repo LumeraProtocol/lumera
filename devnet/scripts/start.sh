@@ -10,7 +10,7 @@
 #   bootstrap        Runs setup scripts supernode-setup.sh & validator-setup.sh in the foreground.
 #                    Exits when setup_complete is created. Does NOT start lumerad.
 #
-#   run              Waits for setup_complete, starts lumerad, and tails logs.
+#   run              Waits for setup_complete, starts lumerad, verifies block production, and tails logs.
 #
 #   wait  (optional) Wait for setup_complete and exit.
 #
@@ -335,6 +335,16 @@ start_lumera() {
 	if [ -n "${EXTRA_START_FLAGS}" ]; then
 		echo "[BOOT] ${MONIKER}: Claims CSV found, loading claim records at genesis"
 	fi
+	# The EVM JSON-RPC metrics server is enabled by the --metrics start flag and
+	# only exists on EVM-enabled builds; pre-EVM lumerad does not know the flag.
+	if lumera_supports_evm; then
+		local enable_metrics
+		enable_metrics="$(jq -r '.["json-rpc"].enable_metrics // true' "${CFG_CHAIN}" 2>/dev/null || echo true)"
+		if [ "${enable_metrics}" = "true" ]; then
+			EXTRA_START_FLAGS="${EXTRA_START_FLAGS} --metrics"
+			echo "[BOOT] ${MONIKER}: EVM build detected, enabling JSON-RPC metrics (--metrics)"
+		fi
+	fi
 	echo "+ ${DAEMON} start --home ${DAEMON_HOME} ${EXTRA_START_FLAGS}"
 	# shellcheck disable=SC2086
 	"${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
@@ -415,11 +425,11 @@ bootstrap)
 run)
 	archive_existing_logs
 	wait_for_validator_setup
+	start_lumera
 	wait_for_n_blocks 3 || {
 		echo "[SN] Lumera chain not producing blocks in time; exiting."
 		exit 1
 	}
-	start_lumera
 	launch_test_accounts_setup
 	start_nm_ui_if_present
 	tail_logs

@@ -200,14 +200,27 @@ _mb_filter_targets() {
   printf '%s' "$out"
 }
 
+# Minimum spendable ulume required for the target to broadcast its own
+# self-send (publishes pubkey). Sized to cover the multisig self-send fee
+# (5000ulume) with headroom. Targets below this threshold MUST be funded by
+# --funder even if their TOTAL balance is large (the vesting-locked case).
+_MB_MIN_SELF_SEND_SPENDABLE_ULUME=10000
+
 # _mb_classify_target <legacy_addr>
 # Probes chain and prints one of:
 #   migrated       — migration-record exists
 #   ready          — auth pubkey present, no migration record
 #   needs-pubkey   — auth account exists (or has balance) but no pubkey
-#   needs-funding  — account not found on auth AND balance==0
+#                    AND has enough SPENDABLE balance to self-fund the
+#                    self-send fee
+#   needs-funding  — pubkey missing AND spendable balance is insufficient
+#                    for the self-send fee. This covers two cases:
+#                      a) account does not exist on auth and balance==0
+#                         (classic fresh foundation account)
+#                      b) account exists with non-zero TOTAL balance but
+#                         that balance is vesting-locked → spendable < fee
 #   unknown        — RPC failure (cannot even read bank balances)
-# Plus prints `balance=<ulume>` on second line.
+# Plus prints `balance=<ulume>` and `spendable=<ulume>` on subsequent lines.
 #
 # NOTE: the existing auth_pubkey_type helper hard-exits (exit 2) when the
 # account does not exist on auth, which is a LEGITIMATE state for fresh
@@ -215,9 +228,18 @@ _mb_filter_targets() {
 # ourselves and disambiguate "account not found" from "RPC down" by using
 # `bank balances` as the RPC-liveness probe (which succeeds with an empty
 # balances array for unknown addresses).
+#
+# WHY we look at SPENDABLE, not TOTAL: foundation multisigs on the mainnet
+# launch bundle are continuous-vesting accounts. Until their end_time they
+# carry a large TOTAL balance but spendable=0, so any tx they sign — even a
+# self-send to themselves — is rejected at the ante handler with
+# "insufficient funds" against the fee. A classifier that only looks at
+# TOTAL balance silently routes those targets onto the no-funder code path,
+# which then fails at broadcast. Looking at spendable lets the funder bail
+# them out instead.
 _mb_classify_target() {
   local addr="$1"
-  local rec_json balance_json balance auth_json pk_type_str
+  local rec_json balance_json balance spendable_json spendable auth_json pk_type_str
 
   # 1) already migrated?
   if rec_json=$(lumerad_q_capture evmigration migration-record "$addr" 2>/dev/null); then
@@ -232,9 +254,19 @@ _mb_classify_target() {
   if ! balance_json=$(lumerad_q_capture bank balances "$addr" 2>/dev/null); then
     printf 'unknown\n'
     printf 'balance=0\n'
+    printf 'spendable=0\n'
     return 0
   fi
   balance=$(jq -r '[.balances[]? | select(.denom == "ulume").amount | tonumber] | add // 0' <<<"$balance_json")
+
+  # 2b) spendable balance — same denom. For vesting-locked accounts this is
+  # strictly less than balance until end_time. We tolerate RPC failure here
+  # (treat as spendable=0 so we route to needs-funding, which is the safe
+  # default — the funder will top up).
+  spendable=0
+  if spendable_json=$(lumerad_q_capture bank spendable-balances "$addr" 2>/dev/null); then
+    spendable=$(jq -r '[.balances[]? | select(.denom == "ulume").amount | tonumber] | add // 0' <<<"$spendable_json")
+  fi
 
   # 3) auth account — may legitimately be absent for a fresh foundation
   # account. We treat that as "not on auth" (acct_known=0), NOT as RPC failure.
@@ -254,12 +286,16 @@ _mb_classify_target() {
       printf 'ready\n'
       ;;
     *)
-      # No pubkey on chain. Two sub-cases:
-      #   - account exists on auth but no pubkey (genesis / received-only) → needs-pubkey
-      #   - account does NOT exist on auth at all → needs-funding to create it,
-      #     unless someone has already sent to it (balance > 0), in which case
-      #     it's effectively needs-pubkey.
-      if (( acct_known == 1 )) || [[ "$balance" != "0" ]]; then
+      # No pubkey on chain. Decide between needs-pubkey (self-fund) and
+      # needs-funding (caller must provide --funder) based on whether the
+      # target can pay its own self-send fee from SPENDABLE balance.
+      #
+      # An account is self-fundable iff:
+      #   - auth knows it OR total balance > 0  (so it can plausibly broadcast)
+      #   - AND spendable >= _MB_MIN_SELF_SEND_SPENDABLE_ULUME
+      # Otherwise we hand it to the funder path.
+      if { (( acct_known == 1 )) || [[ "$balance" != "0" ]]; } \
+         && (( spendable >= _MB_MIN_SELF_SEND_SPENDABLE_ULUME )); then
         printf 'needs-pubkey\n'
       else
         printf 'needs-funding\n'
@@ -267,6 +303,7 @@ _mb_classify_target() {
       ;;
   esac
   printf 'balance=%s\n' "$balance"
+  printf 'spendable=%s\n' "$spendable"
 }
 
 ###############################################################################
@@ -379,8 +416,9 @@ Phase B — per-target chain-state probe. READ-ONLY. No signing, no broadcast.
 Per target, classifies into one of:
   migrated       — already migrated, will be skipped by `execute`
   ready          — pubkey on chain, ready to migrate
-  needs-pubkey   — has balance but no pubkey on chain (will self-send)
-  needs-funding  — zero balance, no pubkey (will need --funder during execute)
+  needs-pubkey   — has spendable balance but no pubkey on chain (will self-send)
+  needs-funding  — pubkey missing and spendable balance < self-send fee
+                   (zero-balance OR vesting-locked; will need --funder during execute)
   unknown        — RPC failure (re-check)
 
 Required:
@@ -699,10 +737,11 @@ _mb_execute_one() {
   # lines. For status=migrated the extra line is `new_address=...` (no balance).
   # For other statuses the extra line is `balance=...`. Parse by key so we
   # don't mis-label new_address as balance in the operator log + JSONL audit.
-  local cls cls_status balance new_addr_cls
+  local cls cls_status balance spendable new_addr_cls
   cls=$(_mb_classify_target "$addr")
   cls_status=$(awk 'NR==1' <<<"$cls")
   balance=$(awk -F= 'NR>1 && $1=="balance" {print $2}' <<<"$cls")
+  spendable=$(awk -F= 'NR>1 && $1=="spendable" {print $2}' <<<"$cls")
   new_addr_cls=$(awk -F= 'NR>1 && $1=="new_address" {print $2}' <<<"$cls")
 
   if [[ "$cls_status" == "migrated" ]]; then
@@ -712,8 +751,8 @@ _mb_execute_one() {
     _mb_log_event target_done target "$name" outcome skipped_already_migrated
     return 0
   fi
-  log_info "  on-chain status: $cls_status  (balance=${balance}ulume)"
-  _mb_log_event classify target "$name" status "$cls_status" balance "$balance"
+  log_info "  on-chain status: $cls_status  (balance=${balance}ulume spendable=${spendable:-0}ulume)"
+  _mb_log_event classify target "$name" status "$cls_status" balance "$balance" spendable "${spendable:-0}"
 
   if [[ "$cls_status" == "unknown" ]]; then
     log_error "  could not classify on-chain state; check RPC and re-run"

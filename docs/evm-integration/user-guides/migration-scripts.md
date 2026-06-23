@@ -14,6 +14,7 @@ Use the script that matches the account you are migrating:
 | Regular single-key account                      | `scripts/migrate-account.sh`   | Migrates a legacy coin-type 118 `secp256k1` account to a coin-type 60 `eth_secp256k1` account.                                |
 | Single-key validator operator                   | `scripts/migrate-validator.sh` | Migrates the validator operator account and re-keys validator-related state. The validator node must be stopped before broadcast. |
 | Multisig account or multisig validator operator | `scripts/migrate-multisig.sh`  | Runs a 4-step coordinator/co-signer ceremony:`generate`, `sign`, `combine`, `submit`.                                     |
+| **Many accounts** (single-key or multisig) you hold all mnemonics for | `scripts/migrate-batch.sh`     | Drives the migration of N accounts in one process: classifies each one off-chain state, sets up an ephemeral keyring, funds vesting-locked / zero-balance targets from an operator funder, self-sends to publish each multisig pubkey, and delegates the migration ceremony to the scripts above. See [scripts/migrate-batch.md](../../../scripts/migrate-batch.md) for the operator playbook. |
 
 Most users should do this first:
 

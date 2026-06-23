@@ -461,7 +461,7 @@ S_USAGE
 
   local count_migrated=0 count_ready=0 count_needs_pubkey=0 count_needs_funding=0 count_unknown=0
   log_info "=== Status (chain: $CHAIN_ID, node: $NODE) ==="
-  local row name addr kind status_lines status balance extra
+  local row name addr kind status_lines status balance spendable extra
   local n_rows
   n_rows=$(jq -r 'length' <<<"$targets")
   local i=0
@@ -473,13 +473,15 @@ S_USAGE
     status_lines=$(_mb_classify_target "$addr")
     status=$(awk 'NR==1' <<<"$status_lines")
     # Parse extras by key, not by line number — _mb_classify_target emits
-    # `balance=...` for non-migrated statuses and `new_address=...` when
-    # migrated. Positional parsing would mis-label one as the other.
+    # `balance=...` and `spendable=...` for non-migrated statuses and
+    # `new_address=...` when migrated. Positional parsing would mis-label.
     balance=$(awk -F= 'NR>1 && $1=="balance" {print $2}' <<<"$status_lines")
+    spendable=$(awk -F= 'NR>1 && $1=="spendable" {print $2}' <<<"$status_lines")
     extra=""
     if [[ "$status" == "migrated" ]]; then
       extra=" -> $(awk -F= 'NR>1 && $1=="new_address" {print $2}' <<<"$status_lines")"
       balance=""
+      spendable=""
     fi
     case "$status" in
       migrated)       count_migrated=$((count_migrated+1)) ;;
@@ -488,13 +490,18 @@ S_USAGE
       needs-funding)  count_needs_funding=$((count_needs_funding+1)) ;;
       *)              count_unknown=$((count_unknown+1)) ;;
     esac
-    printf '  %-12s [%-10s] %-30s %s%s%s\n' \
+    # Surface spendable alongside balance so operators understand why a
+    # vesting-locked account (balance>0, spendable=0) is needs-funding.
+    printf '  %-12s [%-10s] %-30s %s%s%s%s\n' \
       "$status" "$kind" "$name" "$addr" \
-      "${balance:+  balance=${balance}ulume}" "$extra"
+      "${balance:+  balance=${balance}ulume}" \
+      "${spendable:+  spendable=${spendable}ulume}" \
+      "$extra"
     i=$((i+1))
   done
   printf '\nSummary: migrated=%s ready=%s needs-pubkey=%s needs-funding=%s unknown=%s\n' \
     "$count_migrated" "$count_ready" "$count_needs_pubkey" "$count_needs_funding" "$count_unknown"
+  printf 'Note: needs-funding includes targets where spendable=0 even when balance>0 (vesting-locked).\n'
 }
 
 ###############################################################################

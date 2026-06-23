@@ -50,7 +50,7 @@ The consensus key, voting power at block height, and validator jailing/slashing 
    - `would_succeed: true` — the migration can proceed.
    - `is_validator: true` — the chain recognizes this address as a validator operator.
    - `validator_status: "BOND_STATUS_BONDED"` and `validator_jailed: false` — the validator is in the active set and not jailed. If either fails, see [Step 3a](#step-3a--recovering-from-a-jailed-or-non-bonded-validator) before proceeding.
-   - `val_delegation_count + val_unbonding_count + val_redelegation_count` at or below `max_validator_delegations` (default `2000`). If exceeded, governance must raise the limit or delegators must redelegate out before migration.
+   - `val_delegation_count + val_unbonding_count + val_redelegation_count` at or below `max_validator_delegations` (default `2500`). If exceeded, governance must raise the limit or delegators must redelegate out before migration.
    - `rejection_reason` empty. Common non-empty values: validator is jailed (recoverable via `unjail`), validator is voluntarily unbonded (recoverable by re-staking), migration is disabled by param, deadline has passed.
 
 3. **Prepare both keys.** You need the legacy `secp256k1` key (coin-type 118) and a new `eth_secp256k1` key (coin-type 60) derived from the **same mnemonic**. See step 2 below.
@@ -70,7 +70,7 @@ lumerad query evmigration params
   "params": {
     "enable_migration": true,
     "max_migrations_per_block": "50",
-    "max_validator_delegations": "2000"
+    "max_validator_delegations": "2500"
   }
 }
 ```

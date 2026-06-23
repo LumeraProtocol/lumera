@@ -538,6 +538,31 @@ The coordinator does not need signing keys. Co-signers sign locally.
 - The new multisig destination address must be fresh.
 - For multisig validators, stop the validator node before`submit`.
 
+> **⚠️ Critical: build the destination multisig with `--nosort`.** Cosmos SDK's `keys add --multisig` sorts sub-pubkeys by bytes by default. Because legacy `secp256k1` and new `eth_secp256k1` pubkey bytes sort differently, the default sort breaks the mirror-source invariant — co-signers will fail at `sign` with a "signer index mismatch" error and you'll have to rebuild the destination key and regenerate `proof.json`. Always pass `--nosort` and list members in the same order as the legacy multisig's on-chain `public_keys`. See [Step 0](#0-build-the-destination-evm-multisig) below.
+
+### 0. Build the destination EVM multisig
+
+Run this before `generate`. Each member who holds a legacy sub-key must already have created an `eth_secp256k1` sub-key in their local keyring; collect the N member key names (or base64 pubkeys) and assemble the composite **in the same order as the legacy multisig** and **with `--nosort`**:
+
+```bash
+# 1. Read legacy member order from chain (this is the canonical reference order).
+lumerad query auth account <legacy-multisig-address> -o json \
+  | jq -r '.account.value.pub_key.public_keys[].key'
+
+# 2. For each legacy member at index i, identify their eth_secp256k1 sub-key.
+#    Convention: name them <member>_evm to keep the mapping obvious.
+
+# 3. Build the destination multisig in matching order, WITH --nosort.
+lumerad keys add <new-multisig-key> \
+  --multisig=<member-1>_evm,<member-2>_evm,...,<member-N>_evm \
+  --multisig-threshold=<K> \
+  --nosort
+```
+
+`--nosort` preserves the order you list, so each member ends up at the same signer index on both sides — which is what the on-chain mirror-source rule requires and what `combine` will check.
+
+If you skip `--nosort` (or list members in a different order than the legacy multisig), `migrate-multisig.sh sign` will reject the partial with a clear "signer-index mismatch" error and the exact rebuild command — fix it, then re-run `generate`.
+
 ### 1. Coordinator: Generate
 
 ```bash

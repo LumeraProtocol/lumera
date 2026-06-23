@@ -71,12 +71,22 @@ record count.
   `migrate-account.sh` and `migrate-validator.sh` use `--gas auto` (with a
   record-count fallback), and `migrate-multisig.sh combine` simulates gas at
   combine time.
-- **Gas formula** (if submitting by hand):
-  `gas ≈ 200000 + 7000 × (delegations + unbondings + redelegations)`.
-- **Size limit.** This gas must stay under the chain's block `max_gas` (25M ⇒
-  roughly 3500 records). The `max_validator_delegations` parameter (default
-  2500) enforces this with margin; a validator above the cap cannot migrate in a
+- **Gas formula** (fallback if submitting by hand or if `--gas auto` simulate
+  fails):
+  `gas ≈ 6,000,000 + 1,500,000 × (delegations + unbondings + redelegations)`.
+  `--gas auto` computes the exact value and is the preferred path.
+- **Block gas is not a constraint.** Both devnet and mainnet run
+  `block.max_gas = -1` (unlimited); fees are waived → gas is not a blocker.
+  The `max_validator_delegations` parameter (default 2500) is a safety guard,
+  not a gas-fit requirement; a validator above the cap cannot migrate in a
   single tx.
+- **RPC timeout for large validators.** `--gas auto` runs the full handler in a
+  simulate call; for validators with thousands of records this can take tens of
+  seconds to ~2 minutes. CometBFT's default `timeout_broadcast_tx_commit = 10s`
+  may be exceeded, returning an `EOF` error. If this happens, raise
+  `timeout_broadcast_tx_commit` on your node (e.g. to `600s`) so `--gas auto`
+  can complete, **or** broadcast with a high fixed `--gas` (which skips the
+  simulate entirely).
 
 For step-by-step instructions see [§ Single-sig validator migration](#single-sig-validator-migration) (Method 2) and [§ Post-Migration for Validators](#5-post-migration-for-validators) (Method 3). For maintenance-window planning, consensus-key safety, and the multisig variant, see [validator-migration.md](validator-migration.md).
 

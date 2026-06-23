@@ -121,3 +121,56 @@ a single tx.
   migration (testnet or a freshly created small validator) during implementation.
 - The devnet's inflated 5149-record validator remains un-migratable by design
   (over cap, over block-gas, over RPC CheckTx capacity) — expected.
+
+---
+
+## Post-implementation correction (2026-06-23, live devnet)
+
+Live devnet measurements showed the original analytical assumptions were ~100–200x
+off. Three corrections:
+
+### 1. Gas formula recalibrated
+
+Measured `gas_used` on the devnet:
+
+- Account migration: ≈ **5.77M base** + **~1.33M/record**
+- Validator migration (val1, 5149 records): ≈ **688k/record** (~3.54B total gas)
+
+The original `GAS_BASE = 200000` and `GAS_PER_RECORD = 7000` were ~100–200× too
+low. The constants were recalibrated to:
+
+```
+MIGRATION_GAS_BASE       = 6,000,000
+MIGRATION_GAS_PER_RECORD = 1,500,000   # conservative: uses account marginal with margin
+```
+
+Reference formula: **`gas ≈ 6,000,000 + 1,500,000 × (delegations + unbondings + redelegations)`**.
+`--gas auto` remains the preferred path (computes exact gas via simulate); the
+formula is the fallback when auto-simulate fails.
+
+### 2. Block gas is not a constraint
+
+The original design stated the block gas limit was 25M (from
+`config/evm.go: ChainDefaultConsensusMaxGas = 25_000_000`). Live measurement
+confirms both devnet **and mainnet** (`rpc.lumera.io`, block ~5.65M) run
+`block.max_gas = -1` (unlimited). The 25M figure is a code-level default constant,
+not the actual consensus parameter on any live chain. Combined with waived migration
+fees, **gas is not a feasibility blocker**. The `max_validator_delegations` cap
+(default 2500) is a safety guard against unbounded execution time, not a
+gas-fit requirement.
+
+### 3. Real constraint: execution time and the RPC simulate timeout
+
+`--gas auto` runs the full migration handler during the simulate RPC call.
+For large validators this takes approximately as long as on-chain execution:
+val1's 5149-record migration caused a **~107-second chain-wide block-production
+stall** (normal block time ≈ 5.4s). CometBFT's default
+`timeout_broadcast_tx_commit = 10s` is far shorter, so the simulate exceeds the
+RPC write timeout and returns `Post "…:26657": EOF`.
+
+Extrapolating linearly to mainnet's largest validator (~1597 delegations):
+≈ **~1.1B gas** and **~30s** of block stall — a one-time spike, not a halt.
+
+**Operator guidance:** raise `timeout_broadcast_tx_commit` (e.g. to `600s`) on
+the node you broadcast through so `--gas auto` can complete, **or** broadcast with
+a high fixed `--gas` (skips the simulate, no timeout risk).

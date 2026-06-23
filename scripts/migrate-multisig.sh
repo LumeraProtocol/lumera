@@ -347,7 +347,7 @@ S_USAGE
       log_error "--from '$(legacy_value "$from")' pubkey is not among legacy.sub_pub_keys in $input"
       exit 1
     fi
-    from_idx=$(jq -r --arg pk "$from_pubkey" '.legacy.sub_pub_keys | to_entries[] | select(.value==$pk) | .key' <<<"$pjson")
+    from_idx=$(jq -r --arg pk "$from_pubkey" '.legacy.sub_pub_keys | index($pk) // empty' <<<"$pjson")
   fi
   if [[ -n "$new_key" ]]; then
     local new_pubkey listed_new
@@ -357,7 +357,7 @@ S_USAGE
       log_error "--new-key '$(new_value "$new_key")' pubkey is not among new.sub_pub_keys in $input"
       exit 1
     fi
-    new_idx=$(jq -r --arg pk "$new_pubkey" '.new.sub_pub_keys | to_entries[] | select(.value==$pk) | .key' <<<"$pjson")
+    new_idx=$(jq -r --arg pk "$new_pubkey" '.new.sub_pub_keys | index($pk) // empty' <<<"$pjson")
   fi
 
   # Multisig-to-multisig signer-index alignment pre-check. When a co-signer

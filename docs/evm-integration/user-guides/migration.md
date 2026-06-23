@@ -54,6 +54,34 @@ After migration:
 
 ---
 
+## Validator migration
+
+Migrating a validator's operator account (legacy coin-type 118 → EVM coin-type
+60) changes its valoper address, so the chain re-keys **every delegation,
+unbonding, and redelegation** pointing at the validator from the old valoper to
+the new one. The work — and therefore the gas — scales with the validator's
+record count.
+
+- **Stop the node first.** The migration requires the validator node to be
+  stopped before broadcasting (`--i-have-stopped-the-node`). The validator will
+  miss blocks during the migration and may be jailed; unjail it afterward
+  (`lumerad tx slashing unjail`).
+- **Fees are waived.** Migration txs pay no fee, so the gas value is only an
+  execution limit. The migration helper scripts size it automatically:
+  `migrate-account.sh` and `migrate-validator.sh` use `--gas auto` (with a
+  record-count fallback), and `migrate-multisig.sh combine` simulates gas at
+  combine time.
+- **Gas formula** (if submitting by hand):
+  `gas ≈ 200000 + 7000 × (delegations + unbondings + redelegations)`.
+- **Size limit.** This gas must stay under the chain's block `max_gas` (25M ⇒
+  roughly 3500 records). The `max_validator_delegations` parameter (default
+  2500) enforces this with margin; a validator above the cap cannot migrate in a
+  single tx.
+
+For step-by-step instructions see [§ Single-sig validator migration](#single-sig-validator-migration) (Method 2) and [§ Post-Migration for Validators](#5-post-migration-for-validators) (Method 3). For maintenance-window planning, consensus-key safety, and the multisig variant, see [validator-migration.md](validator-migration.md).
+
+---
+
 ## Method 1: Portal + Keplr (Recommended)
 
 This is the easiest method. The Lumera Portal provides a guided wizard that handles address derivation, signing, and broadcasting, plus an on-page status card that walks you through the post-migration follow-up.
@@ -528,7 +556,7 @@ The following chain parameters govern migration behavior. These are set by gover
 | `enable_migration`          | `true`            | Master on/off switch. When `false`, all migration messages are rejected.                                          |
 | `migration_end_time`        | `0` (no deadline) | Optional Unix timestamp deadline. If non-zero and current block time is past this, migration is rejected.           |
 | `max_migrations_per_block`  | `50`              | Rate limit for `MsgClaimLegacyAccount` per block. Prevents excessive gas consumption.                             |
-| `max_validator_delegations` | `2000`            | Safety cap for `MsgMigrateValidator`. Rejects if total delegation + unbonding + redelegation records exceed this. |
+| `max_validator_delegations` | `2500`            | Safety cap for `MsgMigrateValidator`. Rejects if total delegation + unbonding + redelegation records exceed this. |
 
 ---
 
@@ -583,7 +611,7 @@ Check the `migration_end_time` parameter. If it's `0`, there is no deadline (onl
 
 **Q: My validator has too many delegators and migration is rejected. What do I do?**
 
-The `max_validator_delegations` parameter (default 2000) limits how many records can be re-keyed in one transaction. If your validator exceeds this, governance may increase the limit, or delegators can redelegate before validator migration.
+The `max_validator_delegations` parameter (default 2500) limits how many records can be re-keyed in one transaction. If your validator exceeds this, governance may increase the limit, or delegators can redelegate before validator migration.
 
 ---
 

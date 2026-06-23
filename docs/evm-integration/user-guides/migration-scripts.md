@@ -59,6 +59,7 @@ Compared with raw `lumerad tx evmigration ...`, the scripts add:
 - **Broadcast validation**: the scripts reject CheckTx failures immediately.
 - **Post-migration verification**: after broadcast, the scripts verify the migration record and balances.
 - **Dry-run mode**: runs safety checks and preview without broadcasting.
+- **Automatic gas sizing**: broadcasts with `--gas auto` (record-count fallback); no manual `--gas` needed.
 
 ---
 
@@ -188,6 +189,12 @@ Example for slow networks:
 ```bash
 LUMERA_TX_WAIT_TIMEOUT=300 ./scripts/migrate-account.sh legacy new
 ```
+
+---
+
+## Gas
+
+The scripts no longer use the CLI default (200000) gas for the broadcast. `migrate-account.sh` and `migrate-validator.sh` broadcast with `--gas auto --gas-adjustment 1.5` — the chain simulates the exact gas, and since migration fees are waived this costs nothing. If the simulate fails (e.g. an RPC timeout on a validator with a very large delegation set), they fall back to a record-count formula, `200000 + 7000 × records`, and abort if that would exceed the chain's block `max_gas`. `migrate-multisig.sh combine` likewise simulates gas with `--gas auto` when it builds the unsigned tx, so the combine step needs connectivity to a node. Override the constants via `MIGRATION_GAS_BASE`, `MIGRATION_GAS_PER_RECORD`, `MIGRATION_GAS_ADJUSTMENT`.
 
 ---
 
@@ -618,6 +625,8 @@ Return the `partial-*.json` files to the coordinator.
   partial-alice.json partial-bob.json partial-carol.json \
   --out tx.json
 ```
+
+The combine step runs `combine-proof --gas auto` to simulate gas when building the unsigned tx, so it requires a reachable node (default `tcp://localhost:26657`, overridable with `--node`).
 
 The combine step verifies:
 

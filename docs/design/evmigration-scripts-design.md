@@ -49,7 +49,7 @@ source "${SCRIPT_DIR}/evmigration-common.sh"
 | `require_binary` | Verifies `$BIN` is runnable and the build supports `evmigration` subcommands |
 | `require_jq` | Aborts if `jq` is not on `$PATH` |
 | `lumerad_q <args...>` | Thin wrapper that runs `"$BIN" query "$@" --node "$NODE" --output json` |
-| `lumerad_tx <args...>` | Thin wrapper that runs `"$BIN" tx "$@" --node "$NODE" --chain-id "$CHAIN_ID" --keyring-backend "$KEYRING_BACKEND" --output json`, injecting `--keyring-dir` and `--home` when set |
+| `lumerad_tx <args...>` | Wrapper that runs `"$BIN" tx "$@" --node "$NODE" --chain-id "$CHAIN_ID" --keyring-backend "$KEYRING_BACKEND" --output json`, injecting `--keyring-dir` and `--home` when set. Auto-sizes gas: broadcasts with `--gas auto --gas-adjustment 1.5`, falling back to a record-count formula `200000 + 7000 × records` (clamped to block `max_gas`) when the simulate fails. Migration fees are waived, so the gas limit is free. See 4.7 |
 | `lumerad_keys <args...>` | Thin wrapper for `lumerad keys` with the same keyring flags |
 | `resolve_address <key-name>` | Returns bech32 via `lumerad keys show <k> -a` |
 | `assert_single_sig <estimate-json>` | Reads `is_multisig` from a captured `migration-estimate` response (see 4.4); errors with exit code 3 if true |
@@ -147,6 +147,16 @@ After `wait_for_tx` returns success, `verify_migration` runs three checks:
 3. `lumerad_q bank balances <new>` compared against the **pre-broadcast snapshot**: for every `{denom, amount}` in the snapshot, the new address's balance of that denom must be ≥ `amount`. The new balance can be strictly greater because staking rewards and validator commission are withdrawn during migration and flow into the new bank balance. Accounts with an empty snapshot (fully-staked, no liquid balance) pass trivially.
 
 Any failure exits 7 with a loud message instructing the user to query the tx hash and investigate manually. The tx was already on-chain at this point, so rollback is not possible.
+
+### 4.7 Gas sizing
+
+`migrate-account.sh` and `migrate-validator.sh` broadcast through `lumerad_tx`, which no longer uses the CLI default (200000) gas. It appends `--gas auto --gas-adjustment 1.5` so the chain simulates the exact gas for the migration tx; because the migration ante handler waives fees, the resulting gas limit is free regardless of size.
+
+If the simulate fails — for example an RPC timeout simulating a validator with a very large delegation set — `lumerad_tx` falls back to a record-count formula, `MIGRATION_GAS_BASE + MIGRATION_GAS_PER_RECORD × records` (defaults `200000 + 7000 × records`). The record count comes from the `MIGRATION_RECORD_COUNT` global, which the entry-point scripts set from the `migration-estimate` counts before broadcasting. The fallback limit is clamped to the chain's block `max_gas`; if it would exceed that, the script aborts rather than broadcast an over-limit tx.
+
+The constants are env-overridable: `MIGRATION_GAS_BASE`, `MIGRATION_GAS_PER_RECORD`, and `MIGRATION_GAS_ADJUSTMENT`.
+
+`migrate-multisig.sh combine` does **not** go through `lumerad_tx`; it sets gas separately by running `combine-proof --gas auto`, which simulates gas while building the unsigned tx. As a result the combine step requires connectivity to a reachable node (default `tcp://localhost:26657`, overridable with `--node`).
 
 ## 5. `migrate-account.sh`
 

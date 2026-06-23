@@ -729,7 +729,19 @@ lumerad tx evmigration generate-proof-payload \
 ```
 
 - `--new-sub-pub-keys` entries are either local keyring key names (eth_secp256k1) or base64-encoded 33-byte compressed eth pubkeys. Mix freely. `--new-threshold` is required with `--new-sub-pub-keys`.
-- **Member order is significant.** `generate-proof-payload` preserves the order you list `--new-sub-pub-keys` (it does not sort), and the signer index is the position in that list. Because the mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`, list the eth sub-keys in the **same member order as the legacy multisig's `public_keys`** (`lumerad query auth account <multisig-bech32>`), so each co-signer holds the same signer index on both sides. If you also pre-create the destination composite with `lumerad keys add --multisig`, pass `--nosort` so its derived address matches this order-preserving derivation.
+- **Member order is significant — pass `--nosort` when building the destination key.** `generate-proof-payload` preserves the order you list `--new-sub-pub-keys` (it does not sort), and the signer index is the position in that list. Because the mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`, list the eth sub-keys in the **same member order as the legacy multisig's `public_keys`** (`lumerad query auth account <multisig-bech32>`), so each co-signer holds the same signer index on both sides.
+
+  > **⚠️ When pre-creating the destination composite with `lumerad keys add --multisig`, you MUST pass `--nosort`.** The default behavior is to sort sub-pubkeys by bytes, and because legacy `secp256k1` and new `eth_secp256k1` pubkey bytes sort differently, the default sort produces a destination whose member order does not mirror the legacy side. Co-signers will then fail at `sign-proof` with a "signer index mismatch" error and you'll have to rebuild the destination key and regenerate `proof.json`. Always:
+  >
+  > ```bash
+  > lumerad keys add <new-multisig-key> \
+  >   --multisig=<eth-sub-1>,<eth-sub-2>,...,<eth-sub-N> \
+  >   --multisig-threshold=<K> \
+  >   --nosort
+  > ```
+  >
+  > where the `<eth-sub-i>` order matches the legacy multisig's on-chain `public_keys` order.
+
 - For same-mnemonic migrations, signer index 0's legacy mnemonic should be used to recover signer index 0's EVM sub-key, signer index 1's legacy mnemonic should be used for signer index 1's EVM sub-key, and so on. Reordering the same EVM sub-keys produces a different destination multisig address.
 - `--new <bech32>` is optional; the CLI derives the new multisig address from the sub-keys/threshold and cross-checks `--new` if supplied.
 - `--kind claim` targets `MsgClaimLegacyAccount`; `--kind validator` targets `MsgMigrateValidator`.

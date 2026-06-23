@@ -328,6 +328,29 @@ log_lumerad_err() {
   done <"$_LUMERAD_ERR_FILE"
 }
 
+# Gas sizing for migration txs. Migration fees are waived, so the gas value is an
+# execution limit only; size it to the work (delegation/unbonding/redelegation
+# re-keys) rather than the 200000 CLI default. Env-overridable.
+MIGRATION_GAS_BASE="${MIGRATION_GAS_BASE:-200000}"
+MIGRATION_GAS_PER_RECORD="${MIGRATION_GAS_PER_RECORD:-7000}"
+MIGRATION_GAS_ADJUSTMENT="${MIGRATION_GAS_ADJUSTMENT:-1.5}"
+
+# migration_gas_for_records <records> — fallback fixed gas when --gas auto fails.
+migration_gas_for_records() {
+  local records="${1:-0}"
+  [[ "$records" =~ ^[0-9]+$ ]] || records=0
+  echo $(( MIGRATION_GAS_BASE + MIGRATION_GAS_PER_RECORD * records ))
+}
+
+# gas_exceeds_block_limit <gas> <block_max_gas> — true (0) only when block_max_gas
+# is a positive integer and gas strictly exceeds it. Unlimited (-1), empty, or
+# non-numeric limits are treated as "no limit" (returns 1).
+gas_exceeds_block_limit() {
+  local gas="${1:-0}" limit="${2:-}"
+  [[ "$limit" =~ ^[0-9]+$ ]] || return 1
+  (( gas > limit ))
+}
+
 lumerad_tx() {
   if [[ -z "${CHAIN_ID:-}" ]]; then
     log_error "chain ID is required for tx commands; pass --chain-id or set \$LUMERA_CHAIN_ID / \$CHAIN_ID"

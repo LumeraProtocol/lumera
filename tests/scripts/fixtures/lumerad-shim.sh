@@ -10,6 +10,9 @@
 # Per-command overrides let a single test change just one endpoint:
 #   SHIM_ESTIMATE_FIXTURE, SHIM_RECORD_FIXTURE, SHIM_PARAMS_FIXTURE,
 #   SHIM_AUTH_FIXTURE, SHIM_AUTH_NEW_FIXTURE, SHIM_BANK_FIXTURE, SHIM_TX_FIXTURE
+#   SHIM_TX_PENDING_QUERIES=<n>
+#                              — for query tx, return empty output until the
+#                                nth query, then emit SHIM_TX_FIXTURE.
 #
 # State-machine support (for verify_migration end-to-end tests):
 #   SHIM_STATE_FILE=<path>           — when set, tx evmigration touches this file,
@@ -51,6 +54,10 @@ pending_file() {
 
 record_query_count_file() {
   printf '%s.record_queries\n' "${SHIM_STATE_FILE:-}"
+}
+
+tx_query_count_file() {
+  printf '%s.tx_queries\n' "${SHIM_STATE_FILE:-/tmp/lumerad-shim}"
 }
 
 emit() {
@@ -142,7 +149,19 @@ case "$*" in
       emit "${SHIM_BANK_FIXTURE:-bank-balances}"
     fi
     ;;
-  "query tx "*)                                           emit "${SHIM_TX_FIXTURE:-tx-success}" ;;
+  "query tx "*)
+    if [[ -n "${SHIM_TX_PENDING_QUERIES:-}" ]]; then
+      count_file="$(tx_query_count_file)"
+      count=0
+      [[ -f "$count_file" ]] && count=$(<"$count_file")
+      count=$((count + 1))
+      printf '%s\n' "$count" > "$count_file"
+      if (( count < SHIM_TX_PENDING_QUERIES )); then
+        exit 0
+      fi
+    fi
+    emit "${SHIM_TX_FIXTURE:-tx-success}"
+    ;;
   "keys show "*)
     # Route on the key name (second word after "show") and presence of --output json.
     # If --output json: emit a keys-show-<name>.json fixture; fall back to a generic one.

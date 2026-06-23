@@ -312,6 +312,25 @@ setup_shim() {
   [ "$status" -eq 0 ]
 }
 
+@test "wait_for_tx polls query tx when wait-tx returns before the tx is indexed" {
+  setup_shim
+  local state_dir state_file
+  state_dir=$(mktemp -d)
+  state_file="$state_dir/shim-state"
+
+  run env SHIM_STATE_FILE="$state_file" SHIM_TX_PENDING_QUERIES=3 bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    LUMERA_TX_WAIT_TIMEOUT=3
+    wait_for_tx DEADBEEF
+  '
+  rm -rf "$state_dir"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"polling query tx"* ]]
+  [[ "$output" == *"tx included at height 100"* ]]
+}
+
 @test "assert_broadcast_accepted accepts concatenated successful broadcast JSON" {
   run bash -c '
     source '"$SCRIPTS_DIR"'/evmigration-common.sh

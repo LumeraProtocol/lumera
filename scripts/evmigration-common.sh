@@ -718,12 +718,33 @@ snapshot_bank_balances() {
   lumerad_q bank balances "$addr"
 }
 
+_handle_tx_query_json() {
+  local hash="$1" json="$2" started="$3"
+  local code height raw_log
+
+  code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null || true)
+  if [[ "$code" == "0" ]]; then
+    height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null || printf '<unknown>')
+    log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+    return 0
+  fi
+  if [[ -n "$code" ]]; then
+    raw_log=$(jq -r '.raw_log // "<no raw_log>"' <<<"$json" 2>/dev/null || printf '<no raw_log>')
+    log_error "tx $hash failed with code $code: $raw_log"
+    return 1
+  fi
+  return 2
+}
+
 # wait_for_tx <hash>
-# Waits for the tx to commit using two paths in order:
+# Waits for the tx to commit using three paths in order:
 #   1. Fast path — `query tx <hash>`. Catches the case where the tx was
 #      already committed by the time we got here.
 #   2. Slow path — `query wait-tx <hash> --timeout`. Subscribes to the
 #      CometBFT WebSocket and waits for the commit event.
+#   3. Fallback path — repeated `query tx <hash>` until the timeout expires.
+#      This covers RPC/WebSocket paths where wait-tx returns immediately even
+#      though the tx later commits and becomes queryable.
 #
 # Important: the slow-path call goes DIRECTLY to $BIN, NOT through lumerad_q.
 # Cosmos SDK's wait-tx accepts --keyring-backend without warning but then
@@ -742,7 +763,7 @@ snapshot_bank_balances() {
 wait_for_tx() {
   local hash="$1"
   local timeout="${LUMERA_TX_WAIT_TIMEOUT:-90}"
-  local json code height
+  local json rc elapsed remaining next_progress
   local started=$SECONDS
 
   # Fast path: tx may already be committed.
@@ -750,33 +771,56 @@ wait_for_tx() {
   # stderr). So a "found" check is "stdout is non-empty AND parseable JSON",
   # not just "exit 0". Empty json → both nested ifs are false → fall through.
   if json=$(lumerad_q tx "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
-    code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null)
-    if [[ "$code" == "0" ]]; then
-      height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null)
-      log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+    if _handle_tx_query_json "$hash" "$json" "$started"; then
       return 0
-    fi
-    if [[ -n "$code" ]]; then
-      log_error "tx $hash failed with code $code: $(jq -r '.raw_log // "<no raw_log>"' <<<"$json")"
-      return 1
+    else
+      rc=$?
+      if (( rc == 1 )); then
+        return 1
+      fi
     fi
   fi
 
   # Slow path: subscribe and wait. Bypass lumerad_q so we don't pass
   # --keyring-backend, which silently breaks wait-tx (see header comment).
   if json=$("$BIN" query wait-tx "$hash" --node "$NODE" --output json --timeout "${timeout}s" 2>/dev/null) && [[ -n "$json" ]]; then
-    code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null)
-    if [[ "$code" == "0" ]]; then
-      height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null)
-      log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+    if _handle_tx_query_json "$hash" "$json" "$started"; then
       return 0
-    fi
-    if [[ -n "$code" ]]; then
-      log_error "tx $hash failed with code $code: $(jq -r '.raw_log // "<no raw_log>"' <<<"$json")"
-      return 1
+    else
+      rc=$?
+      if (( rc == 1 )); then
+        return 1
+      fi
     fi
   fi
-  local elapsed=$(( SECONDS - started ))
+
+  elapsed=$(( SECONDS - started ))
+  remaining=$(( timeout - elapsed ))
+  if (( remaining > 0 )); then
+    log_info "tx $hash not indexed yet; polling query tx for up to ${remaining}s"
+    next_progress=10
+    while (( SECONDS - started < timeout )); do
+      sleep 1
+      if json=$(lumerad_q tx "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
+        if _handle_tx_query_json "$hash" "$json" "$started"; then
+          return 0
+        else
+          rc=$?
+          if (( rc == 1 )); then
+            return 1
+          fi
+        fi
+      fi
+
+      elapsed=$(( SECONDS - started ))
+      if (( elapsed >= next_progress && elapsed < timeout )); then
+        log_info "still waiting for tx $hash to be indexed (${elapsed}s elapsed, timeout ${timeout}s)"
+        next_progress=$(( next_progress + 10 ))
+      fi
+    done
+  fi
+
+  elapsed=$(( SECONDS - started ))
 
   log_warn "tx $hash not indexed after ${elapsed}s (timeout was ${timeout}s); it may still land on chain"
   log_warn "  check status manually: $BIN q tx $hash"
@@ -1266,6 +1310,35 @@ key_multisig_sub_pub_keys_csv() {
     exit 1
   fi
   printf '%s\n' "$keys_csv"
+}
+
+log_signer_order_json_array() {
+  local title="$1" threshold="$2" keys_json="$3"
+  local count
+  count=$(jq -r 'length' <<<"$keys_json" 2>/dev/null || printf '0')
+  log_info "$title (${threshold}-of-${count})"
+  log_info "  signer index is part of the multisig address; keep this order unchanged"
+  local i key
+  for (( i=0; i<count; i++ )); do
+    key=$(jq -r ".[$i]" <<<"$keys_json")
+    log_info "  index $i: $key"
+  done
+}
+
+log_signer_order_csv() {
+  local title="$1" threshold="$2" keys_csv="$3"
+  local old_ifs="$IFS"
+  IFS=','
+  read -r -a _evmig_order_keys <<<"$keys_csv"
+  IFS="$old_ifs"
+  local keys_json
+  keys_json=$(printf '%s\n' "${_evmig_order_keys[@]}" | jq -R . | jq -cs .)
+  log_signer_order_json_array "$title" "$threshold" "$keys_json"
+}
+
+pubkey_index_in_json_array() {
+  local key="$1" keys_json="$2"
+  jq -r --arg key "$key" 'index($key) // empty' <<<"$keys_json"
 }
 
 # key_pubkey_b64 <key-name>

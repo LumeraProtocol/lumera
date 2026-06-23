@@ -320,6 +320,9 @@ setup() {
     --out "$tmp/proof.json"
   [ "$status" -eq 0 ]
   [[ "$output" == *"using destination EVM multisig key new-msig"* ]]
+  [[ "$output" == *"Destination signer order"* ]]
+  [[ "$output" == *"index 0"* ]]
+  [[ "$output" == *"B1111111111111111111111111111111111111111111"* ]]
   [ -f "$tmp/proof.json" ]
   rm -rf "$tmp"
 }
@@ -491,6 +494,8 @@ setup() {
       --out "$tmp/alice-partial.json"
   [ "$status" -eq 0 ]
   [ -f "$tmp/alice-partial.json" ]
+  [[ "$output" == *"legacy signer index 0"* ]]
+  [[ "$output" == *"sign the same signer index on both legacy and new sides"* ]]
   rm -rf "$tmp"
 }
 

@@ -203,6 +203,23 @@ Stopping before broadcast avoids double-signing risk and prevents the node from 
 
 > **Downtime warning:** mainnet genesis sets `downtime_jail_duration` to `3600s` (1 hour). Do not let the stop-to-restart migration window exceed this time; if the window approaches 1 hour, restart and catch up before retrying the migration.
 
+## Step 4a — Raise the RPC timeout on your broadcast node (required)
+
+`migrate-validator` sizes gas with `--gas auto`, which runs the **full re-keying handler inside a simulate call** before broadcasting. For a validator with thousands of delegations / unbondings / redelegations that simulate takes tens of seconds to ~2 minutes — past CometBFT's default `timeout_broadcast_tx_commit = 10s`, which aborts the call with an `EOF` error and the migration never lands.
+
+Your own validator node is stopped (Step 4) and you broadcast through a **trusted external RPC** (Step 5), so raise the timeout on **that** node — a full node you control, *not* the stopped validator. Edit its `~/.lumera/config/config.toml`:
+
+```toml
+[rpc]
+timeout_broadcast_tx_commit = "600s"   # default "10s"; set ≥ your expected simulate time
+```
+
+Then **restart that node** so the change takes effect (CometBFT reads this only at startup).
+
+> **No reconfigurable RPC?** If you must broadcast through an endpoint you cannot change (e.g. a public provider), skip the simulate instead: pass a high fixed `--gas` computed from the gas formula (`6,000,000 + 1,500,000 × records`) rather than `--gas auto`.
+
+Revert this to `"10s"` and restart once the migration is done — see [Step 7](#step-7--restart-the-validator-immediately).
+
 ## Step 5 — Broadcast the validator migration
 
 Route the transaction through a trusted external RPC since your own node is down:
@@ -313,6 +330,8 @@ systemctl start lumerad   # or however you supervise the node — see "Note on s
 ```
 
 > **Warning:** restart promptly after migration. Extended downtime leads to missed blocks and eventual jailing. Use a trusted external RPC for the migration broadcast so you're not blocked on your own node being up.
+
+**Revert the RPC timeout.** If you raised `timeout_broadcast_tx_commit` on your broadcast node in [Step 4a](#step-4a--raise-the-rpc-timeout-on-your-broadcast-node-required), set it back to the default `"10s"` in that node's `config.toml` `[rpc]` section and restart it. The elevated value is only needed for the one-time migration simulate.
 
 Verify the validator is signing blocks:
 

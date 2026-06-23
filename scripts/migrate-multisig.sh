@@ -157,7 +157,7 @@ G_USAGE
   # Check on-chain pubkey BEFORE estimate so a nil-pubkey multisig gets
   # the exit-8 "seed the pubkey first" remediation, not a confusing
   # downstream error.
-  local pk_type
+  local pk_type legacy_pubkey_json legacy_sub_pub_keys_json
   pk_type=$(auth_pubkey_type "$legacy")
   case "$pk_type" in
     none)
@@ -171,8 +171,10 @@ G_USAGE
     *) log_error "unexpected pubkey type for $(legacy_value "$legacy"): $pk_type"; exit 2 ;;
   esac
   local legacy_threshold legacy_subkey_count
-  legacy_threshold=$(auth_multisig_threshold "$legacy")
-  legacy_subkey_count=$(auth_multisig_subkey_count "$legacy")
+  legacy_pubkey_json=$(auth_multisig_pubkey_json "$legacy")
+  legacy_threshold=$(jq -r '.threshold // empty' <<<"$legacy_pubkey_json")
+  legacy_subkey_count=$(jq -r '.public_keys | length' <<<"$legacy_pubkey_json")
+  legacy_sub_pub_keys_json=$(jq -c '[.public_keys[]?.key]' <<<"$legacy_pubkey_json")
   if [[ -z "$legacy_threshold" || ! "$legacy_threshold" =~ ^[0-9]+$ || "$legacy_threshold" == "0" ]]; then
     log_error "could not read legacy multisig threshold from chain for $(legacy_value "$legacy")"
     exit 2
@@ -235,6 +237,16 @@ G_USAGE
   log_info "  legacy: $(legacy_value "$legacy")"
   [[ -n "$new" ]] && log_info "  new:    $(new_value "$new")"
   "$BIN" "${args[@]}"
+  if [[ -f "$out" ]]; then
+    local proof_json proof_new_threshold proof_new_keys_json
+    proof_json=$(read_proof_file "$out")
+    proof_new_threshold=$(jq -r '.new.threshold' <<<"$proof_json")
+    proof_new_keys_json=$(jq -c '.new.sub_pub_keys' <<<"$proof_json")
+    log_signer_order_json_array "On-chain legacy signer order" "$legacy_threshold" "$legacy_sub_pub_keys_json"
+    log_signer_order_json_array "Destination signer order" "$proof_new_threshold" "$proof_new_keys_json"
+    log_info "Signing instruction: co-signers should sign the same signer index on both legacy and new sides"
+    log_info "For same-mnemonic migrations: recover each EVM sub-key from the matching legacy mnemonic, then build the destination multisig with --nosort in the legacy order above"
+  fi
   log_info "done — distribute $out to the K co-signers"
 }
 _mms_sign() {
@@ -338,6 +350,10 @@ S_USAGE
   local pjson
   pjson=$(read_proof_file "$input")
 
+  local legacy_keys_json new_keys_json from_index="" new_index=""
+  legacy_keys_json=$(jq -c '.legacy.sub_pub_keys' <<<"$pjson")
+  new_keys_json=$(jq -c '.new.sub_pub_keys' <<<"$pjson")
+
   if [[ -n "$from" ]]; then
     local from_pubkey listed
     from_pubkey=$(key_pubkey_b64 "$from")
@@ -346,6 +362,8 @@ S_USAGE
       log_error "--from '$(legacy_value "$from")' pubkey is not among legacy.sub_pub_keys in $input"
       exit 1
     fi
+    from_index=$(pubkey_index_in_json_array "$from_pubkey" "$legacy_keys_json")
+    log_info "legacy signer index $from_index: $(legacy_value "$from")"
   fi
   if [[ -n "$new_key" ]]; then
     local new_pubkey listed_new
@@ -355,6 +373,13 @@ S_USAGE
       log_error "--new-key '$(new_value "$new_key")' pubkey is not among new.sub_pub_keys in $input"
       exit 1
     fi
+    new_index=$(pubkey_index_in_json_array "$new_pubkey" "$new_keys_json")
+    log_info "new signer index $new_index: $(new_value "$new_key")"
+  fi
+  log_info "Signing instruction: sign the same signer index on both legacy and new sides; combine only counts matching indices"
+  if [[ -n "$from_index" && -n "$new_index" && "$from_index" != "$new_index" ]]; then
+    log_warn "legacy signer index $from_index differs from new signer index $new_index"
+    log_warn "  this is expected only if you intentionally mapped signer identities across different key orders"
   fi
 
   # Pass through to lumerad tx evmigration sign-proof. At least one of

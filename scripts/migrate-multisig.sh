@@ -338,6 +338,7 @@ S_USAGE
   local pjson
   pjson=$(read_proof_file "$input")
 
+  local from_idx="" new_idx=""
   if [[ -n "$from" ]]; then
     local from_pubkey listed
     from_pubkey=$(key_pubkey_b64 "$from")
@@ -346,6 +347,7 @@ S_USAGE
       log_error "--from '$(legacy_value "$from")' pubkey is not among legacy.sub_pub_keys in $input"
       exit 1
     fi
+    from_idx=$(jq -r --arg pk "$from_pubkey" '.legacy.sub_pub_keys | to_entries[] | select(.value==$pk) | .key' <<<"$pjson")
   fi
   if [[ -n "$new_key" ]]; then
     local new_pubkey listed_new
@@ -355,6 +357,45 @@ S_USAGE
       log_error "--new-key '$(new_value "$new_key")' pubkey is not among new.sub_pub_keys in $input"
       exit 1
     fi
+    new_idx=$(jq -r --arg pk "$new_pubkey" '.new.sub_pub_keys | to_entries[] | select(.value==$pk) | .key' <<<"$pjson")
+  fi
+
+  # Multisig-to-multisig signer-index alignment pre-check. When a co-signer
+  # passes BOTH --from and --new-key, the two keys must occupy the same signer
+  # position in their respective multisigs (mirror-source rule). The on-chain
+  # consensus check enforces this, and `lumerad sign-proof` rejects mismatches
+  # with a terse error. We catch it earlier with an actionable remediation so
+  # the operator doesn't have to round-trip through cryptic CLI output.
+  #
+  # Root cause when this fires: the destination EVM multisig was built without
+  # --nosort, so cosmos-sdk sorted its eth_secp256k1 sub-pubkeys by bytes —
+  # and that byte-order differs from the legacy secp256k1 byte-order. Result:
+  # member N's legacy key and EVM key land at different indices.
+  if [[ -n "$from_idx" && -n "$new_idx" && "$from_idx" != "$new_idx" ]]; then
+    local legacy_threshold
+    legacy_threshold=$(jq -r '.legacy.threshold // .new.threshold // "K"' <<<"$pjson")
+    log_error "signer-index mismatch: legacy key '$(legacy_value "$from")' is at index $from_idx,"
+    log_error "  but new key '$(new_value "$new_key")' is at index $new_idx in $input"
+    log_error ""
+    log_error "Multisig migration requires the same signer position on both sides."
+    log_error "The destination EVM multisig was almost certainly built WITHOUT --nosort,"
+    log_error "so its sub-pub-keys were re-sorted by bytes and no longer mirror the legacy"
+    log_error "member order."
+    log_error ""
+    log_error "Remediation — rebuild the destination multisig in legacy member order:"
+    log_error "  1. Get legacy member order from chain:"
+    log_error "     lumerad query auth account <legacy-multisig-address> -o json \\"
+    log_error "       | jq -r '.account.value.pub_key.public_keys[].key'"
+    log_error "  2. Identify each member's eth_secp256k1 sub-key (in the SAME order)."
+    log_error "  3. Recreate the destination key WITH --nosort:"
+    log_error "       lumerad keys delete <new-multisig-key> -y    # if it already exists"
+    log_error "       lumerad keys add <new-multisig-key> \\"
+    log_error "         --multisig=<eth-sub-1>,<eth-sub-2>,...,<eth-sub-N> \\"
+    log_error "         --multisig-threshold=${legacy_threshold} \\"
+    log_error "         --nosort"
+    log_error "  4. Re-run 'migrate-multisig.sh generate' with the rebuilt key, then redistribute"
+    log_error "     the fresh proof.json to co-signers."
+    exit 11
   fi
 
   # Pass through to lumerad tx evmigration sign-proof. At least one of

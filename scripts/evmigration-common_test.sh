@@ -13,9 +13,10 @@ check() { # check <label> <got> <want>
   if [[ "$2" == "$3" ]]; then echo "ok: $1"; else echo "FAIL: $1 — got '$2' want '$3'"; fail=1; fi
 }
 
-check "base+per-record 0"    "$(migration_gas_for_records 0)"    "200000"
-check "base+per-record 1597" "$(migration_gas_for_records 1597)" "11379000"
-check "base+per-record 2500" "$(migration_gas_for_records 2500)" "17700000"
+# Constants calibrated from live devnet migrations (2026-06-23): base 6M, 1.5M/record.
+check "base+per-record 0"    "$(migration_gas_for_records 0)"    "6000000"
+check "base+per-record 1597" "$(migration_gas_for_records 1597)" "2401500000"
+check "base+per-record 2500" "$(migration_gas_for_records 2500)" "3756000000"
 
 # gas_exceeds_block_limit: returns 0 (true) only when over a positive limit.
 gas_exceeds_block_limit 30000000 25000000; check "30M>25M true" "$?" "0"

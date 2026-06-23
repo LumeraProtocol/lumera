@@ -328,11 +328,18 @@ log_lumerad_err() {
   done <"$_LUMERAD_ERR_FILE"
 }
 
-# Gas sizing for migration txs. Migration fees are waived, so the gas value is an
-# execution limit only; size it to the work (delegation/unbonding/redelegation
-# re-keys) rather than the 200000 CLI default. Env-overridable.
-MIGRATION_GAS_BASE="${MIGRATION_GAS_BASE:-200000}"
-MIGRATION_GAS_PER_RECORD="${MIGRATION_GAS_PER_RECORD:-7000}"
+# Gas sizing for migration txs. Migration fees are waived AND the chain runs
+# block.max_gas=-1 (unlimited) on devnet and mainnet, so the gas value is an
+# execution limit only and over-estimating is free — size it to the work
+# (delegation/unbonding/redelegation re-keys), not the 200000 CLI default.
+# `--gas auto` (in lumerad_tx) is the accurate path; these constants only feed
+# the fallback used when the auto-simulate fails (e.g. RPC timeout on a large
+# validator). They are deliberately conservative (over-estimate) so the fallback
+# never under-runs: calibrated from live devnet migrations (2026-06-23) where the
+# observed cost was ~6M base + ~688k/record (validator) / ~1.33M/record (account);
+# we use the higher account marginal with margin. Env-overridable.
+MIGRATION_GAS_BASE="${MIGRATION_GAS_BASE:-6000000}"
+MIGRATION_GAS_PER_RECORD="${MIGRATION_GAS_PER_RECORD:-1500000}"
 MIGRATION_GAS_ADJUSTMENT="${MIGRATION_GAS_ADJUSTMENT:-1.5}"
 
 # migration_gas_for_records <records> — fallback fixed gas when --gas auto fails.

@@ -10,7 +10,7 @@
 #   bootstrap        Runs setup scripts supernode-setup.sh & validator-setup.sh in the foreground.
 #                    Exits when setup_complete is created. Does NOT start lumerad.
 #
-#   run              Waits for setup_complete, starts lumerad, and tails logs.
+#   run              Waits for setup_complete, starts lumerad, verifies block production, and tails logs.
 #
 #   wait  (optional) Wait for setup_complete and exit.
 #
@@ -425,11 +425,11 @@ bootstrap)
 run)
 	archive_existing_logs
 	wait_for_validator_setup
+	start_lumera
 	wait_for_n_blocks 3 || {
 		echo "[SN] Lumera chain not producing blocks in time; exiting."
 		exit 1
 	}
-	start_lumera
 	launch_test_accounts_setup
 	start_nm_ui_if_present
 	tail_logs

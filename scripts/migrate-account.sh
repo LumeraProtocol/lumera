@@ -76,6 +76,7 @@ main() {
 
   assert_estimate_succeeds "$estimate"
 
+  # shellcheck disable=SC2034
   MIGRATION_RECORD_COUNT="$(jq -r '
       ((.delegation_count   // 0) | tonumber)
     + ((.unbonding_count    // 0) | tonumber)

@@ -101,6 +101,9 @@ main() {
     log_warn "validator record count ($total) is within 10% of cap ($cap)"
   fi
 
+  # Record count drives the gas fallback (see lumerad_tx).
+  MIGRATION_RECORD_COUNT="$total"
+
   assert_estimate_succeeds "$estimate"
 
   local snap

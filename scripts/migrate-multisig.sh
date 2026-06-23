@@ -377,14 +377,17 @@ S_USAGE
 }
 _mms_combine() {
   local out="" binary="lumerad"
+  local node="${LUMERA_NODE:-tcp://localhost:26657}"
   local positional=()
   while (( $# > 0 )); do
     case "$1" in
       --out)     _require_value "$1" "$#" "${2-}"; out="$2"; shift 2 ;;
+      --node)    _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
       --binary)  _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
       -h|--help)
         cat >&2 <<'C_USAGE'
-Usage: migrate-multisig.sh combine <partial1.json> <partial2.json> [...] --out <tx.json> [--binary <path>]
+Usage: migrate-multisig.sh combine <partial1.json> <partial2.json> [...] --out <tx.json> \
+  [--node <url>] [--binary <path>]
 
 Purpose:
   The coordinator merges co-signer partial JSON files into a final tx.json
@@ -393,6 +396,12 @@ Purpose:
 Required:
   <partial*.json>       One or more partial files returned by co-signers.
   --out <tx.json>       Output transaction file.
+
+Optional:
+  --node <url>          RPC endpoint for gas simulation (default $LUMERA_NODE or
+                        tcp://localhost:26657). combine now simulates gas (--gas auto)
+                        and therefore requires connectivity to a node; the coordinator
+                        already needs a node for the subsequent submit step.
 
 Validation before combine:
   - all partials are valid multisig proof/partial files
@@ -426,6 +435,8 @@ C_USAGE
 
   # shellcheck disable=SC2034
   BIN="$binary"
+  # shellcheck disable=SC2034
+  NODE="$node"
 
   require_multisig_binary
   require_jq
@@ -442,7 +453,9 @@ C_USAGE
 
   # Pass through to lumerad combine-proof. If lumerad reports fewer valid
   # signatures than the threshold, map its exit to exit 4.
-  local args=(tx evmigration combine-proof "${positional[@]}" --out "$out")
+  local args=(tx evmigration combine-proof "${positional[@]}" --out "$out" \
+    --node "$node" --chain-id "$CHAIN_ID" \
+    --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT")
   local combine_out combine_rc=0
   combine_out=$("$BIN" "${args[@]}" 2>&1) || combine_rc=$?
   printf '%s\n' "$combine_out" >&2

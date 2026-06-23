@@ -357,10 +357,43 @@ lumerad_tx() {
     exit 1
   fi
   _read_keyring_flags
+
+  # Primary: let the chain simulate the exact gas (migration fees are waived, so
+  # the resulting limit is free). Capture stdout (the tx JSON) separately from
+  # stderr (gas-estimate notes / errors) so callers receive clean JSON to parse.
+  local err_file out rc=0
+  err_file="$(mktemp)"
+  out="$("$BIN" tx "$@" \
+    --node "$NODE" \
+    --chain-id "$CHAIN_ID" \
+    "${_KRF[@]}" \
+    --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT" \
+    --output json 2>"$err_file")" || rc=$?
+  if (( rc == 0 )); then
+    rm -f "$err_file"
+    printf '%s\n' "$out"
+    return 0
+  fi
+
+  log_warn "  --gas auto failed (rc=${rc}); falling back to record-count gas formula"
+  local _line
+  while IFS= read -r _line; do [[ -n "$_line" ]] && log_warn "    $_line"; done <"$err_file"
+  rm -f "$err_file"
+
+  # Fallback: fixed gas from the record-count formula, clamped to block max_gas.
+  local fallback_gas block_max_gas
+  fallback_gas="$(migration_gas_for_records "${MIGRATION_RECORD_COUNT:-0}")"
+  block_max_gas="$(lumerad_q consensus params 2>/dev/null | jq -r '.params.block.max_gas // .block.max_gas // "-1"' 2>/dev/null || echo -1)"
+  if gas_exceeds_block_limit "$fallback_gas" "$block_max_gas"; then
+    log_error "estimated migration gas ${fallback_gas} exceeds block max_gas ${block_max_gas}"
+    log_error "this account/validator has too many delegation records to migrate in a single tx"
+    exit 1
+  fi
   "$BIN" tx "$@" \
     --node "$NODE" \
     --chain-id "$CHAIN_ID" \
     "${_KRF[@]}" \
+    --gas "$fallback_gas" \
     --output json
 }
 

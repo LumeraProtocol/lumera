@@ -76,6 +76,12 @@ main() {
 
   assert_estimate_succeeds "$estimate"
 
+  MIGRATION_RECORD_COUNT="$(jq -r '
+      ((.delegation_count   // 0) | tonumber)
+    + ((.unbonding_count    // 0) | tonumber)
+    + ((.redelegation_count // 0) | tonumber)
+  ' <<<"$estimate")"
+
   local snap
   snap=$(snapshot_bank_balances "$legacy_addr")
 

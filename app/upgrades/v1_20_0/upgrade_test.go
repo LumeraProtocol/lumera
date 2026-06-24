@@ -62,13 +62,13 @@ func TestV1200SetsDevnetMigrationEndTime(t *testing.T) {
 		"max_validator_delegations default should be 2500")
 }
 
-// On testnet the handler derives a 7-day migration window from the upgrade
-// block time.
+// On testnet the handler derives a 3-calendar-month migration window from the
+// upgrade block time.
 func TestV1200SetsTestnetMigrationEndTime(t *testing.T) {
 	app := lumeraapp.Setup(t)
 	ctx := app.BaseApp.NewContext(false)
 
-	want := ctx.BlockTime().Add(7 * 24 * time.Hour).Unix()
+	want := ctx.BlockTime().AddDate(0, 3, 0).Unix()
 
 	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera-testnet-1"))
 	_, err := handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
@@ -77,23 +77,30 @@ func TestV1200SetsTestnetMigrationEndTime(t *testing.T) {
 	after, err := app.EvmigrationKeeper.Params.Get(ctx)
 	require.NoError(t, err)
 	require.Equal(t, want, after.MigrationEndTime,
-		"testnet upgrade should set migration_end_time to upgrade block time + 7 days")
+		"testnet upgrade should set migration_end_time to upgrade block time + 3 months")
 }
 
-// Mainnet keeps migration_end_time at the default 0 at upgrade; a specific
-// absolute timestamp is chosen and applied separately near launch.
-func TestV1200LeavesMigrationEndTimeZeroOnMainnet(t *testing.T) {
+// On mainnet the handler derives a 3-calendar-month migration window from the
+// upgrade block time, the same window as testnet.
+func TestV1200SetsMainnetMigrationEndTime(t *testing.T) {
 	app := lumeraapp.Setup(t)
 	ctx := app.BaseApp.NewContext(false)
 
+	// Default genesis params seed migration with no deadline.
+	before, err := app.EvmigrationKeeper.Params.Get(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), before.MigrationEndTime)
+
+	want := ctx.BlockTime().AddDate(0, 3, 0).Unix()
+
 	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera-mainnet-1"))
-	_, err := handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
+	_, err = handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
 	require.NoError(t, err)
 
 	after, err := app.EvmigrationKeeper.Params.Get(ctx)
 	require.NoError(t, err)
-	require.Equal(t, int64(0), after.MigrationEndTime,
-		"mainnet upgrade must leave migration_end_time at the default 0")
+	require.Equal(t, want, after.MigrationEndTime,
+		"mainnet upgrade should set migration_end_time to upgrade block time + 3 months")
 }
 
 func TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped(t *testing.T) {

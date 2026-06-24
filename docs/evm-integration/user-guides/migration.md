@@ -1,6 +1,6 @@
 # EVM Legacy Account Migration - User Guide
 
-**Last updated**: 2026-06-16
+**Last updated**: 2026-06-24
 **Applies to**: Lumera chain with `x/evmigration` module enabled (post-EVM upgrade)
 
 ---
@@ -117,19 +117,21 @@ This is the easiest method. The Lumera Portal provides a guided wizard that hand
 
 The Portal exposes the same Lumera chain through two profiles in the top-left network picker:
 
-- **lumera-devnet / lumera-testnet-2 / lumera-mainnet-1** (legacy profile) —`bip44.coinType: 118`, no EVM features. Lets users with legacy 118-derived wallets see their pre-migration account.
+- **lumera-devnet-1 / lumera-testnet-2 / lumera-mainnet-1** (legacy profile) —`bip44.coinType: 118`, no EVM features. Lets users with legacy 118-derived wallets see their pre-migration account.
 - **lumera-devnet-evm / lumera-testnet-evm / lumera-mainnet-evm** (EVM profile) —`bip44.coinType: 60`,`eth-secp256k1-cosmos` features enabled. Lets users with the post-migration EVM-derived wallet see their migrated state.
 
 Both profiles connect to the **same on-chain network** (the same `chain_id`). What differs is which `bip44.coinType` and which address-derivation style the Portal asks Keplr to use. You can migrate from either profile — the wizard derives the destination EVM address through Keplr's Ethereum provider regardless — but after migration you'll generally end up on the EVM profile to see your migrated balance.
 
-### The chain/profile state panel
+### The EVM Migration page and its state panel
 
-Every page in the **EVM Account Migration** section starts with a state panel that summarises four pieces of context. Watching these four rows is the single most reliable way to understand what the Portal sees and which follow-up step (if any) is still pending:
+Migration now has its own dedicated page. Open **EVM Migration** from the left-hand navigation (it sits below the chain menu items). The page is titled **EVM Account Migration** and opens with a **Migration Status** section. Before you connect a wallet, that section already shows two context rows (**on-chain network** and **Portal profile**), the **Migration Window** countdown, and global progress stats; the two Keplr rows appear once you connect.
+
+The state panel at the top of **Migration Status** summarises four pieces of context. Watching these four rows is the single most reliable way to understand what the Portal sees and which follow-up step (if any) is still pending:
 
 | Row                          | What it means                                                                                                                                                                                                                                                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **on-chain network**   | The `chain_id` of the connected node, plus a tag indicating the chain has EVM migration support (`/ EVM support`).                                                                                                                                                                                        |
-| **Portal profile**     | Which JSON profile the Portal is currently using (`lumera-devnet` or `lumera-devnet-evm`) and the `coin-type` it's configured for. Yellow when on the legacy profile (`118`), green on the EVM profile (`60`).                                                                                      |
+| **Portal profile**     | Which JSON profile the Portal is currently using (`lumera-devnet-1` or `lumera-devnet-evm`) and the `coin-type` it's configured for. Yellow when on the legacy profile (`118`), green on the EVM profile (`60`).                                                                                      |
 | **Keplr chain config** | The `bip44.coinType` Keplr has stored for this `chain_id` in its chain registry — independent of which profile the Portal is on. Yellow when Keplr is still on `118`, green on `60`.                                                                                                                 |
 | **Keplr account key**  | Which derivation Keplr is actually serving for the connected wallet (`legacy key / coin-type 118` or `EVM key / coin-type 60`). The Portal infers this by recomputing both bech32 variants from Keplr's pubkey and matching against `walletStore.currentAddress` (with a migration-record cross-check). |
 
@@ -137,26 +139,43 @@ When **all four rows are green**, your wallet, Keplr, and the Portal are fully a
 
 ### Step-by-Step Guide
 
-#### 1. Connect Your Wallet and Check Migration Status
+#### 1. Open the EVM Migration page and connect your wallet
 
-Navigate to the Lumera Portal and go to the **Claim** page. Scroll to the **EVM Account Migration** section.
+Make sure Keplr has your legacy account selected (you'll see its legacy balance on the Dashboard while on the legacy `lumera-devnet-1` profile):
 
-Click **Connect Wallet**. If the Lumera chain isn't yet registered in Keplr, the Portal will prompt you to approve it via Keplr's `suggestChain` dialog (screenshot 10 below shows the EVM-profile variant).
+![Portal dashboard on the legacy profile with Keplr showing the legacy account](../assets/evmigration-1.png)
 
-The state panel summarises what the Portal currently sees, the migration progress dashboard reports global migration counters, and the **Connected Wallet Address** panel shows your address along with a status badge. If you have a legacy (coin-type 118) account with on-chain state, you'll see the **"Ready to Migrate"** badge with a summary of your assets:
+In the Portal, open **EVM Migration** from the left-hand navigation. This opens the dedicated **EVM Account Migration** page. Before you connect, the **Migration Status** section already shows the on-chain network, the current Portal profile, the **Migration Window** countdown, and global progress stats; the **START MIGRATION WIZARD** button is disabled until a wallet is connected:
 
-![Portal claim page — legacy profile, legacy account ready for migration](../assets/evmigration-1.png)
+![EVM Account Migration page before connecting a wallet](../assets/evmigration-2.png)
+
+Click **Connect Wallet** (top-right) and choose **Keplr**:
+
+![Connect Wallet dialog — Keplr selected](../assets/evmigration-3.png)
+
+If the Lumera chain isn't yet registered in Keplr, the Portal will prompt you to approve it via Keplr's `suggestChain` dialog (the EVM-profile variant is shown later in the post-migration flow).
+
+Once connected, the state panel fills in all four rows, and the **Connected Wallet Address** section shows your address with a status line. If you have a legacy (coin-type 118) account with on-chain state, you'll see **"Legacy account ready for migration"** and a **Ready to Migrate** breakdown of your assets:
+
+![EVM Account Migration page — legacy account connected and ready to migrate](../assets/evmigration-4.png)
 
 In this screenshot:
 
-- The state panel shows**Portal profile: lumera-devnet / coin-type 118**,**Keplr chain config: coin-type 118**,**Keplr account key: legacy key / coin-type 118** — all in yellow (legacy 118 derivation everywhere). The**on-chain network** row confirms`lumera-devnet-1 / EVM support`.
-- **Account Migration Progress** shows global counters (e.g.`5 / 46 accounts` migrated, refreshed every 5 minutes).
-- The**Ready to Migrate** badge under the connected address breaks down what will move:
+- The state panel shows **Portal profile: lumera-devnet-1 / coin-type 118**, **Keplr chain config: coin-type 118**, **Keplr account key: legacy key / coin-type 118** — all in yellow (legacy 118 derivation everywhere). The **on-chain network** row confirms `lumera-devnet-1 / EVM support`.
+- The **Migration Window** card shows how long migration stays open (e.g. `1d 22h 35m left`) and the exact close time. This reflects the chain's `migration_end_time` parameter; when it shows no deadline, migration has no time limit.
+- The progress stats report global counters, refreshed every 5 minutes:
+  - **Migrated** — accounts already migrated
+  - **Remaining** — accounts still to migrate, split into **with key** (have signed on-chain, so a key is known) and **without key** (never signed)
+  - **Staked (legacy)** — legacy accounts still holding delegations
+  - **Validators** — migrated / total validators
+- The **Ready to Migrate** breakdown under the connected address shows what will move:
   - **Balance** — your available LUME balance
   - **Delegations** — active staking delegations
   - **Unbonding** — pending unbonding entries
   - **Authz Grants / Feegrants** — authorization and fee grant counts
   - **Supernode** — whether this account runs a supernode
+
+> **Multisig account?** The page has a separate **Migrate a Multisig Account** section at the bottom with an address field and a **CHECK MULTISIG** preflight button. The wizard itself does not support multisig — see [§ Migrating a multisig account](#migrating-a-multisig-account).
 
 Click **START MIGRATION WIZARD** to begin.
 
@@ -164,7 +183,9 @@ Click **START MIGRATION WIZARD** to begin.
 
 The wizard opens (modal title: **EVM Legacy Account Migration**) on **Step 1: Review**. Verify that the information is correct before proceeding:
 
-![Step 1: Review — eligibility, addresses, and balance summary](../assets/evmigration-2.png)
+![Step 1: Review — eligibility, addresses, and balance summary](../assets/evmigration-5.png)
+
+A note under the eligibility banner reminds you this is a **preliminary check** — the chain performs additional validation (migration window, rate limits, address uniqueness) when the transaction is actually submitted.
 
 Key things to check:
 
@@ -183,43 +204,41 @@ Click **NEXT** when ready.
 
 #### 3. Step 2: Sign & Confirm
 
-This step collects two cryptographic proofs that authenticate you as the owner of both the legacy and new addresses. No private keys leave your device — both signatures are produced locally in Keplr.
+This step collects two cryptographic proofs that authenticate you as the owner of both the legacy and new addresses. No private keys leave your device — both signatures are produced locally in Keplr. The wizard spells this out: when you click the button, Keplr opens **two pop-ups, one after the other**; each only *signs a message* — no tokens move, no fee is charged, and nothing is sent on-chain yet.
 
-![Step 2: Sign & Confirm — both proofs unsigned, transaction summary](../assets/evmigration-3.png)
+![Step 2: Sign & Confirm — both proofs unsigned, transaction summary](../assets/evmigration-6.png)
 
-Click **SIGN MIGRATION PROOFS**. Keplr opens **two signature popups** in sequence:
+Click **SIGN MIGRATION PROOFS**. The wizard tracks progress inline ("Waiting for you to approve the first (legacy) pop-up in Keplr…") while Keplr opens **two signature popups** in sequence.
 
 **First popup — Legacy proof (ADR-036 signArbitrary):**
 
-![Keplr signature request for legacy proof — ADR-036 format](../assets/evmigration-4.png)
+![Wizard signing state with the Keplr legacy-proof popup (ADR-036)](../assets/evmigration-7.png)
 
 This is the legacy account proof. Notice:
 
-- **"Signing with"** shows your Keplr wallet name (e.g. `my-legacy-acc`).
-- **"on lumera-devnet"** — the Lumera chain.
-- **"with lumera1jen0vglekw...57d5qn0xqg"** — your legacy address.
+- **"Signing with"** shows your Keplr wallet name (e.g. `legacy-acc`).
+- **"on lumera-devnet-1"** — the Lumera chain (Keplr's Cosmos signing provider).
+- **"with lumera1rzmeg8fta4…ls0nmdx2uh"** — your legacy address.
 - **Message** is the migration payload string: `lumera-evm-migration:{chainID}:{evmChainID}:claim:{legacyAddr}:{newAddr}`.
-- The collapsed **Advanced** drawer holds the full ADR-036 JSON sign doc (`sign/MsgSignData`) — the standard Cosmos arbitrary-message format. Expand it to inspect the fields:
-
-  ![ADR-036 advanced view — full sign doc with sign/MsgSignData](../assets/evmigration-4ex.png)
+- The collapsed **Advanced** drawer holds the full ADR-036 JSON sign doc (`sign/MsgSignData`) — the standard Cosmos arbitrary-message format. Expand it if you want to inspect the raw fields.
 
 Click **Approve** to sign with your legacy key.
 
 **Second popup — New proof (EIP-191 personal_sign):**
 
-![Keplr signature request for new proof — Ethereum personal_sign](../assets/evmigration-5.png)
+![Wizard with the legacy proof signed and the Keplr new-proof popup (Ethereum personal_sign)](../assets/evmigration-8.png)
 
-This is the new (EVM) address proof. Notice the differences:
+Once the legacy proof is signed the wizard advances ("Legacy proof signed. Now approve the second (new) pop-up in Keplr…") and Keplr opens the second popup. This is the new (EVM) address proof. Notice the differences:
 
 - **"on Ethereum"** — Keplr is using its Ethereum signing provider this time, not the Cosmos one.
-- **"with 0x2b750d6a4c...1ab71f99ee"** — your Ethereum hex address.
+- **"with 0x8fe663865b…31529109d2"** — your Ethereum hex address.
 - **Message** is the same migration payload string.
 
 Click **Approve** to sign with your new (coin-type 60) key.
 
-When both signatures land, the wizard updates: the button reads **BOTH PROOFS SIGNED** and each line shows a green check:
+When both signatures land, the wizard updates: the button reads **BOTH PROOFS SIGNED**, each line shows a green check, and the confirmation checkbox becomes active:
 
-![Step 2 completed — both proofs signed, confirmation checkbox](../assets/evmigration-6.png)
+![Step 2 completed — both proofs signed, confirmation checkbox](../assets/evmigration-9.png)
 
 The transaction summary lists **From** (legacy, 118) and **To** (new, 60) and confirms **Fee: None (fee-free)**.
 
@@ -227,20 +246,21 @@ Tick **"I understand this is irreversible and all on-chain state will move to my
 
 #### 4. Migration Result
 
-The Portal broadcasts the transaction and waits for confirmation (typically one block, 5–6 seconds). On success:
+The Portal broadcasts the transaction and waits for confirmation (typically one block, 5–6 seconds). On success the wizard shows a **Migration Result** screen — *"Migration Successful! All on-chain state has been moved to your new address. Follow the steps below to finish setting up your wallet."*
 
-![Migration Result — Migration Successful with new address, eth hex, and tx hash](../assets/evmigration-7.png)
+![Migration Result — Migration Successful with the full post-migration checklist](../assets/evmigration-10.png)
 
-The result screen shows:
+The result screen now embeds the complete post-migration checklist so you can finish without leaving the dialog:
 
-- **New address** — your post-migration Lumera bech32.
-- **Ethereum hex** — the 0x-prefixed equivalent.
-- **Tx** — the on-chain transaction hash for verification.
-- A note pointing you back to the Claim page:*"Close this dialog and follow the Migration Successful instructions on the Claim page, or follow the Migration User Guide."*
+- A **Next steps** heading with a **COPY CHECKLIST** button (copies the whole sequence to your clipboard).
+- A **Multiple legacy accounts?** callout: keep Portal and Keplr on the legacy network until every legacy account is migrated, then do the cleanup once at the end (see the batching note further below).
+- **1. New Lumera address** and **2. Ethereum hex address** — your post-migration addresses, each with a copy button.
+- **3. Switch the Portal to Lumera EVM, reconnect Keplr, then add an existing wallet with the same recovery phrase** — the ordered sub-steps (a–e) that the Claim/EVM Migration page also walks you through after you close the dialog.
+- **Tx** — the on-chain transaction hash, with copy and explorer-link buttons.
 
-**For validators**: an urgent section underneath shows the restart command (`systemctl start lumerad`). Restart your validator promptly to avoid missed blocks and jailing.
+**For validators**: an urgent section shows the restart command (`systemctl start lumerad`). Restart your validator promptly to avoid missed blocks and jailing.
 
-Click **DONE** to close the wizard. The Claim page now switches into the post-migration follow-up flow described next.
+Click **DONE** to close the wizard. The **EVM Migration** page now switches into the post-migration follow-up flow described next.
 
 > **Migrating more than one legacy account? Batch the wizards first, do the cleanup once at the end.**
 >
@@ -248,81 +268,107 @@ Click **DONE** to close the wizard. The Claim page now switches into the post-mi
 >
 > Recommended order when migrating multiple legacy accounts:
 >
-> 1. **Stay on the legacy Portal profile** (`lumera-devnet` /`lumera-mainnet`) and the original Keplr chain definition for the entire migration phase.
+> 1. **Stay on the legacy Portal profile** (`lumera-devnet-1` /`lumera-mainnet-1`) and the original Keplr chain definition for the entire migration phase.
 > 2. After the wizard closes for account 1, ignore the**Wallet Re-Import Still Required** card for now.
-> 3. In Keplr, click your wallet name (top-left) and switch to the next legacy account in the wallet list. The Connected Wallet Address on the Claim page updates automatically.
+> 3. In Keplr, click your wallet name (top-left) and switch to the next legacy account in the wallet list. The Connected Wallet Address on the EVM Migration page updates automatically.
 > 4. The Portal will detect it as another "Legacy account ready for migration" — click**START MIGRATION WIZARD** and run through Step 1 → Step 2 → Migrate again.
 > 5. Repeat steps 3–4 for every legacy account you have.
 > 6. **Only once every legacy account is migrated**, follow the post-migration cleanup once: switch Portal to the EVM profile, refresh Keplr's chain registration, and then re-import the mnemonic(s) into fresh Keplr profile(s) to expose the migrated EVM-derived addresses for each account.
 >
 > **Many accounts? Use the shell helpers instead.** Once you're past a handful of legacy accounts, clicking through the Portal+Keplr wizard for each one becomes the bottleneck — and Keplr's signature popups can't be automated. Switch to the bundled [`scripts/migrate-account.sh`](#method-2-shell-helper-scripts) (or `migrate-validator.sh` for validators), which run the same migration non-interactively from a keyring. They're easy to drop into a loop over a list of legacy key names, produce structured exit codes for each result, and capture pre/post balance snapshots — so a batch migration is auditable rather than something you have to retrace by hand.
 
-#### 5. Post-Migration Follow-Up on the Claim Page
+#### 5. Post-Migration Follow-Up on the EVM Migration Page
 
-After the wizard closes, the Claim page shows a **Migration Successful** card whose contents adapt to the *current* state of your Portal profile, Keplr chain config, and Keplr account key. There are four possible states; you'll move through them in order until everything is green.
+After the wizard closes, the **EVM Migration** page shows a **Migration Successful** card whose contents adapt to the *current* state of your Portal profile, Keplr chain config, and Keplr account key. Your funds are already safe at the new address — the remaining work is a **per-Keplr-installation** cleanup so your wallet and the Portal both render the new EVM-derived address. The four state names below (A → D) are checkpoints you pass through; the linear walkthrough that follows takes you from A to D in order.
 
-##### State A: "Migration Successful — Wallet Re-Import Still Required" (legacy Portal profile)
+##### State A: "Wallet Re-Import Still Required" (still on the legacy profile)
 
 Right after the wizard closes you're still on the legacy Portal profile, so the page looks like this:
 
-![Post-migration on legacy Portal profile — Wallet Re-Import Still Required](../assets/evmigration-8.png)
+![Post-migration on the legacy Portal profile — Wallet Re-Import Still Required](../assets/evmigration-11.png)
 
-The state panel still reads `Portal profile: lumera-devnet / coin-type 118` (yellow) and `Keplr account key: legacy key / coin-type 118` (yellow). The Portal knows your migration record from the chain ("Account migrated from legacy …" appears under the connected address) but the connected key is still the legacy 118 derivation, so your displayed balance is 0 — the assets now live at the new EVM address.
+The state panel still reads `Portal profile: lumera-devnet-1 / coin-type 118` (yellow), `Keplr chain config: coin-type 118` (yellow), and `Keplr account key: legacy key / coin-type 118` (yellow). The Portal knows your migration record from the chain ("Account migrated from legacy …" appears under the connected address) but the connected key is still the legacy 118 derivation, so your displayed Keplr balance is 0 — the assets now live at the new EVM address. The card states the **main action** directly: *re-import the same mnemonic in Keplr and use the new profile derived from coin-type 60.* The migration record (legacy address, new Lumera address, **Migration date**, **Block height**) is shown at the bottom.
 
-The **Migration Successful — Wallet Re-Import Still Required** card lays out the **main action** and the ordered sub-steps:
+Work through the cleanup in the order below.
 
-1. **Disconnect** your wallet in the Portal.
-2. In the Portal, click**Lumera Network** (top-left) and select**lumera-devnet-evm** — this switches the Portal to the EVM profile, which makes Keplr re-suggest the chain with`coin-type 60` + EVM features.
-3. **Connect Keplr again.** When the Portal asks Keplr to add the EVM chain, accept it.
-4. In Keplr, click your wallet name →**+** button →**Import existing wallet**.
-5. Enter the**same recovery phrase** and select the newly imported profile.
+###### a. Remove the legacy Lumera chain in Keplr
 
-The migration record summary at the bottom shows the legacy address, the new Lumera address, the **Migration date**, and the **Block height**.
+In Keplr, open the **☰** menu (top-right) and choose **Add/Remove Chains**:
 
-##### State B: "Migration Successful — Update Keplr Chain Definition" (Portal on EVM, Keplr chain still 118)
+![Keplr menu with Add/Remove Chains](../assets/evmigration-12.png)
 
-If you only switch the Portal profile (step 2 above) without finishing the rest of the flow, the page shifts to:
+Find the legacy **lumera-devnet-1** entry and toggle it **off**. (Removing it now avoids a stale `coin-type 118` chain definition lingering in Keplr's registry.)
 
-![Post-migration on EVM Portal profile, Keplr chain still 118 — Update Keplr Chain Definition](../assets/evmigration-9.png)
+![Keplr Add/Remove Chains — toggle the legacy lumera-devnet-1 chain off](../assets/evmigration-13.png)
 
-The state panel now reads `Portal profile: lumera-devnet-evm / coin-type 60` (green) but `Keplr chain config: coin-type 118` (yellow) and `Keplr account key: legacy key / coin-type 118` (yellow) — Keplr's chain registry hasn't been updated yet.
+###### b. Switch the Portal to the EVM profile
 
-A **"Connected to the migrated legacy account"** explainer appears, followed by the **Update Keplr Chain Definition** action card:
+Click **Lumera Network** (top-left) and select **Lumera-Devnet-Evm**:
 
-1. **Disconnect** your wallet in the Portal.
-2. In Keplr, open**Settings** from the top-right corner.
-3. Open**Add/Remove Chains**.
-4. Find the legacy Lumera Network entry and toggle it off.
-5. Back in the Portal, click**Connect Wallet** again. The Portal will re-suggest the EVM chain definition; approve it in Keplr:
+![Portal network picker — Lumera-Devnet-Evm and Lumera-Devnet-1 profiles](../assets/evmigration-14.png)
 
-![Keplr suggestChain dialog — Lumera EVM chain (coin-type 60, eth_secp256k1, eth-secp256k1-cosmos features)](../assets/evmigration-10.png)
+The page reloads on the EVM profile. The **Portal profile** row is now green (`lumera-devnet-evm / coin-type 60`), and the wallet is disconnected:
 
-This refreshes Keplr's chain registry to the EVM definition (`bip44.coinType: 60`, `features: ["eth-address-gen", "eth-key-sign", "eth-secp256k1-cosmos"]`).
+![EVM Migration page on the EVM profile, wallet disconnected](../assets/evmigration-15.png)
 
-##### State C: "Migration Successful — Wallet Re-Import Still Required" (Portal on EVM, Keplr chain 60, but the *vault* still holds the 118 key)
+###### c. Reconnect Keplr and approve the EVM chain
 
-After Keplr's chain config is on `60` but you haven't re-imported the mnemonic yet, the same Keplr profile is still serving its original 118-derived key, just rendered in eth-style for the new chain config:
+Click **Connect Wallet**. On the EVM profile the dialog now also offers **MetaMask** alongside Keplr; choose **Keplr**:
 
-![Post-migration on EVM Portal profile + EVM Keplr chain config, but vault still on 118 — Wallet Re-Import Still Required](../assets/evmigration-11.png)
+![Connect Wallet on the EVM profile — Keplr and MetaMask options](../assets/evmigration-16.png)
 
-The state panel shows `Portal profile: lumera-devnet-evm / coin-type 60` and `Keplr chain config: coin-type 60` — both green — but `Keplr account key: legacy key / coin-type 118` is still yellow. The **Migration Successful — Wallet Re-Import Still Required** card asks you to finish the flow by importing the mnemonic into a fresh Keplr profile (the steps mirror sub-items d–e from State A).
+The Portal asks Keplr to add the EVM chain definition. Approve the `suggestChain` dialog (`bip44.coinType: 60`, `features: ["eth-address-gen", "eth-key-sign", "eth-secp256k1-cosmos"]`):
 
-> **Why a fresh profile rather than just using the existing one?** A Keplr wallet profile derives its keys from the mnemonic at *creation time* using the chain's then-current `bip44.coinType`. Existing profiles aren't re-derived when the chain config later changes. Importing the same mnemonic into a new profile, after the chain registry is on `coin-type 60`, makes Keplr derive the EVM-compatible (P_60) key for that profile.
+![Keplr suggestChain dialog — Add lumera-devnet-evm (coin-type 60)](../assets/evmigration-17.png)
+
+> **Checkpoint — State B ("Update Keplr Chain Definition").** If you reconnected *before* removing the legacy chain in step a, the card reads **Update Keplr Chain Definition** instead: `Portal profile` is green but `Keplr chain config` is still `coin-type 118` (yellow). Disconnect, remove the legacy chain (step a), then reconnect so the Portal re-suggests the EVM definition.
+
+###### d. Checkpoint — State C ("vault still holds the 118 key")
+
+After the chain config is on `60` but before you re-import the mnemonic, the same Keplr profile is still serving its original 118-derived key, just rendered eth-style for the new chain config. The state panel shows the first three rows green but **Keplr account key: legacy key / coin-type 118** still yellow:
+
+![State panel — Portal and chain on coin-type 60, but Keplr account key still legacy 118](../assets/evmigration-18.png)
+
+> **Why a fresh profile rather than just using the existing one?** A Keplr wallet profile derives its keys from the mnemonic at *creation time* using the chain's then-current `bip44.coinType`. Existing profiles aren't re-derived when the chain config later changes. Importing the same mnemonic into a new profile, after the chain registry is on `coin-type 60`, makes Keplr derive the EVM-compatible (P_60) key.
+
+###### e. Re-import the mnemonic into a fresh Keplr profile
+
+In Keplr, click your wallet name (top-left) to open **Select Wallet**, then click the **+** button:
+
+![Keplr Select Wallet — the + (add wallet) button](../assets/evmigration-19.png)
+
+Choose **Import an existing wallet**:
+
+![Keplr — Create / Import an existing wallet / Connect Hardware Wallet](../assets/evmigration-20.png)
+
+Choose **Use recovery phrase or private key**:
+
+![Keplr — Use recovery phrase or private key vs Connect with Google](../assets/evmigration-21.png)
+
+Enter the **same recovery phrase** you used for the legacy account (12- or 24-word, whichever you have):
+
+![Keplr Import Existing Wallet — recovery phrase entry](../assets/evmigration-22.png)
+
+Give the new profile a name (e.g. `evm-acc`) and click **Next**:
+
+![Keplr Set Up Your Wallet — name the new profile](../assets/evmigration-23.png)
+
+Select the chains to enable and click **Save**:
+
+![Keplr Select Chains — final import step](../assets/evmigration-24.png)
 
 ##### State D: "Migration Successful" — clean state (everything aligned)
 
-Once you select the freshly-imported wallet profile, the state panel goes fully green and the card reduces to a brief confirmation:
+Select the freshly-imported wallet profile. The state panel goes fully green and the card reduces to a brief confirmation:
 
-![After re-import — clean state, all four rows green, migration record visible](../assets/evmigration-12.png)
+![After re-import — clean state, all four rows green, migration record visible](../assets/evmigration-25.png)
 
 - **Portal profile**:`lumera-devnet-evm / coin-type 60` (green)
 - **Keplr chain config**:`coin-type 60` (green)
 - **Keplr account key**:`EVM key / coin-type 60` (green)
 - **Connected wallet address** is now your post-migration bech32, matching`migrationRecord.new_address`.
 
-The card body says *"Your wallet and Portal are already on the migrated EVM address."* The migration record is displayed with the legacy address, new Lumera address, **Ethereum hex**, **Migration date**, and **Block height**.
-
-The old `Lumera (Legacy)` chain entry can be removed from Keplr at any point after this — it's no longer needed.
+The card body says *"Your wallet and Portal are already on the migrated EVM address."* The migration record is displayed with the legacy address, new Lumera address, **Ethereum hex**, **Migration date**, and **Block height**. Keplr now shows the new profile (e.g. `evm-acc`) serving the EVM-derived address.
 
 ### Troubleshooting
 

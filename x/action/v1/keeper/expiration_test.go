@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"

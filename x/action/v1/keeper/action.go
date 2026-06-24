@@ -493,7 +493,7 @@ func (k *Keeper) IterateActions(ctx sdk.Context, handler func(*actiontypes.Actio
 	if err != nil {
 		return errors.Wrap(err, "failed to create iterator for actions")
 	}
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	for ; iter.Valid(); iter.Next() {
 		// Extract the action bytes
@@ -529,7 +529,7 @@ func (k *Keeper) IterateActionsByState(ctx sdk.Context, state actiontypes.Action
 	if err != nil {
 		return errors.Wrap(err, "failed to create iterator for actions by state")
 	}
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	for ; iter.Valid(); iter.Next() {
 		// Extract the action ID from the key

@@ -61,7 +61,10 @@ func SimulateMsgCascadeWithSVCFlow(
 
 		// Select a funded account and register the action.
 		feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
-		simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
+		simAccount, ok := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
+		if !ok {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgRequestAction", "no account with sufficient funds"), nil, nil
+		}
 
 		sigStr := generateCascadeSignature(simAccount)
 

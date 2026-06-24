@@ -28,10 +28,7 @@ def compute_sn_reward(sn_storage_gib, hw_rate, storage_apr, p_lume,
                       period_blocks, block_time_sec):
     """Return per-SN reward dict at the given chain-wide policy."""
     seconds_per_period = period_blocks * block_time_sec
-    # 30-day reference month, so the default period (432000 blocks * 6s = 30 d)
-    # gives sn_period_usd == sn_monthly_usd exactly. The funding model doc uses
-    # HW_rate in $/GiB/month and treats one period as one month at default.
-    seconds_per_month = 30 * 86400
+    weeks_per_month = (365.25 / 12) / 7  # ~= 4.348
 
     per_byte_monthly_usd = hw_rate * (1 + storage_apr)
 
@@ -49,8 +46,7 @@ def compute_sn_reward(sn_storage_gib, hw_rate, storage_apr, p_lume,
         }
 
     sn_monthly_usd = sn_storage_gib * per_byte_monthly_usd
-    # Per-period reward scales with the period length, independent of week/month assumptions.
-    sn_period_usd = sn_monthly_usd * (seconds_per_period / seconds_per_month)
+    sn_period_usd = sn_monthly_usd / weeks_per_month
     sn_period_lume = sn_period_usd / p_lume
     sn_annual_usd = sn_monthly_usd * 12
 
@@ -85,7 +81,7 @@ def main():
                    help="Storage APR paid to operators, as fraction")
     p.add_argument("--p-lume", type=float, default=0.30,
                    help="LUME spot price in USD")
-    p.add_argument("--period-blocks", type=int, default=432000,
+    p.add_argument("--period-blocks", type=int, default=100800,
                    help="payment_period_blocks")
     p.add_argument("--block-time-sec", type=float, default=6.0,
                    help="Average block time in seconds")

@@ -20,21 +20,45 @@ INTERVAL="${INTERVAL:-5}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-600}"
 
 deadline=$((SECONDS + TIMEOUT_SECONDS))
+CONSECUTIVE_PENDING_POLLS=0
+MAX_FAILURES_BEFORE_LOG_CHECK="${MAX_FAILURES_BEFORE_LOG_CHECK:-3}"
 
-echo "Waiting for block height >= ${TARGET_HEIGHT} (service=${SERVICE}, timeout=${TIMEOUT_SECONDS}s)..."
+detect_upgrade_halt() {
+	local logs
+	logs="$(docker compose -f "${COMPOSE_FILE}" logs --tail=50 "${SERVICE}" 2>/dev/null || true)"
+	if echo "${logs}" | grep -qE "UPGRADE.*NEEDED.*height.*${TARGET_HEIGHT}|UPGRADE.*NEEDED at height: ${TARGET_HEIGHT}"; then
+		return 0
+	fi
+	return 1
+}
 
+echo -n "Waiting for height >= ${TARGET_HEIGHT} (service=${SERVICE}, timeout=${TIMEOUT_SECONDS}s): "
+
+LAST_HEIGHT=""
 while ((SECONDS < deadline)); do
 	height="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
 		lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // "0"' 2>/dev/null || echo "0")"
 
 	if [[ "$height" =~ ^[0-9]+$ ]] && ((height >= TARGET_HEIGHT)); then
-		echo "Reached height ${height}."
+		echo "${height} ✓"
 		exit 0
 	fi
 
-	echo "Current height ${height}."
+	CONSECUTIVE_PENDING_POLLS=$((CONSECUTIVE_PENDING_POLLS + 1))
+	if ((CONSECUTIVE_PENDING_POLLS >= MAX_FAILURES_BEFORE_LOG_CHECK)) && detect_upgrade_halt; then
+		echo ""
+		echo "Node halted for upgrade at height ${TARGET_HEIGHT} (detected from container logs)."
+		exit 0
+	fi
+
+	if [[ "$height" != "$LAST_HEIGHT" && "$height" =~ ^[0-9]+$ && "$height" != "0" ]]; then
+		echo -n "${height}-"
+		LAST_HEIGHT="$height"
+		CONSECUTIVE_PENDING_POLLS=0
+	fi
 	sleep "${INTERVAL}"
 done
 
+echo ""
 echo "Timeout waiting for height ${TARGET_HEIGHT}." >&2
 exit 1

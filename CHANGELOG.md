@@ -2,6 +2,51 @@
 
 ---
 
+## 1.20.0
+
+Changes included since `v1.11.1` (range: `v1.11.1..v1.20.0`).
+
+Full EVM integration documentation: [docs/evm-integration/main.md](docs/evm-integration/main.md)
+
+This release integrates a full EVM execution layer (Cosmos EVM v0.6.0) alongside the existing CosmWasm runtime, and adds the `x/evmigration` module for migrating legacy accounts to Ethereum-compatible keys.
+
+### EVM execution layer
+
+- Added Cosmos EVM v0.6.0 with four modules: `x/vm` (EVM execution), `x/feemarket` (EIP-1559 dynamic base fee), `x/precisebank` (6-decimal `ulume` ↔ 18-decimal `alume` bridge), and `x/erc20` (STRv2 token pairs + IBC middleware). CosmWasm (`wasmd v0.61.6`) and EVM now coexist in the same runtime.
+- **Breaking:** changed default key type to `eth_secp256k1` and BIP44 coin type from 118 to 60 for Ethereum-compatible wallet derivation (MetaMask, Ledger).
+- Added EVM chain ID `76857769`, EIP-1559 base fee `0.0025 ulume/gas`, and a min gas price floor `0.0005 ulume/gas` (prevents zero-fee spam).
+- Added a JSON-RPC server and indexer enabled by default (7 namespaces), OpenRPC discovery (`rpc_discover`, `GET /openrpc.json`), runtime-configurable tracing, and an optional per-IP rate-limiting proxy.
+- Added an app-side EVM mempool with Ethereum-like sender ordering and nonce-gap handling, an async broadcast queue, and Prometheus metrics (size, pending/queued, broadcast depth, labeled rejections).
+- Added a dual-route ante handler that routes Ethereum extension txs to the EVM path and all others to the Cosmos path.
+
+### Precompiles & cross-runtime bridge
+
+- Added 11 static precompiles (P256, Bech32, Staking, Distribution, ICS20, Bank, Gov, Slashing) plus custom Action (`0x0901`) and Supernode (`0x0902`) precompiles giving Solidity contracts native access to action requests/finalization (incl. LEP-5 cascade commitments) and supernode queries/registration.
+- Added a CosmWasm ↔ EVM cross-runtime bridge (Phase 1): a Wasm precompile (`0x0903`) lets Solidity call CosmWasm contracts, and a custom message/query handler lets CosmWasm contracts call EVM contracts. Cross-runtime gas is capped at 3,000,000 per call.
+- Added blocked-address protections so module accounts and precompile addresses are excluded from bank sends, preventing accidental token loss.
+
+### IBC ERC20
+
+- Added IBC ERC20 middleware on both v1 and v2 transfer stacks with a governance-controlled registration policy (`all`/`allowlist`/`none`) via `MsgSetRegistrationPolicy`.
+
+### Account migration (`x/evmigration`)
+
+- Added the `x/evmigration` module for migrating legacy coin-type-118 accounts to coin-type-60 (Ethereum-compatible) addresses, with dual-signature verification and atomic multi-module state re-keying across auth, bank, staking, distribution, authz, feegrant, supernode, action, and claim. A separate `MsgMigrateValidator` flow re-keys the validator operator and rejects jailed validators.
+- Added multisig migration with a K/N mirror-source consensus rule and a four-step offline CLI flow (`generate-proof-payload` → `sign-proof` → `combine-proof` → `submit-proof`) so co-signers participate without sharing keys.
+- Added dual signature verification across all major wallet types: legacy proofs accept raw CLI (SHA-256) and ADR-036 (Keplr/Leap); new-address proofs accept raw Keccak-256 and EIP-191 `personal_sign` (MetaMask).
+- Migration txs are fee-free and signature-free; a hardened ante enforces the migration window and rejects implausible migrations (nonexistent/already-migrated sources, reused destinations) before mempool admission to bound zero-fee spam.
+- Added query endpoints for migration planning and monitoring: `MigrationEstimate`, `MigrationStats`, `LegacyAccounts`, and `MigratedAccounts`.
+- Added user-facing helper scripts (`migrate-account.sh`, `migrate-validator.sh`, `migrate-multisig.sh`) and user guides for account, validator, and supernode migration.
+
+### Upgrade & operations
+
+- Added the `v1.20.0` upgrade handler with store additions for the new EVM and evmigration modules and post-upgrade finalization of Lumera EVM, fee market, and ERC20 params. The handler auto-derives `migration_end_time` from the upgrade-block time (devnet +2 days; testnet and mainnet +3 calendar months).
+- Added `app.toml` auto-config migration for nodes upgrading from pre-EVM binaries — detects missing `[evm]`, `[json-rpc]`, `[tls]`, and `[lumera.*]` sections and regenerates them with Lumera defaults while preserving operator settings.
+- Added a node-operator EVM configuration guide and a tuning guide covering `app.toml`, RPC exposure, tracer config, and rate limiting.
+- Updated transitive Go dependencies (CosmWasm, go-ethereum, quic-go, and others) to address critical and high-severity security vulnerabilities, and migrated the example Solidity toolchain to Hardhat 3.
+
+---
+
 ## 1.12.0
 
 Changes included since `v1.11.1` (range: `v1.11.1..v1.12.0`).
@@ -61,7 +106,7 @@ Changes included since `v1.10.0` (range: `v1.10.0..v1.10.1`).
 Changes included since `v1.9.1` (range: `v1.9.1..v1.10.0`).
 
 - Cosmos SDK: upgraded from v0.50.14 to v0.53.5, CometBFT upgraded to v0.38.20
-- enabled unordered 
+- enabled unordered
 - migrated consensus params from `x/params` to `x/consensus` via baseapp.MigrateParams; removed `x/params` usage.
 - IBC: upgraded to IBC-Go from v10.3.0 to v10.5.0 with IBC v2 readiness (Router v2, v2 packet/event handling helpers).
 - Wasm: upgraded wasmd from v0.55.0-ibc2.0 to v0.61.6 and wasmvm from v3.0.0-ibc2.0 to v3.0.2.
@@ -75,7 +120,7 @@ Changes included since `v1.9.1` (range: `v1.9.1..v1.10.0`).
 
 Changes included since `v1.9.0` (range: `v1.9.0..v1.9.1`).
 
-.- Action/ICA: persist `app_pubkey` on new actions, expose `app_pubkey` in action query responses, and regenerate action protobufs.
+- Action/ICA: persist `app_pubkey` on new actions, expose `app_pubkey` in action query responses, and regenerate action protobufs.
 - Action/crypto: refreshed signature verification paths (ADR-36 fallback, DER→RS64) and added coverage for app_pubkey validation/caching + query output.
 - Devnet/Hermes: added ICA cascade flow tests and IBC helpers; updated Hermes configs/scripts and devnet setup scripts; removed legacy `devnet/tests/test-channel.sh`.
 - Dependencies/docs: updated devnet and root Go module files and refreshed `readme.md`.

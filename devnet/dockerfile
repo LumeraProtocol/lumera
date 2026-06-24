@@ -9,6 +9,9 @@ ARG SCRIPTS_DEST_DIR=/root/scripts
 LABEL Name="${APP_NAME}" \
       Version="${APP_VERSION}"
 
+# Use bash as default shell (debian:slim defaults to dash)
+SHELL ["/bin/bash", "-c"]
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     jq \
@@ -23,9 +26,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lnav \
     mc \
     nginx-light \
+    ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js (for network-maker UI tooling) using NodeSource 25.x
+# Install Node.js (for lumera-uploader UI tooling) using NodeSource 25.x
 RUN curl -fsSL https://deb.nodesource.com/setup_25.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
@@ -33,15 +37,40 @@ RUN curl -fsSL https://deb.nodesource.com/setup_25.x | bash - && \
 # Update libraries cache & create directories
 RUN ldconfig && mkdir -p ${SCRIPTS_DEST_DIR} /root/.lumerad
 
+ENV PATH="${SCRIPTS_DEST_DIR}:${PATH}"
+
 # Copy scripts with correct paths
 COPY --chmod=0755 \
+    ${SCRIPTS_SRC_DIR}/common.sh \
+    ${SCRIPTS_SRC_DIR}/account-registry.sh \
     ${SCRIPTS_SRC_DIR}/start.sh \
     ${SCRIPTS_SRC_DIR}/stop.sh \
     ${SCRIPTS_SRC_DIR}/restart.sh \
+    ${SCRIPTS_SRC_DIR}/lumera-helper.sh \
+    ${SCRIPTS_SRC_DIR}/test-accounts-setup.sh \
     ${SCRIPTS_SRC_DIR}/validator-setup.sh \
     ${SCRIPTS_SRC_DIR}/supernode-setup.sh \
-    ${SCRIPTS_SRC_DIR}/network-maker-setup.sh \
+    ${SCRIPTS_SRC_DIR}/lumera-uploader-setup.sh \
     ${SCRIPTS_DEST_DIR}/
+
+# Migration helper scripts (mirrored from repo-root scripts/ into
+# devnet/scripts/migration/ at build time by Makefile.devnet's
+# _devnet-stage-migration-scripts target). These are the same end-user-
+# facing scripts shipped in the release tarball; bundling them in the devnet
+# image lets validators run them directly inside containers for testing.
+COPY --chmod=0755 \
+    ${SCRIPTS_SRC_DIR}/migration/ \
+    ${SCRIPTS_DEST_DIR}/migration/
+
+# Add the migration directory to PATH so `migrate-account.sh` etc. can be
+# invoked by name from any cwd inside the container.
+ENV PATH="${SCRIPTS_DEST_DIR}/migration:${PATH}"
+
+# Bake the devnet chain ID in so the migration scripts have a working default
+# (matches devnet/config/config.json::chain.id). Resolution order in the scripts
+# is: --chain-id flag > $LUMERA_CHAIN_ID > $CHAIN_ID. Users can still override
+# at invocation time via either the env var or the flag.
+ENV CHAIN_ID=lumera-devnet-1
 
 # Expose necessary ports
 EXPOSE 26656 26657 1317 9090 4444 8002 50051 8080 8088

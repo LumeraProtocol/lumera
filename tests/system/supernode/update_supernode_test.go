@@ -91,35 +91,35 @@ func TestUpdateSupernode(t *testing.T) {
 						var fieldsUpdated string
 						kv := map[string]string{}
 						for _, attr := range e.Attributes {
-						    kv[string(attr.Key)] = string(attr.Value)
-						    if string(attr.Key) == sntypes.AttributeKeyValidatorAddress {
-						        require.Equal(t, valAddrStr, string(attr.Value))
-						        addrOK = true
-						    }
-						    if string(attr.Key) == sntypes.AttributeKeyFieldsUpdated {
-						        fieldsUpdated = string(attr.Value)
-						        fieldsOK = true
-						    }
-						    if string(attr.Key) == sntypes.AttributeKeyHeight {
-						        require.NotEmpty(t, string(attr.Value))
-						        heightOK = true
-						    }
-						    if string(attr.Key) == sntypes.AttributeKeyOldAccount {
-						        require.Equal(t, walletAddr.String(), string(attr.Value))
-						        oldAccOK = true
-						    }
-						    if string(attr.Key) == sntypes.AttributeKeyNewAccount {
-						        require.NotEmpty(t, string(attr.Value))
-						        newAccOK = true
-						    }
-						    if string(attr.Key) == sntypes.AttributeKeyOldIPAddress {
-						        require.Equal(t, "192.168.1.1", string(attr.Value))
-						        oldIPOK = true
-						    }
-						    if string(attr.Key) == sntypes.AttributeKeyIPAddress {
-						        require.Equal(t, "10.0.0.2", string(attr.Value))
-						        newIPOK = true
-						    }
+							kv[string(attr.Key)] = string(attr.Value)
+							if string(attr.Key) == sntypes.AttributeKeyValidatorAddress {
+								require.Equal(t, valAddrStr, string(attr.Value))
+								addrOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyFieldsUpdated {
+								fieldsUpdated = string(attr.Value)
+								fieldsOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyHeight {
+								require.NotEmpty(t, string(attr.Value))
+								heightOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyOldAccount {
+								require.Equal(t, walletAddr.String(), string(attr.Value))
+								oldAccOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyNewAccount {
+								require.NotEmpty(t, string(attr.Value))
+								newAccOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyOldIPAddress {
+								require.Equal(t, "192.168.1.1", string(attr.Value))
+								oldIPOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyIPAddress {
+								require.Equal(t, "10.0.0.2", string(attr.Value))
+								newIPOK = true
+							}
 						}
 						require.True(t, addrOK && fieldsOK && heightOK)
 						require.Contains(t, fieldsUpdated, sntypes.AttributeKeyIPAddress)
@@ -157,7 +157,7 @@ func TestUpdateSupernode(t *testing.T) {
 				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Note:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*sntypes.SuperNodeStateRecord{
 						{
 							State:  sntypes.SuperNodeStateActive,
@@ -272,59 +272,59 @@ func TestUpdateSupernode(t *testing.T) {
 
 // Additional test case for P2P port update
 func TestUpdateSupernode_P2PPort(t *testing.T) {
-    // Base accounts
-    walletPrivKey := secp256k1.GenPrivKey()
-    walletAddr := sdk.AccAddress(walletPrivKey.PubKey().Address())
-    valAddr := sdk.ValAddress(walletAddr)
-    valAddrStr := valAddr.String()
+	// Base accounts
+	walletPrivKey := secp256k1.GenPrivKey()
+	walletAddr := sdk.AccAddress(walletPrivKey.PubKey().Address())
+	valAddr := sdk.ValAddress(walletAddr)
+	valAddrStr := valAddr.String()
 
-    testSuite := setupSupernodeSystemSuite(t)
-    // Create and set up validator in Staking
-    validator, err := stakingtypes.NewValidator(valAddrStr, walletPrivKey.PubKey(), stakingtypes.Description{})
-    require.NoError(t, err)
-    validator.Status = stakingtypes.Bonded
-    validator.Tokens = sdkmath.NewInt(1000000)
-    testSuite.app.StakingKeeper.SetValidator(testSuite.sdkCtx, validator)
+	testSuite := setupSupernodeSystemSuite(t)
+	// Create and set up validator in Staking
+	validator, err := stakingtypes.NewValidator(valAddrStr, walletPrivKey.PubKey(), stakingtypes.Description{})
+	require.NoError(t, err)
+	validator.Status = stakingtypes.Bonded
+	validator.Tokens = sdkmath.NewInt(1000000)
+	testSuite.app.StakingKeeper.SetValidator(testSuite.sdkCtx, validator)
 
-    // Set initial SN
-    sn := sntypes.SuperNode{
-        ValidatorAddress: valAddrStr,
-        SupernodeAccount: walletAddr.String(),
-        Note:             "1.0.0",
-        States: []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive, Height: testSuite.sdkCtx.BlockHeight()}},
-        PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "127.0.0.1", Height: testSuite.sdkCtx.BlockHeight()}},
-        P2PPort:          "26657",
-    }
-    err = testSuite.app.SupernodeKeeper.SetSuperNode(testSuite.sdkCtx, sn)
-    require.NoError(t, err)
+	// Set initial SN
+	sn := sntypes.SuperNode{
+		ValidatorAddress: valAddrStr,
+		SupernodeAccount: walletAddr.String(),
+		Note:             "1.0.0",
+		States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive, Height: testSuite.sdkCtx.BlockHeight()}},
+		PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "127.0.0.1", Height: testSuite.sdkCtx.BlockHeight()}},
+		P2PPort:          "26657",
+	}
+	err = testSuite.app.SupernodeKeeper.SetSuperNode(testSuite.sdkCtx, sn)
+	require.NoError(t, err)
 
-    // Update P2P port
-    msg := &sntypes.MsgUpdateSupernode{
-        Creator:          walletAddr.String(),
-        ValidatorAddress: valAddrStr,
-        P2PPort:          "26699",
-    }
-    msgServer := keeper.NewMsgServerImpl(testSuite.app.SupernodeKeeper)
-    resp, err := msgServer.UpdateSupernode(testSuite.ctx, msg)
-    require.NoError(t, err)
-    require.NotNil(t, resp)
+	// Update P2P port
+	msg := &sntypes.MsgUpdateSupernode{
+		Creator:          walletAddr.String(),
+		ValidatorAddress: valAddrStr,
+		P2PPort:          "26699",
+	}
+	msgServer := keeper.NewMsgServerImpl(testSuite.app.SupernodeKeeper)
+	resp, err := msgServer.UpdateSupernode(testSuite.ctx, msg)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
 
-    // Verify event
-    events := testSuite.sdkCtx.EventManager().Events()
-    var foundUpdateEvent bool
-    for _, e := range events {
-        if e.Type == sntypes.EventTypeSupernodeUpdated {
-            foundUpdateEvent = true
-            kv := map[string]string{}
-            for _, a := range e.Attributes {
-                kv[string(a.Key)] = string(a.Value)
-            }
-            require.Equal(t, valAddrStr, kv[sntypes.AttributeKeyValidatorAddress])
-            require.NotEmpty(t, kv[sntypes.AttributeKeyHeight])
-            require.Contains(t, kv[sntypes.AttributeKeyFieldsUpdated], sntypes.AttributeKeyP2PPort)
-            require.Equal(t, "26657", kv[sntypes.AttributeKeyOldP2PPort])
-            require.Equal(t, "26699", kv[sntypes.AttributeKeyP2PPort])
-        }
-    }
-    require.True(t, foundUpdateEvent, "supernode_updated event not found for P2P change")
+	// Verify event
+	events := testSuite.sdkCtx.EventManager().Events()
+	var foundUpdateEvent bool
+	for _, e := range events {
+		if e.Type == sntypes.EventTypeSupernodeUpdated {
+			foundUpdateEvent = true
+			kv := map[string]string{}
+			for _, a := range e.Attributes {
+				kv[string(a.Key)] = string(a.Value)
+			}
+			require.Equal(t, valAddrStr, kv[sntypes.AttributeKeyValidatorAddress])
+			require.NotEmpty(t, kv[sntypes.AttributeKeyHeight])
+			require.Contains(t, kv[sntypes.AttributeKeyFieldsUpdated], sntypes.AttributeKeyP2PPort)
+			require.Equal(t, "26657", kv[sntypes.AttributeKeyOldP2PPort])
+			require.Equal(t, "26699", kv[sntypes.AttributeKeyP2PPort])
+		}
+	}
+	require.True(t, foundUpdateEvent, "supernode_updated event not found for P2P change")
 }

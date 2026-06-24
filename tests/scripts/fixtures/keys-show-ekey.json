@@ -1,0 +1,6 @@
+{
+  "name": "ekey",
+  "type": "local",
+  "address": "lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "pubkey": "{\"@type\":\"/cosmos.evm.crypto.v1.ethsecp256k1.PubKey\",\"key\":\"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\"}"
+}

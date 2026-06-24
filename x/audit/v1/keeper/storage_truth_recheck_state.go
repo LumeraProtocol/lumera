@@ -29,7 +29,7 @@ func (k Keeper) GetAllRecheckEvidenceForGenesis(ctx sdk.Context) []types.Genesis
 	prefix := types.RecheckEvidencePrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisRecheckEvidence, 0)
 	for ; it.Valid(); it.Next() {

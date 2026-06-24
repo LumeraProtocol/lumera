@@ -2,12 +2,18 @@ package params
 
 import (
 	"cosmossdk.io/log"
+	storetypes "cosmossdk.io/store/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	consensuskeeper "github.com/cosmos/cosmos-sdk/x/consensus/keeper"
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
+	erc20keeper "github.com/cosmos/evm/x/erc20/keeper"
+	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
+	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
 
 	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	auditmodulekeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
+	evmigrationmodulekeeper "github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -26,4 +32,10 @@ type AppUpgradeParams struct {
 	ParamsKeeper          *paramskeeper.Keeper
 	ConsensusParamsKeeper *consensuskeeper.Keeper
 	AuditKeeper           *auditmodulekeeper.Keeper
+	BankKeeper            bankkeeper.Keeper
+	EVMKeeper             *evmkeeper.Keeper
+	FeeMarketKeeper       *feemarketkeeper.Keeper
+	Erc20Keeper           *erc20keeper.Keeper
+	Erc20StoreKey         *storetypes.KVStoreKey
+	EvmigrationKeeper     *evmigrationmodulekeeper.Keeper
 }

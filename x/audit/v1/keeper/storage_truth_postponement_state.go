@@ -52,7 +52,7 @@ func (k Keeper) GetAllStorageTruthPostponements(ctx sdk.Context) []types.Storage
 	store := k.kvStore(ctx)
 	prefix := types.StorageTruthPostponementPrefix()
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var out []types.StorageTruthPostponement
 	for ; it.Valid(); it.Next() {

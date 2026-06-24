@@ -4,13 +4,20 @@ package system
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/sjson"
 )
 
 func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testing.T) {
-	const epochLengthBlocks = uint64(10)
+	const (
+		// Use 20-block epochs so that chain setup (StartChain + CLI init + 2 registrations,
+		// ~10-12 blocks) always completes within epoch 0. This prevents missing-report
+		// enforcement from postponing supernodes before the test's target epochs start.
+		epochLengthBlocks = uint64(20)
+	)
+	const originHeight = int64(1)
 
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
@@ -67,7 +74,7 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	})
 	RequireTxSuccess(t, tx1e2)
 
-	awaitAtLeastHeight(t, anchor2.EpochEndHeight+1)
+	awaitAtLeastHeight(t, anchor2.EpochEndHeight+1, 120*time.Second)
 
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))

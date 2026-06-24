@@ -22,10 +22,10 @@ const (
 	DefaultClaimsFileName = "claims.csv"
 
 	// FlagClaimsPath is the flag used to specify the path to the claims CSV file
-	FlagClaimsPath            = "claims-path"
+	FlagClaimsPath = "claims-path"
 
 	// FlagSkipClaimsCheck is the flag used to skip the claims.csv file check
-	FlagSkipClaimsCheck       = "skip-claims-check"
+	FlagSkipClaimsCheck = "skip-claims-check"
 )
 
 var (

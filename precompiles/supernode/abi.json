@@ -1,0 +1,725 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "ISupernode",
+  "sourceName": "solidity/precompiles/supernode/ISupernode.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "newState",
+          "type": "uint8"
+        }
+      ],
+      "name": "SupernodeRegistered",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "oldState",
+          "type": "uint8"
+        }
+      ],
+      "name": "SupernodeDeregistered",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "newState",
+          "type": "uint8"
+        }
+      ],
+      "name": "SupernodeStateChanged",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "ipAddress",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "supernodeAccount",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "p2pPort",
+          "type": "string"
+        }
+      ],
+      "name": "registerSupernode",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        }
+      ],
+      "name": "deregisterSupernode",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        }
+      ],
+      "name": "startSupernode",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "stopSupernode",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "ipAddress",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "note",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "supernodeAccount",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "p2pPort",
+          "type": "string"
+        }
+      ],
+      "name": "updateSupernode",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "supernodeAccount",
+          "type": "string"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint32",
+              "name": "versionMajor",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "versionMinor",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "versionPatch",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "cpuCoresTotal",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "cpuUsagePercent",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "memTotalGb",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "memUsagePercent",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "memFreeGb",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "diskTotalGb",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "diskUsagePercent",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "diskFreeGb",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "uptimeSeconds",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint32",
+              "name": "peersCount",
+              "type": "uint32"
+            }
+          ],
+          "internalType": "struct ISupernode.MetricsReport",
+          "name": "metrics",
+          "type": "tuple"
+        }
+      ],
+      "name": "reportMetrics",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "compliant",
+          "type": "bool"
+        },
+        {
+          "internalType": "string[]",
+          "name": "issues",
+          "type": "string[]"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        }
+      ],
+      "name": "getSuperNode",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "validatorAddress",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "supernodeAccount",
+              "type": "string"
+            },
+            {
+              "internalType": "uint8",
+              "name": "currentState",
+              "type": "uint8"
+            },
+            {
+              "internalType": "int64",
+              "name": "stateHeight",
+              "type": "int64"
+            },
+            {
+              "internalType": "string",
+              "name": "ipAddress",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "p2pPort",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "note",
+              "type": "string"
+            },
+            {
+              "internalType": "uint64",
+              "name": "evidenceCount",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct ISupernode.SuperNodeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "supernodeAddress",
+          "type": "string"
+        }
+      ],
+      "name": "getSuperNodeByAccount",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "validatorAddress",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "supernodeAccount",
+              "type": "string"
+            },
+            {
+              "internalType": "uint8",
+              "name": "currentState",
+              "type": "uint8"
+            },
+            {
+              "internalType": "int64",
+              "name": "stateHeight",
+              "type": "int64"
+            },
+            {
+              "internalType": "string",
+              "name": "ipAddress",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "p2pPort",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "note",
+              "type": "string"
+            },
+            {
+              "internalType": "uint64",
+              "name": "evidenceCount",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct ISupernode.SuperNodeInfo",
+          "name": "info",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "offset",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "limit",
+          "type": "uint64"
+        }
+      ],
+      "name": "listSuperNodes",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "validatorAddress",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "supernodeAccount",
+              "type": "string"
+            },
+            {
+              "internalType": "uint8",
+              "name": "currentState",
+              "type": "uint8"
+            },
+            {
+              "internalType": "int64",
+              "name": "stateHeight",
+              "type": "int64"
+            },
+            {
+              "internalType": "string",
+              "name": "ipAddress",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "p2pPort",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "note",
+              "type": "string"
+            },
+            {
+              "internalType": "uint64",
+              "name": "evidenceCount",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct ISupernode.SuperNodeInfo[]",
+          "name": "nodes",
+          "type": "tuple[]"
+        },
+        {
+          "internalType": "uint64",
+          "name": "total",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "int32",
+          "name": "blockHeight",
+          "type": "int32"
+        },
+        {
+          "internalType": "int32",
+          "name": "limit",
+          "type": "int32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "state",
+          "type": "uint8"
+        }
+      ],
+      "name": "getTopSuperNodesForBlock",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "validatorAddress",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "supernodeAccount",
+              "type": "string"
+            },
+            {
+              "internalType": "uint8",
+              "name": "currentState",
+              "type": "uint8"
+            },
+            {
+              "internalType": "int64",
+              "name": "stateHeight",
+              "type": "int64"
+            },
+            {
+              "internalType": "string",
+              "name": "ipAddress",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "p2pPort",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "note",
+              "type": "string"
+            },
+            {
+              "internalType": "uint64",
+              "name": "evidenceCount",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct ISupernode.SuperNodeInfo[]",
+          "name": "nodes",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "validatorAddress",
+          "type": "string"
+        }
+      ],
+      "name": "getMetrics",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint32",
+              "name": "versionMajor",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "versionMinor",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "versionPatch",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "cpuCoresTotal",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "cpuUsagePercent",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "memTotalGb",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "memUsagePercent",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "memFreeGb",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "diskTotalGb",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "diskUsagePercent",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "diskFreeGb",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "uptimeSeconds",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint32",
+              "name": "peersCount",
+              "type": "uint32"
+            }
+          ],
+          "internalType": "struct ISupernode.MetricsReport",
+          "name": "metrics",
+          "type": "tuple"
+        },
+        {
+          "internalType": "uint64",
+          "name": "reportCount",
+          "type": "uint64"
+        },
+        {
+          "internalType": "int64",
+          "name": "lastReportHeight",
+          "type": "int64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getParams",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "minimumStake",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint64",
+          "name": "reportingThreshold",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "slashingThreshold",
+          "type": "uint64"
+        },
+        {
+          "internalType": "string",
+          "name": "minSupernodeVersion",
+          "type": "string"
+        },
+        {
+          "internalType": "uint64",
+          "name": "minCpuCores",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "minMemGb",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "minStorageGb",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

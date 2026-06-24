@@ -122,7 +122,7 @@ type ClaimCSVRecord struct {
 	Amount     uint64 `csv:"amount"`
 }
 
-// GenerateClaimsCSVFile creates a claims.csv file at the specified path 
+// GenerateClaimsCSVFile creates a claims.csv file at the specified path
 // (or in a temporary directory with a unique name if path is empty).
 // Returns the full file path and error if any.
 func GenerateClaimsCSVFile(data []ClaimCSVRecord, filePath *string) (string, error) {
@@ -145,7 +145,7 @@ func GenerateClaimsCSVFile(data []ClaimCSVRecord, filePath *string) (string, err
 		}
 		path = file.Name()
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Write CSV header and rows
 	writer := csv.NewWriter(file)
@@ -211,7 +211,7 @@ func GenerateNodeClaimingTestData(configDir string) (string, error) {
 	claimsFilePath, err = GenerateClaimsCSVFile([]ClaimCSVRecord{
 		{OldAddress: testData.OldAddress, Amount: claimtypes.DefaultClaimableAmountConst},
 	}, &claimsFilePath)
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to generate claims CSV file: %w", err)
 	}

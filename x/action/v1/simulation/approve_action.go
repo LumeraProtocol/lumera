@@ -96,6 +96,9 @@ func SimulateMsgApproveActionInvalidState(
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
 		// 1. Find or create action NOT in DONE state (e.g., PENDING)
 		actionID, action, creator := findOrCreateActionNotInDoneState(r, ctx, accs, k, bk, ak)
+		if action == nil {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgApproveAction", "no account with sufficient funds"), nil, nil
+		}
 
 		// 2. Create approval message
 		msg := types.NewMsgApproveAction(

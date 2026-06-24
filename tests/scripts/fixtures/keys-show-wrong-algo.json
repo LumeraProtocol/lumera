@@ -1,0 +1,6 @@
+{
+  "name": "wrong-algo",
+  "type": "local",
+  "address": "lumera1wrongalgo1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "pubkey": "{\"@type\":\"/cosmos.crypto.secp256k1.PubKey\",\"key\":\"A1111111111111111111111111111111111111111111\"}"
+}

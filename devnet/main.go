@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"gen/config"
 	"gen/generators"
-	"path/filepath"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -24,10 +24,12 @@ func main() {
 	}
 
 	if useExistingGenesis {
+		sharedDir := os.Getenv("DEVNET_SHARED_DIR")
+		if sharedDir == "" {
+			sharedDir = filepath.Join("/tmp", cfg.Chain.ID, generators.SubFolderShared)
+		}
 		data, err := os.ReadFile(filepath.Join(
-			"/tmp",
-			cfg.Chain.ID,
-			generators.SubFolderShared,
+			sharedDir,
 			generators.SubFolderConfig,
 			"external_genesis.json"))
 		if err != nil {

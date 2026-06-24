@@ -1,42 +1,33 @@
 # Lumera
 [![Release Workflow](https://github.com/LumeraProtocol/lumera/actions/workflows/release.yml/badge.svg)](https://github.com/LumeraProtocol/lumera/actions/workflows/release.yml)
 
-# lumera
-**lumera** is a blockchain built using Cosmos SDK and Tendermint and created with [Ignite CLI](https://ignite.com/cli).
+**Lumera** is a Cosmos SDK blockchain (v0.53.6) supporting CosmWasm smart contracts, IBC cross-chain messaging, Cosmos EVM, and four custom modules (action, claim, lumeraid, supernode).
 
 ## Get started
 
-### Install Ignite CLI
+### Prerequisites
 
-```bash
-curl https://get.ignite.com/cli! | bash
-```
-
+- Go 1.26+ (see `go.mod` for exact version)
+- `make`
+- `libwasmvm` shared library (built automatically or available from CosmWasm releases)
 
 ### Build
 
 ```bash
-ignite chain build
+make build
 ```
 
-> **Note:** You can still build directly with go: `go build cmd`, but it won't build protobuf files.
+This produces the `lumerad` binary in `build/lumerad`.
 
-**Note2:** You might get error during build:
-```
-Cosmos SDK's version is: v0.50.14
+Other useful build targets:
 
-✘ Cannot build app:                                                          
-                                                                           
-error while running command go mod tidy: go: cannot find "go1.25.5" in PATH
-: exit status 1
+```bash
+make build-debug          # Build with debug symbols
+make build-proto          # Regenerate protobuf files
+make lint                 # Run golangci-lint
+make unit-tests           # Run unit tests
+make integration-tests    # Run integration tests
 ```
-Lumera project doesn't specify toolchain, but it seems `Ignite` sometime might still require it. Do this:
-```cmd
-go install golang.org/dl/go1.25.5@latest
-go1.25.5 download
-export GOTOOLCHAIN=auto
-```
-
 
 ### Initialize
 
@@ -47,26 +38,31 @@ lumerad init my-node
 
 ### Get latest `genesis.json`
 
-```bash
+```
 https://github.com/LumeraProtocol/lumera-networks
 ```
 
 ### Get seeds
 
-```bash
+```
 https://github.com/LumeraProtocol/lumera-networks
 ```
 
 ### Start
 
-```
+```bash
 lumerad start
 ```
 
+## Documentation
+
+- [EVM Integration](docs/evm-integration/main.md) — Cosmos EVM architecture, precompiles, JSON-RPC, migration guides
+- [Devnet](docs/devnet/main.md) — Local Docker test network setup, configuration, upgrade testing
+- [Port Reference](docs/lumera-ports.md) — Network port defaults, config keys, and CLI flags
+
 ## Learn more
 
-- [Ignite CLI](https://ignite.com/cli)
-- [Tutorials](https://docs.ignite.com/guide)
-- [Ignite CLI docs](https://docs.ignite.com)
 - [Cosmos SDK docs](https://docs.cosmos.network)
-- [Developer Chat](https://discord.gg/ignite)
+- [CometBFT docs](https://docs.cometbft.com)
+- [IBC Protocol](https://ibc.cosmos.network)
+- [CosmWasm](https://cosmwasm.com)

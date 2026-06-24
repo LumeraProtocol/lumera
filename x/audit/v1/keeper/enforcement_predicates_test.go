@@ -3,7 +3,7 @@ package keeper_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 	"github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
@@ -105,10 +105,10 @@ func TestApplyStorageTruthBandAtEpochEnd_StrongPostponeOnIndexFail(t *testing.T)
 
 	// Score = 150 >= strong_postpone = 100. LastIndexFailEpoch > 0 → predicate met.
 	require.NoError(t, f.keeper.SetNodeSuspicionState(f.ctx, types.NodeSuspicionState{
-		SupernodeAccount:  sn.SupernodeAccount,
-		SuspicionScore:    150,
-		LastUpdatedEpoch:  0,
-		ClassACountWindow: 1,
+		SupernodeAccount:   sn.SupernodeAccount,
+		SuspicionScore:     150,
+		LastUpdatedEpoch:   0,
+		ClassACountWindow:  1,
 		LastIndexFailEpoch: 1, // index fail confirmed
 	}))
 	submitSelfReport(t, f, sn.SupernodeAccount, 0)

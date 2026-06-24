@@ -1,0 +1,44 @@
+{
+  "body": {
+    "messages": [{
+      "@type": "/lumera.evmigration.MsgClaimLegacyAccount",
+      "legacy_address": "lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "new_address": "lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "legacy_proof": {
+        "multisig": {
+          "threshold": 2,
+          "sub_pub_keys": [
+            "A1111111111111111111111111111111111111111111",
+            "A2222222222222222222222222222222222222222222",
+            "A3333333333333333333333333333333333333333333"
+          ],
+          "signer_indices": [0, 1],
+          "sub_signatures": ["YWxpY2Uc", "Ym9icy1z"],
+          "sig_format": "SIG_FORMAT_CLI"
+        }
+      },
+      "new_proof": {
+        "multisig": {
+          "threshold": 2,
+          "sub_pub_keys": [
+            "B1111111111111111111111111111111111111111111",
+            "B2222222222222222222222222222222222222222222",
+            "B3333333333333333333333333333333333333333333"
+          ],
+          "signer_indices": [0, 1],
+          "sub_signatures": ["QUxJQ0U=", "Qk9CU1NJRw=="],
+          "sig_format": "SIG_FORMAT_CLI"
+        }
+      }
+    }],
+    "memo": "",
+    "timeout_height": "0",
+    "extension_options": [],
+    "non_critical_extension_options": []
+  },
+  "auth_info": {
+    "signer_infos": [],
+    "fee": {"amount": [], "gas_limit": "200000", "payer": "", "granter": ""}
+  },
+  "signatures": []
+}

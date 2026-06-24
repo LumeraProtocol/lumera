@@ -342,4 +342,3 @@ func protoChunkProof(p *merkle.Proof) *actiontypes.ChunkProof {
 		PathDirections: append([]bool(nil), p.PathDirections...),
 	}
 }
-

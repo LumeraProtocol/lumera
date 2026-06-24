@@ -46,11 +46,15 @@ func NewCoordinator(t *testing.T, n int, wasmOpts ...[]wasmkeeper.Option) *Coord
 	}
 
 	for i := 1; i <= n; i++ {
+		// Reset EVM global state before each chain to avoid "already set" panics
+		// from cosmos/evm's package-level singletons (coin info, chain config).
+		resetEVMGlobalState()
+
 		chainID := GetChainID(i)
 		var x []wasmkeeper.Option
 		if len(wasmOpts) > (i - 1) {
 			x = wasmOpts[i-1]
-			
+
 		}
 		chains[chainID] = NewTestChain(t, coord, chainID, x...)
 	}

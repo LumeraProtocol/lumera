@@ -14,12 +14,12 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 
-	wasmvm "github.com/CosmWasm/wasmvm/v3"
 	"github.com/CosmWasm/wasmd/x/wasm/types"
+	wasmvm "github.com/CosmWasm/wasmvm/v3"
+	"github.com/LumeraProtocol/lumera/tests/ibctesting"
+	wasmtest "github.com/LumeraProtocol/lumera/tests/system/wasm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	wasmtest "github.com/LumeraProtocol/lumera/tests/system/wasm"
-	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 )

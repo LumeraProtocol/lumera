@@ -66,18 +66,22 @@ func setAuditParamsForFastEpochs(t *testing.T, epochLengthBlocks uint64, peerQuo
 	}
 }
 
-// setAuditParamsForFastEpochsWithMinDiskFree is setAuditParamsForFastEpochs
-// plus an explicit MinDiskFreePercent override. Used by tests that need to
-// exercise the self-compliance gate against the host report's disk-usage
-// field (e.g. the empty-active-set bootstrap exception's self-compliance
-// guard).
-func setAuditParamsForFastEpochsWithMinDiskFree(t *testing.T, epochLengthBlocks uint64, peerQuorumReports, minTargets, maxTargets uint32, requiredOpenPorts []uint32, minDiskFreePercent uint32) GenesisMutator {
+// setAuditParamsForFastEpochsWithMinCpuFree is setAuditParamsForFastEpochs
+// plus an explicit MinCpuFreePercent override. Used by tests that need to
+// exercise the self-compliance gate against a non-storage host minimum
+// (e.g. the empty-active-set bootstrap exception's self-compliance guard).
+//
+// Note: disk pressure is intentionally NOT used for postpone/self-compliance
+// gating — per LEP-6 it is owned exclusively by the STORAGE_FULL transition
+// path in audit SetReport. Tests that want to keep an SN out of the recovery
+// path must drive non-compliance via a non-storage metric (cpu or mem).
+func setAuditParamsForFastEpochsWithMinCpuFree(t *testing.T, epochLengthBlocks uint64, peerQuorumReports, minTargets, maxTargets uint32, requiredOpenPorts []uint32, minCpuFreePercent uint32) GenesisMutator {
 	base := setAuditParamsForFastEpochs(t, epochLengthBlocks, peerQuorumReports, minTargets, maxTargets, requiredOpenPorts)
 	return func(genesis []byte) []byte {
 		t.Helper()
 		state := base(genesis)
 		var err error
-		state, err = sjson.SetRawBytes(state, "app_state.audit.params.min_disk_free_percent", []byte(strconv.FormatUint(uint64(minDiskFreePercent), 10)))
+		state, err = sjson.SetRawBytes(state, "app_state.audit.params.min_cpu_free_percent", []byte(strconv.FormatUint(uint64(minCpuFreePercent), 10)))
 		require.NoError(t, err)
 		return state
 	}
@@ -311,12 +315,26 @@ func auditHostReportJSON(inboundPortStates []string) string {
 
 // auditHostReportWithDiskUsageJSON is like auditHostReportJSON but lets the
 // caller pin disk_usage_percent. Used by tests that exercise the
-// self-compliance gate (e.g. min-free thresholds).
+// STORAGE_FULL transition via the SetReport disk-pressure path.
 func auditHostReportWithDiskUsageJSON(inboundPortStates []string, diskUsagePercent float64) string {
 	bz, _ := json.Marshal(map[string]any{
 		"cpu_usage_percent":    1.0,
 		"mem_usage_percent":    1.0,
 		"disk_usage_percent":   diskUsagePercent,
+		"inbound_port_states":  inboundPortStates,
+		"failed_actions_count": 0,
+	})
+	return string(bz)
+}
+
+// auditHostReportWithCpuUsageJSON is like auditHostReportJSON but lets the
+// caller pin cpu_usage_percent. Used by tests that exercise the
+// self-compliance gate against a non-storage host minimum.
+func auditHostReportWithCpuUsageJSON(inboundPortStates []string, cpuUsagePercent float64) string {
+	bz, _ := json.Marshal(map[string]any{
+		"cpu_usage_percent":    cpuUsagePercent,
+		"mem_usage_percent":    1.0,
+		"disk_usage_percent":   1.0,
 		"inbound_port_states":  inboundPortStates,
 		"failed_actions_count": 0,
 	})
@@ -670,6 +688,27 @@ func seedProofTranscripts(
 	seeds []transcriptSeed,
 	fullMode bool,
 ) testNodeIdentity {
+	return seedProofTranscriptsWithClass(t, cli, epochID, candidates, targetAcct, seeds, fullMode,
+		"STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT")
+}
+
+// seedProofTranscriptsWithClass is identical to seedProofTranscripts but emits seed
+// proof results carrying an explicit result class. Callers that need the seed to
+// count as a Class A failure under postpone predicates pass HASH_MISMATCH; callers
+// that only need a recheck-eligible record can stick with the INVALID_TRANSCRIPT
+// default exposed via seedProofTranscripts. Class A semantics are now failure-class
+// driven (see storageTruthIsClassAFault), so an INDEX-artifact alone no longer
+// promotes a non-class-A result to Class A.
+func seedProofTranscriptsWithClass(
+	t *testing.T,
+	cli *LumeradCli,
+	epochID uint64,
+	candidates []testNodeIdentity,
+	targetAcct string,
+	seeds []transcriptSeed,
+	fullMode bool,
+	resultClass string,
+) testNodeIdentity {
 	t.Helper()
 
 	var prober, rechecker testNodeIdentity
@@ -713,15 +752,17 @@ func seedProofTranscripts(
 
 	var proofResults []string
 	for _, s := range seeds {
-		proofResults = append(proofResults, buildStorageProofResultJSON(
+		proofResults = append(proofResults, buildStorageProofResultJSONWithClass(
 			prober.accAddr, targetAcct, s.ticketID, s.transcriptHash,
 			"STORAGE_PROOF_BUCKET_TYPE_RECENT",
+			resultClass,
 		))
 		if fullMode {
 			// FULL mode requires both RECENT and OLD results for every assigned target.
-			proofResults = append(proofResults, buildStorageProofResultJSON(
+			proofResults = append(proofResults, buildStorageProofResultJSONWithClass(
 				prober.accAddr, targetAcct, s.ticketID, s.transcriptHash+"-old-seed",
 				"STORAGE_PROOF_BUCKET_TYPE_OLD",
+				resultClass,
 			))
 		}
 	}

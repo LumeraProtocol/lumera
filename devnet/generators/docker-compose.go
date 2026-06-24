@@ -4,7 +4,11 @@ import (
 	"fmt"
 	confg "gen/config"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
@@ -15,6 +19,8 @@ const (
 	defaultNetworkPrefix  = "172.28.0."
 	defaultServiceIPStart = 10
 )
+
+var semverPattern = regexp.MustCompile(`v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?`)
 
 type DockerComposeLogging struct {
 	Driver  string            `yaml:"driver"`
@@ -39,6 +45,7 @@ type DockerComposeService struct {
 	CapAdd        []string                               `yaml:"cap_add,omitempty"`
 	SecurityOpt   []string                               `yaml:"security_opt,omitempty"`
 	Logging       *DockerComposeLogging                  `yaml:"logging,omitempty"`
+	Restart       string                                 `yaml:"restart,omitempty"`
 }
 
 type DockerComposeNetwork struct {
@@ -72,6 +79,142 @@ func supernodeBinaryHostPath() (string, bool) {
 	return "", false
 }
 
+func normalizeVersion(version string) string {
+	out := strings.TrimSpace(version)
+	if out == "" {
+		return ""
+	}
+	match := semverPattern.FindString(out)
+	if match == "" {
+		return ""
+	}
+	if match[0] >= '0' && match[0] <= '9' {
+		return "v" + match
+	}
+	return match
+}
+
+func detectLumeraVersion(binaryName string) string {
+	binaryName = strings.TrimSpace(binaryName)
+	if binaryName == "" {
+		binaryName = "lumerad"
+	}
+
+	candidates := make([]string, 0, 4)
+	if dir := strings.TrimSpace(os.Getenv("DEVNET_BIN_DIR")); dir != "" {
+		candidates = append(candidates, filepath.Join(dir, binaryName))
+	}
+	candidates = append(candidates, filepath.Join(SubFolderBin, binaryName))
+	if strings.ContainsRune(binaryName, os.PathSeparator) {
+		candidates = append(candidates, binaryName)
+	} else {
+		candidates = append(candidates, binaryName)
+	}
+
+	seen := map[string]struct{}{}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+
+		resolved := candidate
+		if strings.ContainsRune(candidate, os.PathSeparator) {
+			info, err := os.Stat(candidate)
+			if err != nil || info.IsDir() {
+				continue
+			}
+		} else {
+			path, err := exec.LookPath(candidate)
+			if err != nil {
+				continue
+			}
+			resolved = path
+		}
+
+		out, err := exec.Command(resolved, "version").CombinedOutput()
+		if err != nil {
+			continue
+		}
+		if version := normalizeVersion(string(out)); version != "" {
+			return version
+		}
+	}
+
+	return ""
+}
+
+// parseSemverTriple extracts numeric major.minor.patch from a version string
+// such as "v1.20.0" or "v1.20.0-rc1". Prerelease/build metadata is ignored.
+// Returns ok=false when the value cannot be parsed into three integers.
+func parseSemverTriple(version string) (major, minor, patch int, ok bool) {
+	v := strings.TrimPrefix(strings.TrimSpace(version), "v")
+	if i := strings.IndexAny(v, "-+"); i >= 0 {
+		v = v[:i]
+	}
+	parts := strings.Split(v, ".")
+	if len(parts) != 3 {
+		return 0, 0, 0, false
+	}
+	nums := make([]int, 3)
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			return 0, 0, 0, false
+		}
+		nums[i] = n
+	}
+	return nums[0], nums[1], nums[2], true
+}
+
+// versionAtLeast reports whether current >= floor by semver major.minor.patch.
+// It fails closed (returns false) when either version cannot be parsed, so an
+// unresolvable chain version never publishes EVM ports.
+func versionAtLeast(current, floor string) bool {
+	cMaj, cMin, cPatch, ok := parseSemverTriple(current)
+	if !ok {
+		return false
+	}
+	fMaj, fMin, fPatch, ok := parseSemverTriple(floor)
+	if !ok {
+		return false
+	}
+	if cMaj != fMaj {
+		return cMaj > fMaj
+	}
+	if cMin != fMin {
+		return cMin > fMin
+	}
+	return cPatch >= fPatch
+}
+
+func resolveLumeraChainVersion(config *confg.ChainConfig) (string, error) {
+	if config == nil {
+		return "", fmt.Errorf("nil chain config")
+	}
+	if version := normalizeVersion(config.Chain.Version); version != "" {
+		return version, nil
+	}
+	if strings.TrimSpace(config.Chain.Version) != "" {
+		return "", fmt.Errorf("invalid chain.version %q", config.Chain.Version)
+	}
+	if detected := detectLumeraVersion(config.Daemon.Binary); detected != "" {
+		return detected, nil
+	}
+	binaryName := strings.TrimSpace(config.Daemon.Binary)
+	if binaryName == "" {
+		binaryName = "lumerad"
+	}
+	return "", fmt.Errorf(
+		"failed to resolve Lumera version from binary %q; set chain.version in config.json or ensure DEVNET_BIN_DIR points to a working %s binary",
+		binaryName,
+		binaryName,
+	)
+}
+
 func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validator, useExistingGenesis bool) (*DockerComposeConfig, error) {
 	compose := &DockerComposeConfig{
 		Services: make(map[string]DockerComposeService),
@@ -94,11 +237,25 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 
 	folderMount := fmt.Sprintf("/tmp/%s", config.Chain.ID)
 	validatorBaseIP := defaultServiceIPStart + 1
+	chainVersion, err := resolveLumeraChainVersion(config)
+	if err != nil {
+		return nil, err
+	}
+	evmFromVersion := strings.TrimSpace(config.Chain.EVMFromVersion)
+	if evmFromVersion == "" {
+		evmFromVersion = confg.DefaultEVMFromVersion
+	}
+	// EVM JSON-RPC endpoints only exist from evmFromVersion onward. Publishing
+	// their host ports for a pre-EVM chain reserves ports (notably 8545) for
+	// servers that never start, causing bind collisions on the host.
+	evmEnabled := versionAtLeast(chainVersion, evmFromVersion)
 
 	for index, validator := range validators {
 		serviceName := fmt.Sprintf("%s-%s", config.Docker.ContainerPrefix, validator.Name)
 		env := map[string]string{
-			"MONIKER": validator.Moniker,
+			"MONIKER":                  validator.Moniker,
+			"LUMERA_VERSION":           chainVersion,
+			"LUMERA_FIRST_EVM_VERSION": evmFromVersion,
 		}
 
 		// Pass useExistingGenesis to containers via ENV
@@ -106,19 +263,21 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			env["USE_EXISTING_GENESIS"] = "1"
 		}
 		env["INTEGRATION_TEST"] = "true"
-		// Mark the everlight test's target validator (the one whose supernode
-		// key the test uses to drive MsgSubmitEpochReport). Its on-chain
-		// host_reporter is suppressed at boot so the test wins the
-		// account-sequence race for that key. Keep host_reporter running on
-		// the other validators so peer reachability data still flows, which
-		// is what gates ACTIVE-state eligibility.
+		// Keep validator-owned host_reporters enabled by default so all
+		// supernodes submit audit epoch reports and remain healthy. Specific
+		// tests that drive MsgSubmitEpochReport externally can override this
+		// to 1 when they need to avoid account-sequence contention.
 		if validator.Name == "supernova_validator_1" {
-			env["EVERLIGHT_TEST_TARGET"] = "1"
+			env["EVERLIGHT_TEST_TARGET"] = "0"
 		}
 
 		service := DockerComposeService{
 			Build:         ".",
 			ContainerName: serviceName,
+			// Auto-restart on lumerad crashes / host pkill mishaps.
+			// start.sh wait_for_lumera() makes PID 1 exit with lumerad's
+			// status for observability; this policy handles recovery.
+			Restart: "unless-stopped",
 			Ports: []string{
 				fmt.Sprintf("%d:%d", validator.Port, DefaultP2PPort),
 				fmt.Sprintf("%d:%d", validator.RPCPort, DefaultRPCPort),
@@ -155,14 +314,34 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 		if snPresent {
 			// add supernode port mappings, if provided
 			// container ports are fixed by supernode: 4444 (service), 4445 (p2p), 8002 (gateway)
-			if validator.SupernodePort > 0 {
-				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodePort, DefaultSupernodePort))
+			if validator.Supernode.Port > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.Supernode.Port, DefaultSupernodePort))
 			}
-			if validator.SupernodeP2PPort > 0 {
-				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodeP2PPort, DefaultSupernodeP2PPort))
+			if validator.Supernode.P2PPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.Supernode.P2PPort, DefaultSupernodeP2PPort))
 			}
-			if validator.SupernodeGatewayPort > 0 {
-				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodeGatewayPort, DefaultSupernodeGatewayPort))
+			if validator.Supernode.GatewayPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.Supernode.GatewayPort, DefaultSupernodeGatewayPort))
+			}
+		}
+
+		// Optional JSON-RPC host bindings per validator, published only for
+		// EVM-enabled chain versions. Container ports are fixed by lumerad:
+		// 8545 (HTTP), 8546 (WebSocket), 6065 (JSON-RPC metrics), 8100 (geth
+		// metrics). Host ports follow a contiguous per-validator block
+		// (8645/8646/8647/8648 + index*100) defined in validators.json.
+		if evmEnabled {
+			if validator.JSONRPC.Port > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.Port, DefaultJSONRPCPort))
+			}
+			if validator.JSONRPC.WSPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.WSPort, DefaultJSONRPCWSPort))
+			}
+			if validator.JSONRPC.MetricsPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.MetricsPort, DefaultJSONRPCMetricsPort))
+			}
+			if validator.JSONRPC.GethMetricsPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.GethMetricsPort, DefaultGethMetricsPort))
 			}
 		}
 
@@ -170,25 +349,25 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			service.DependsOn = []string{validators[0].Name}
 		}
 
-		if validator.NetworkMaker.Enabled {
-			nmGrpc := validator.NetworkMaker.GRPCPort
+		if validator.LumeraUploader.Enabled {
+			nmGrpc := validator.LumeraUploader.GRPCPort
 			if nmGrpc == 0 {
-				nmGrpc = DefaultNetworkMakerGRPCPort
+				nmGrpc = DefaultLumeraUploaderGRPCPort
 			}
-			nmHTTP := validator.NetworkMaker.HTTPPort
+			nmHTTP := validator.LumeraUploader.HTTPPort
 			if nmHTTP == 0 {
-				nmHTTP = DefaultNetworkMakerHTTPPort
+				nmHTTP = DefaultLumeraUploaderHTTPPort
 			}
 			service.Ports = append(service.Ports,
-				fmt.Sprintf("%d:%d", nmGrpc, DefaultNetworkMakerGRPCPort),
-				fmt.Sprintf("%d:%d", nmHTTP, DefaultNetworkMakerHTTPPort),
-				fmt.Sprintf("%d:%d", DefaultNetworkMakerUIPort, DefaultNetworkMakerUIPort),
+				fmt.Sprintf("%d:%d", nmGrpc, DefaultLumeraUploaderGRPCPort),
+				fmt.Sprintf("%d:%d", nmHTTP, DefaultLumeraUploaderHTTPPort),
+				fmt.Sprintf("%d:%d", DefaultLumeraUploaderUIPort, DefaultLumeraUploaderUIPort),
 			)
 
-			if config.NetworkMaker.GRPCPort > 0 {
+			if config.LumeraUploader.GRPCPort > 0 {
 				env[EnvNMAPIBase] = fmt.Sprintf("http://localhost:%d", nmHTTP)
 			}
-			if config.NetworkMaker.AccountBalance != "" {
+			if config.LumeraUploader.AccountBalance != "" {
 				// reserve env slot for key if provided in config (optional)
 			}
 		}
@@ -218,7 +397,10 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 				},
 			},
 			Environment: map[string]string{
-				"HERMES_CONFIG": "/root/.hermes/config.toml",
+				"HERMES_CONFIG":            "/root/.hermes/config.toml",
+				"LUMERA_HERMES_CONTAINER":  "true",
+				"LUMERA_VERSION":           chainVersion,
+				"LUMERA_FIRST_EVM_VERSION": evmFromVersion,
 			},
 			Logging: &DockerComposeLogging{
 				Driver: "json-file",

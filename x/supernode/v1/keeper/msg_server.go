@@ -15,7 +15,7 @@ type msgServer struct {
 func NewMsgServerImpl(keeper types.SupernodeKeeper) *msgServer {
 	return &msgServer{
 		UnimplementedMsgServer: types.UnimplementedMsgServer{},
-		SupernodeKeeper: keeper,
+		SupernodeKeeper:        keeper,
 	}
 }
 

@@ -7,11 +7,11 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 
+	gogoproto "github.com/cosmos/gogoproto/proto"
 	transfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 	channeltypesv2 "github.com/cosmos/ibc-go/v10/modules/core/04-channel/v2/types"
 	ibctst "github.com/cosmos/ibc-go/v10/testing"
-	gogoproto "github.com/cosmos/gogoproto/proto"
 )
 
 // Path contains two endpoints representing two chains connected over IBC
@@ -186,8 +186,12 @@ func (path *Path) RelayAndAckPendingPackets() error {
 	if srcChain == nil || dstChain == nil {
 		return errors.New("source or destination chain is nil")
 	}
-	src.UpdateClient()
-	dst.UpdateClient()
+	if err := src.UpdateClient(); err != nil {
+		return err
+	}
+	if err := dst.UpdateClient(); err != nil {
+		return err
+	}
 
 	srcChain.Logf("Relay: %d Packets A->B, %d Packets B->A\n", len(*srcChain.PendingSendPackets), len(*dstChain.PendingSendPackets))
 	for _, v := range *srcChain.PendingSendPackets {
@@ -232,8 +236,12 @@ func (path *Path) RelayPendingPacketsV2() error {
 		return errors.New("source or destination chain is nil")
 	}
 	// ensure both chains are up to date
-	src.UpdateClient()
-	dst.UpdateClient()
+	if err := src.UpdateClient(); err != nil {
+		return err
+	}
+	if err := dst.UpdateClient(); err != nil {
+		return err
+	}
 
 	//srcChain.Logf("Relay: %d PacketsV2 A->B, %d PacketsV2 B->A\n", len(*srcChain.PendingSendPacketsV2), len(*dstChain.PendingSendPacketsV2))
 	for _, v := range *srcChain.PendingSendPacketsV2 {
@@ -311,8 +319,12 @@ func (path *Path) RelayPendingPacketsWithAcksV2() error {
 		return errors.New("source or destination chain is nil")
 	}
 	// ensure both chains are up to date
-	src.UpdateClient()
-	dst.UpdateClient()
+	if err := src.UpdateClient(); err != nil {
+		return err
+	}
+	if err := dst.UpdateClient(); err != nil {
+		return err
+	}
 
 	srcChain.Logf("Relay: %d PacketsV2 A->B, %d PacketsV2 B->A\n", len(*srcChain.PendingSendPacketsV2), len(*dstChain.PendingSendPacketsV2))
 	for _, v := range *srcChain.PendingSendPacketsV2 {

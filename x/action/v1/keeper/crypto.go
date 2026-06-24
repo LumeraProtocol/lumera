@@ -35,12 +35,12 @@ var highCompressSem = semaphore.NewWeighted(maxParallelHighCompressCalls)
 // VerifySignature verifies that a signature is valid for given data and signer.
 //
 // Flow:
-// - Try to get a pubkey from the context cache (creatorAccountCtxKey). For ICA creators
-//    this uses the app-level pubkey provided on the message; for non-ICA creators it uses
-//    the cached account pubkey when present.
-// - If no cached key is found, resolve the account and pubkey from auth keeper + address codec.
-// - Decode the base64 signature, coerce to r||s format, and verify.
-// - If direct verification fails, retry using ADR-36 amino sign bytes (Keplr/browser flow).
+//   - Try to get a pubkey from the context cache (creatorAccountCtxKey). For ICA creators
+//     this uses the app-level pubkey provided on the message; for non-ICA creators it uses
+//     the cached account pubkey when present.
+//   - If no cached key is found, resolve the account and pubkey from auth keeper + address codec.
+//   - Decode the base64 signature, coerce to r||s format, and verify.
+//   - If direct verification fails, retry using ADR-36 amino sign bytes (Keplr/browser flow).
 //
 // Parameters:
 // - data: The original data that was signed (string format)

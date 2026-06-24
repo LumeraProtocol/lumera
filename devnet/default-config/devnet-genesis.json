@@ -41,10 +41,7 @@
           4445,
           8002
         ],
-        "min_cpu_free_percent": 0,
-        "min_mem_free_percent": 0,
-        "min_disk_free_percent": 0,
-        "consecutive_epochs_to_postpone": 100,
+        "consecutive_epochs_to_postpone": 1,
         "keep_last_epoch_entries": "200",
         "peer_port_postpone_threshold_percent": 100,
         "action_finalization_signature_failure_evidences_per_epoch": 1,
@@ -62,16 +59,16 @@
         "storage_truth_compound_range_len_bytes": 256,
         "storage_truth_max_self_heal_ops_per_epoch": 5,
         "storage_truth_probation_epochs": 3,
-        "storage_truth_node_suspicion_decay_per_epoch": "1000",
+        "storage_truth_node_suspicion_decay_per_epoch": "920",
         "storage_truth_reporter_reliability_decay_per_epoch": "900",
         "storage_truth_ticket_deterioration_decay_per_epoch": "900",
         "storage_truth_node_suspicion_threshold_watch": "20",
         "storage_truth_node_suspicion_threshold_probation": "50",
-        "storage_truth_node_suspicion_threshold_postpone": "100",
+        "storage_truth_node_suspicion_threshold_postpone": "90",
         "storage_truth_reporter_reliability_low_trust_threshold": "20",
         "storage_truth_reporter_reliability_ineligible_threshold": "90",
         "storage_truth_ticket_deterioration_heal_threshold": "8",
-        "storage_truth_enforcement_mode": "STORAGE_TRUTH_ENFORCEMENT_MODE_SOFT",
+        "storage_truth_enforcement_mode": "STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW",
         "storage_truth_reporter_reliability_degraded_threshold": "50",
         "storage_truth_pattern_escalation_window": 14,
         "storage_truth_divergence_window_epochs": 14,
@@ -210,11 +207,11 @@
     "claim": {
       "params": {
         "enable_claims": true,
-        "claim_end_time": "1746071999",
+        "claim_end_time": "1893456000",
         "max_claims_per_block": "100"
       },
       "claim_records": [],
-      "total_claimable_amount": "18749999981413",
+      "total_claimable_amount": "102250000",
       "claims_denom": "ulume"
     },
     "consensus": null,
@@ -245,6 +242,17 @@
     },
     "evidence": {
       "evidence": []
+    },
+    "evmigration": {
+      "params": {
+        "enable_migration": true,
+        "max_migrations_per_block": "50",
+        "max_validator_delegations": "2000",
+        "max_multisig_sub_keys": 20
+      },
+      "migration_records": [],
+      "total_migrated": "0",
+      "total_validators_migrated": "0"
     },
     "feegrant": {
       "allowances": []
@@ -413,7 +421,7 @@
     "supernode": {
       "params": {
         "reward_distribution": {
-          "payment_period_blocks": "432000",
+          "payment_period_blocks": "100800",
           "registration_fee_share_bps": "200",
           "min_cascade_bytes_for_payment": "1073741824",
           "new_sn_ramp_up_periods": "4",

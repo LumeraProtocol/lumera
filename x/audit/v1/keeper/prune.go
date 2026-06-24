@@ -71,6 +71,10 @@ func (k Keeper) PruneOldEpochs(ctx sdk.Context, currentEpochID uint64, params ty
 	// Reporter result by target index: st/rrs-tt/<target>/<u64be(epoch_id)>/<ticket_id>0x00<reporter>
 	// Same shape as st/rrs/ (account-then-epoch), reuse helper.
 	pruneSupernodeWindowReporter(store, []byte("st/rrs-tt/"), minKeepEpochID)
+	// Reporter result by epoch index: st/rrs-e/<u64be(epoch_id)>/<reporter>
+	if err := prunePrefixByWindowIDLeadingU64(store, types.ReporterStorageTruthResultByEpochRootPrefix(), minKeepEpochID); err != nil {
+		return err
+	}
 	// Transcript by target/bucket/epoch index: st/spt-tbe/<target>/<u32be(bucket)>/<u64be(epoch_id)>/<transcript_hash>
 	pruneTargetBucketEpoch(store, []byte("st/spt-tbe/"), minKeepEpochID)
 	// Primary transcript store: st/spt/<transcript_hash> -> JSON{epoch_id, ...}.
@@ -101,7 +105,7 @@ func (k Keeper) pruneInactiveTicketDeteriorationStates(ctx sdk.Context, currentE
 	store := k.kvStore(ctx)
 	prefix := types.TicketDeteriorationStatePrefix()
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var toDelete [][]byte
 	for ; it.Valid(); it.Next() {
@@ -132,7 +136,7 @@ func (k Keeper) pruneInactiveTicketDeteriorationStates(ctx sdk.Context, currentE
 
 func prunePrefixByWindowIDLeadingU64(store storetypes.KVStore, prefix []byte, minKeepEpochID uint64) error {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var toDelete [][]byte
 
@@ -166,7 +170,7 @@ func prunePrefixByWindowIDLeadingU64(store storetypes.KVStore, prefix []byte, mi
 // by parsing the final 8 bytes as the epoch id.
 func pruneReporterTrailingWindowID(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var toDelete [][]byte
 
@@ -194,7 +198,7 @@ func pruneReporterTrailingWindowID(store storetypes.KVStore, prefix []byte, minK
 //	sc/<supernode>"/"<u64be(epoch_id)>"/"<reporter>
 func pruneSupernodeWindowReporter(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var toDelete [][]byte
 
@@ -243,7 +247,7 @@ func bytesIndexByte(b []byte, c byte) int {
 // The 8-byte epoch sits after target + '/' + 4-byte bucket + '/'.
 func pruneTargetBucketEpoch(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var toDelete [][]byte
 
@@ -285,7 +289,7 @@ func pruneTargetBucketEpoch(store storetypes.KVStore, prefix []byte, minKeepWind
 // signal to investigate.
 func pruneStorageProofTranscripts(ctx sdk.Context, k Keeper, store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	// Minimal struct to decode just the epoch_id field; tolerant of unknown fields.
 	type epochProbe struct {
@@ -327,7 +331,7 @@ func (k Keeper) pruneTerminalHealOps(ctx sdk.Context, currentEpochID, keepLastEp
 	store := k.kvStore(ctx)
 	prefix := types.HealOpPrefix()
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var toDelete []types.HealOp
 	for ; it.Valid(); it.Next() {
@@ -357,7 +361,7 @@ func (k Keeper) pruneTerminalHealOps(ctx sdk.Context, currentEpochID, keepLastEp
 			copy(kc, vit.Key())
 			verKeys = append(verKeys, kc)
 		}
-		vit.Close()
+		_ = vit.Close()
 		for _, vk := range verKeys {
 			store.Delete(vk)
 		}

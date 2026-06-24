@@ -22,7 +22,7 @@ type Keeper struct {
 	bankKeeper    types.BankKeeper
 	accountKeeper types.AccountKeeper
 
-	claimsPath    string
+	claimsPath string
 }
 
 func NewKeeper(

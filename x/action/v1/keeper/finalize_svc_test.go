@@ -3,10 +3,10 @@ package keeper_test
 import (
 	"testing"
 
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
-	"github.com/LumeraProtocol/lumera/x/action/v1/merkle"
 	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/merkle"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"

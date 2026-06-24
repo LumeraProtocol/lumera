@@ -1,0 +1,20 @@
+{
+  "is_validator": true,
+  "is_multisig": true,
+  "threshold": 2,
+  "num_signers": 3,
+  "delegation_count": 0,
+  "unbonding_count": 0,
+  "redelegation_count": 0,
+  "val_delegation_count": 5,
+  "val_unbonding_count": 0,
+  "val_redelegation_count": 0,
+  "authz_grant_count": 0,
+  "feegrant_count": 0,
+  "total_touched": 0,
+  "has_supernode": false,
+  "action_count": 0,
+  "balance_summary": "1000000ulume",
+  "would_succeed": true,
+  "rejection_reason": ""
+}

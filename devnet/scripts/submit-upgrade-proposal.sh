@@ -174,6 +174,7 @@ EOF
 		--from "$GOV_ADDRESS" \
 		--chain-id "$CHAIN_ID" \
 		--keyring-backend "$KEYRING" \
+		--gas 400000 \
 		--fees 5000ulume \
 		--broadcast-mode sync \
 		--output json \
@@ -226,6 +227,7 @@ submit_proposal_deposit() {
 		--from "$GOV_ADDRESS" \
 		--chain-id "$CHAIN_ID" \
 		--keyring-backend "$KEYRING" \
+		--gas 300000 \
 		--fees 5000ulume \
 		--broadcast-mode sync \
 		--output json \

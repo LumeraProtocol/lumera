@@ -19,8 +19,8 @@ func TestDistributePool_SkipsStaleAuditReports(t *testing.T) {
 	params.MetricsFreshnessMaxBlocks = 5
 	require.NoError(t, k.SetParams(ctx, params))
 
-	// Add supernode at block height 1 (initial ctx height) so MetricsState.Height = 1.
-	// Then run distributePool at height 100 → staleness = 99 > MetricsFreshnessMaxBlocks(5).
+	// Add supernode at the initial ctx height so MetricsState.Height pins low,
+	// then run distributePool at height 100 — staleness 99 > MetricsFreshnessMaxBlocks(5).
 	val := makeValAddr(1)
 	acc := makeAccAddr(1)
 	addSupernode(snKeeper, auditKeeper, val, acc, sntypes.SuperNodeStateActive, 10_000)

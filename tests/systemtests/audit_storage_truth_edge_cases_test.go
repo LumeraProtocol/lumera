@@ -253,7 +253,11 @@ func TestStorageTruth_ScoreDecay_TriggersRecovery(t *testing.T) {
 			transcriptHash: fmt.Sprintf("orig-hash-%d", i),
 		})
 	}
-	rechecker := seedProofTranscripts(t, cli, epochID1, nodes, target.accAddr, decaySeeds, false)
+	// Seed with HASH_MISMATCH so each seeded fact is a Class A fault on a RECENT bucket;
+	// the 3 recheks below combined with these seeds satisfy the postpone predicate
+	// (recent Class A + secondFailureEvents>=2) under the current Class A semantics.
+	rechecker := seedProofTranscriptsWithClass(t, cli, epochID1, nodes, target.accAddr, decaySeeds, false,
+		"STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH")
 
 	// Submit 3 recheks against target with distinct ticket IDs → suspicion exceeds 50.
 	for i := 0; i < 3; i++ {

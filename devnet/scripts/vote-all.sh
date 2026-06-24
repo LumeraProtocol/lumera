@@ -11,12 +11,136 @@ CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
 PROPOSAL_ID="$1"
 SERVICE_NAME="supernova_validator_1"
-LUMERA_SHARED="/tmp/lumera-devnet/shared"
 COMPOSE_FILE="../docker-compose.yml"
 FEES="5000ulume"
-# Gas configuration
-USE_GAS_AUTO="true" # "true" to use --gas auto with --gas-adjustment 1.3
-GAS_AMOUNT="120000" # Used when USE_GAS_AUTO="false"
+# Gas configuration — use a fixed gas amount by default. `--gas auto` simulates
+# a gov vote at ~57.9k and even with a 1.3x bump lands right at the real usage
+# (~58k), so votes fail nondeterministically with "out of gas" (code 11). A fixed
+# amount with headroom is deterministic for both single-sig and multisig votes
+# (the multisig `tx multisign` path can't use --gas auto at all).
+USE_GAS_AUTO="false" # "true" to use --gas auto with --gas-adjustment 1.3
+GAS_AMOUNT="250000"  # fixed gas; headroom over a vote's real ~58k usage
+PRIMARY_KEY="supernova_validator_1_key" # fee-buffer source for vesting voters
+FEE_TOPUP="1000000ulume"                # sent to a voter with no spendable balance
+FEE_MIN="5000"                          # minimum spendable ulume needed to pay a vote fee
+
+# ensure_fee_funds tops up a voter that cannot self-pay the tx fee. Validators
+# whose operator account is a PermanentLocked (or otherwise vesting) account have
+# 0 *spendable* balance, so they fail with "spendable balance 0ulume ... insufficient
+# funds". Send a small spendable buffer from the primary so the vote can proceed.
+ensure_fee_funds() {
+	local svc="$1" addr="$2" spendable balances_json topup_json topup_rc topup_code tx_hash raw_log
+	if ! balances_json=$(docker compose -f "$COMPOSE_FILE" exec -T "$svc" \
+		lumerad query bank spendable-balances "$addr" --output json 2>/dev/null); then
+		echo "  ❌ $svc: failed to query spendable balance for $addr" >&2
+		return 1
+	fi
+	spendable=$(echo "$balances_json" | jq -r '[.balances[]?|select(.denom=="ulume")|.amount][0] // "0"' | tr -d '\r\n')
+	spendable=${spendable:-0}
+	if [[ "$spendable" =~ ^[0-9]+$ ]] && [ "$spendable" -ge "$FEE_MIN" ]; then
+		return 0
+	fi
+	echo "  💧 $svc voter has ${spendable}ulume spendable (< ${FEE_MIN}); topping up ${FEE_TOPUP} from ${SERVICE_NAME}/${PRIMARY_KEY}"
+	topup_json=$(docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE_NAME" \
+		lumerad tx bank send "$PRIMARY_KEY" "$addr" "$FEE_TOPUP" \
+		--keyring-backend "$KEYRING_BACKEND" --chain-id "$CHAIN_ID" \
+		--gas "$GAS_AMOUNT" --gas-prices 0.025ulume -y -o json 2>&1)
+	topup_rc=$?
+	if [ "$topup_rc" -ne 0 ]; then
+		echo "  ❌ $svc: fee top-up command failed with exit code $topup_rc" >&2
+		echo "$topup_json" >&2
+		return 1
+	fi
+
+	if ! topup_code=$(echo "$topup_json" | jq -r '.code // 0' 2>/dev/null); then
+		echo "  ❌ $svc: fee top-up did not return valid JSON" >&2
+		echo "$topup_json" >&2
+		return 1
+	fi
+	if ! [[ "$topup_code" =~ ^[0-9]+$ ]]; then
+		echo "  ❌ $svc: fee top-up returned non-numeric code: $topup_code" >&2
+		echo "$topup_json" | jq . >&2
+		return 1
+	fi
+
+	tx_hash=$(echo "$topup_json" | jq -r '.txhash // ""')
+	if [ "$topup_code" -ne 0 ] || [ -z "$tx_hash" ]; then
+		raw_log=$(echo "$topup_json" | jq -r '.raw_log // "unknown error"')
+		if [ -z "$tx_hash" ]; then
+			echo "  ❌ $svc: fee top-up failed: $raw_log" >&2
+		else
+			echo "  ❌ $svc: fee top-up failed (txhash: $tx_hash): $raw_log" >&2
+		fi
+		return 1
+	fi
+
+	echo "  ✅ $svc fee top-up accepted (txhash: $tx_hash)"
+	sleep 6
+}
+
+# is_multisig_validator reads /shared/config/validators.json inside the target
+# container to decide whether the validator's --from key is a multisig
+# composite. Falls back to single-sig if the config is missing/malformed.
+is_multisig_validator() {
+	local svc="$1"
+	local enabled
+	enabled=$(docker compose -f "$COMPOSE_FILE" exec -T "$svc" \
+		jq -r --arg m "$svc" '.[] | select(.moniker==$m) | .multisig.enabled // false' \
+		/shared/config/validators.json 2>/dev/null | tr -d '\r\n')
+	[[ "$enabled" == "true" ]]
+}
+
+# cast_vote_multisig runs the offline 2-of-N flow inside the target container:
+# generate unsigned tx → sign with threshold signers → multisign → broadcast.
+# Echoes a broadcast-response-shaped JSON on stdout (matches the single-sig
+# path so the caller can parse txhash/code uniformly).
+cast_vote_multisig() {
+	local svc="$1" proposal="$2"
+	local key_name="${svc}_key"
+	docker compose -f "$COMPOSE_FILE" exec -T "$svc" bash -s -- \
+		"$key_name" "$proposal" "$CHAIN_ID" "$KEYRING_BACKEND" "$GAS_AMOUNT" "$FEES" <<'CONTAINER_SCRIPT'
+set -euo pipefail
+KEY_NAME="$1"
+PROPOSAL="$2"
+CHAIN_ID="$3"
+KEYRING_BACKEND="$4"
+GAS_AMOUNT="$5"
+FEES="$6"
+
+# multisig_sign_unsigned reads ${DAEMON}, ${KEYRING_BACKEND}, ${CHAIN_ID} from
+# the ambient shell; vote-all.sh isn't one of the setup scripts that normally
+# exports these, so set them here before sourcing common.sh.
+DAEMON="lumerad"
+export DAEMON KEYRING_BACKEND CHAIN_ID
+
+source /root/scripts/common.sh
+
+MULTISIG_ADDR="$(lumerad keys show "$KEY_NAME" -a --keyring-backend "$KEYRING_BACKEND" | tr -d '\r\n')"
+ACCT_JSON="$(lumerad q auth account "$MULTISIG_ADDR" --output json 2>/dev/null)"
+ACC_NUM="$(printf '%s' "$ACCT_JSON" | jq -r '.. | objects | select(has("account_number")) | .account_number' | head -n1)"
+SEQ="$(printf '%s' "$ACCT_JSON" | jq -r '.. | objects | select(has("account_number")) | (.sequence // "0")' | head -n1)"
+SEQ="${SEQ:-0}"
+
+UNSIGNED="$(mktemp /tmp/vote-unsigned.XXXXXX.json)"
+SIGNED="$(mktemp /tmp/vote-signed.XXXXXX.json)"
+trap 'rm -f "$UNSIGNED" "$SIGNED"' EXIT
+
+lumerad tx gov vote "$PROPOSAL" yes \
+	--from "$MULTISIG_ADDR" \
+	--chain-id "$CHAIN_ID" \
+	--keyring-backend "$KEYRING_BACKEND" \
+	--gas "$GAS_AMOUNT" \
+	--fees "$FEES" \
+	--account-number "$ACC_NUM" --sequence "$SEQ" \
+	--generate-only --output json >"$UNSIGNED"
+
+multisig_sign_unsigned "$UNSIGNED" "$KEY_NAME" "$MULTISIG_ADDR" \
+	"${KEY_NAME}-signer-1" "${KEY_NAME}-signer-2" \
+	"$ACC_NUM" "$SEQ" >"$SIGNED"
+
+lumerad tx broadcast "$SIGNED" --broadcast-mode sync --output json
+CONTAINER_SCRIPT
+}
 
 # Checking the votes with:
 #    lumerad query gov votes <proposal_id> --output json | jq
@@ -54,8 +178,11 @@ check_tally() {
 vote_all() {
 	echo "🔍 Discovering validator services..."
 
-	# Get all docker compose services and filter out the primary validator (_1)
-	VALIDATOR_SERVICES=$(docker compose -f "$COMPOSE_FILE" config --services | grep supernova_validator_ | grep -v '_1$')
+	# Vote from ALL validators including the primary (_1). The proposer is NOT
+	# auto-voted by x/gov, so excluding _1 silently dropped the primary's (often
+	# largest) stake from the tally — a frequent cause of upgrades not reaching
+	# quorum.
+	VALIDATOR_SERVICES=$(docker compose -f "$COMPOSE_FILE" config --services | grep supernova_validator_)
 
 	TX_HASHES=()
 
@@ -65,26 +192,37 @@ vote_all() {
 
 		KEY_NAME="${SERVICE}_key"
 		VOTER_ADDRESS=$(docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
-			lumerad keys show $KEY_NAME -a --keyring-backend "$KEYRING_BACKEND" 2>/dev/null)
+			lumerad keys show "$KEY_NAME" -a --keyring-backend "$KEYRING_BACKEND" 2>/dev/null)
 
 		echo "🗳️  Voting YES on behalf of $SERVICE (address: $VOTER_ADDRESS)..."
 
-		if [ "$USE_GAS_AUTO" = "true" ]; then
-			GAS_FLAGS=(--gas auto --gas-adjustment 1.3)
-		else
-			GAS_FLAGS=(--gas "$GAS_AMOUNT")
+		# Make sure the voter can pay the fee (vesting accounts have 0 spendable).
+		if ! ensure_fee_funds "$SERVICE" "$VOTER_ADDRESS"; then
+			echo "❌ Skipping vote for $SERVICE because fee top-up failed"
+			continue
 		fi
 
-		VOTE_JSON=$(docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
-			lumerad tx gov vote "$PROPOSAL_ID" yes \
-			--from $VOTER_ADDRESS \
-			--chain-id "$CHAIN_ID" \
-			--keyring-backend "$KEYRING_BACKEND" \
-			"${GAS_FLAGS[@]}" \
-			--fees "$FEES" \
-			--output json \
-			--broadcast-mode sync \
-			--yes)
+		if is_multisig_validator "$SERVICE"; then
+			echo "  ($SERVICE is multisig; using offline 2-of-N signing flow)"
+			VOTE_JSON=$(cast_vote_multisig "$SERVICE" "$PROPOSAL_ID")
+		else
+			if [ "$USE_GAS_AUTO" = "true" ]; then
+				GAS_FLAGS=(--gas auto --gas-adjustment 1.3)
+			else
+				GAS_FLAGS=(--gas "$GAS_AMOUNT")
+			fi
+
+			VOTE_JSON=$(docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
+				lumerad tx gov vote "$PROPOSAL_ID" yes \
+				--from "$VOTER_ADDRESS" \
+				--chain-id "$CHAIN_ID" \
+				--keyring-backend "$KEYRING_BACKEND" \
+				"${GAS_FLAGS[@]}" \
+				--fees "$FEES" \
+				--output json \
+				--broadcast-mode sync \
+				--yes)
+		fi
 
 		if [ -z "$VOTE_JSON" ]; then
 			echo "❌ No JSON response received. The transaction command may have failed to execute."

@@ -1,0 +1,49 @@
+# gen-activity-config.toml — copy to gen-activity-config.toml and edit.
+#
+# Precedence (low -> high): built-in defaults < [common] < [chains.<name>] <
+# explicit CLI flags. Select a chain with `-chain <name>`. Keys mirror the CLI
+# flag names. Running with NO flags launches the interactive wizard.
+
+[common]
+bin = "lumerad"
+home = "~/.lumera"
+keyring-backend = "test"
+funding-key = "governance_key"
+evm-cutover-version = "v1.20.0"
+account-prefix = "gen"
+max-account-amount = "10000000ulume"
+parallelism = 5
+funding-batch-size = 1
+actions = true
+require-actions = false
+max-actions-per-run = 3
+action-states = "pending,done,approved"
+action-readiness-timeout = "180s"
+add-accounts = false
+activity-existing = false
+dry-run = true
+
+# Optional account-mix knobs (default 0 / off). Usually passed as CLI flags, but
+# can be predefined here or per-chain:
+# num-multisig23-accounts = 0        # number of 2-of-3 multisig accounts
+# num-multisig35-accounts = 0        # number of 3-of-5 multisig accounts
+# vesting-percent = 0                # % of regular accounts made continuous/delayed vesting (0-100)
+# num-permanent-locked-accounts = 0  # dedicated PermanentLocked accounts
+
+[chains.devnet]
+rpc = "tcp://localhost:26657"
+grpc = "localhost:9090"
+chain-id = "lumera-devnet-1"
+accounts = "accounts-devnet.json"
+
+[chains.testnet]
+rpc = "https://rpc.testnet.lumera.io:443"
+grpc = "grpc.testnet.lumera.io:443"
+chain-id = "lumera-testnet-1"
+accounts = "accounts-testnet.json"
+
+[chains.mainnet]
+rpc = "https://rpc.lumera.io:443"
+grpc = "grpc.lumera.io:443"
+chain-id = "lumera-mainnet-1"
+accounts = "accounts-mainnet.json"

@@ -331,7 +331,7 @@ func (k Keeper) hasObservedEligibleTicketForTargetBucketInWindow(
 	startKey := binary.BigEndian.AppendUint64(append([]byte(nil), bucketPfx...), startEpoch)
 	endKey := binary.BigEndian.AppendUint64(append([]byte(nil), bucketPfx...), endEpoch+1)
 	it := k.kvStore(ctx).Iterator(startKey, endKey)
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	for ; it.Valid(); it.Next() {
 		var record storageProofTranscriptRecord

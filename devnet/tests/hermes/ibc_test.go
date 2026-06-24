@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"gen/tests/ibcutil"
-	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	_ "github.com/LumeraProtocol/lumera/config" // init() sets Bech32 prefixes and seals config
+	textutil "github.com/LumeraProtocol/lumera/pkg/text"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -35,14 +37,17 @@ const (
 	defaultLumeraREST      = "http://supernova_validator_1:1317"
 	defaultLumeraICAFund   = "1000000"
 	defaultLumeraICAFeeBuf = "10000"
+	hermesContainerEnv     = "LUMERA_HERMES_CONTAINER"
 	actionPollRetries      = 40
 	actionPollDelay        = 3 * time.Second
 	simdQueryTimeout       = 20 * time.Second
 	simdTxTimeout          = 2 * time.Minute
 	icaTestTimeout         = 20 * time.Minute
+	defaultIBCRetries      = 40
+	defaultIBCRetryDelay   = 3 * time.Second
 )
 
-type ibcSimdSuite struct {
+type lumeraHermesSuite struct {
 	suite.Suite
 	channelInfoPath     string
 	simdBin             string
@@ -55,6 +60,7 @@ type ibcSimdSuite struct {
 	lumeraICAFund       string
 	lumeraICAFeeBuffer  string
 	lumeraRecipient     string
+	lumeraKeyStyle      string
 
 	simd   ChainInfo
 	lumera ChainInfo
@@ -80,11 +86,11 @@ type ChainInfo struct {
 	MnemonicFile string
 }
 
-func (s *ibcSimdSuite) logInfo(msg string) {
+func (s *lumeraHermesSuite) logInfo(msg string) {
 	s.T().Log(formatTestLog("INFO", msg))
 }
 
-func (s *ibcSimdSuite) logInfof(format string, args ...any) {
+func (s *lumeraHermesSuite) logInfof(format string, args ...any) {
 	s.T().Log(formatTestLog("INFO", fmt.Sprintf(format, args...)))
 }
 
@@ -93,35 +99,40 @@ func formatTestLog(level, msg string) string {
 	return fmt.Sprintf("%s %s %s", level, ts, msg)
 }
 
-func (s *ibcSimdSuite) SetupSuite() {
-	// Load environment-driven configuration and shared chain metadata.
-	s.channelInfoPath = getenv("CHANNEL_INFO_FILE", defaultChannelInfoPath)
-	s.simdBin = getenv("SIMD_BIN", defaultSimdBin)
-	s.simd = ChainInfo{
-		ChainID:      getenv("SIMD_CHAIN_ID", defaultSimdChainID),
-		RPC:          getenv("SIMD_RPC_ADDR", defaultSimdRPC),
-		GRPC:         normalizeGRPCAddr(getenv("SIMD_GRPC_ADDR", defaultSimdGRPCAddr)),
-		Denom:        getenv("SIMD_DENOM", defaultSimdDenom),
-		KeyName:      getenv("SIMD_KEY_NAME", defaultSimdKeyName),
-		MnemonicFile: getenv("SIMD_KEY_MNEMONIC_FILE", defaultSimdMnemonic),
+func (s *lumeraHermesSuite) SetupSuite() {
+	if !isHermesContainerRuntime() {
+		s.T().Skipf("skip Hermes IBC suite: set %s=true only inside the Hermes container", hermesContainerEnv)
+		return
 	}
-	s.simdKeyring = getenv("SIMD_KEYRING", defaultSimdKeyring)
-	s.simdHome = getenv("SIMD_HOME", defaultSimdHome)
-	s.simdGasPrices = getenv("SIMD_GAS_PRICES", defaultSimdGasPrices)
-	s.simdAddrFile = getenv("SIMD_OWNER_ADDR_FILE", defaultSimdAddrFile)
-	s.lumera = ChainInfo{
-		ChainID:      getenv("LUMERA_CHAIN_ID", defaultLumeraChainID),
-		GRPC:         normalizeGRPCAddr(getenv("LUMERA_GRPC_ADDR", defaultLumeraGRPCAddr)),
-		RPC:          getenv("LUMERA_RPC_ADDR", defaultLumeraRPCAddr),
-		REST:         getenv("LUMERA_REST_ADDR", defaultLumeraREST),
-		Denom:        getenv("LUMERA_DENOM", defaultLumeraDenom),
-		KeyName:      getenv("LUMERA_KEY_NAME", defaultLumeraKeyName),
-		MnemonicFile: getenv("LUMERA_KEY_MNEMONIC_FILE", defaultLumeraMnemonic),
-	}
-	s.lumeraICAFund = getenv("LUMERA_ICA_FUND_AMOUNT", defaultLumeraICAFund)
-	s.lumeraICAFeeBuffer = getenv("LUMERA_ICA_FUND_FEE_BUFFER", defaultLumeraICAFeeBuf)
 
-	ensureLumeraBech32Prefixes()
+	// Load environment-driven configuration and shared chain metadata.
+	s.channelInfoPath = textutil.EnvOrDefault("CHANNEL_INFO_FILE", defaultChannelInfoPath)
+	s.simdBin = textutil.EnvOrDefault("SIMD_BIN", defaultSimdBin)
+	s.simd = ChainInfo{
+		ChainID:      textutil.EnvOrDefault("SIMD_CHAIN_ID", defaultSimdChainID),
+		RPC:          textutil.EnvOrDefault("SIMD_RPC_ADDR", defaultSimdRPC),
+		GRPC:         normalizeGRPCAddr(textutil.EnvOrDefault("SIMD_GRPC_ADDR", defaultSimdGRPCAddr)),
+		Denom:        textutil.EnvOrDefault("SIMD_DENOM", defaultSimdDenom),
+		KeyName:      textutil.EnvOrDefault("SIMD_KEY_NAME", defaultSimdKeyName),
+		MnemonicFile: textutil.EnvOrDefault("SIMD_KEY_MNEMONIC_FILE", defaultSimdMnemonic),
+	}
+	s.simdKeyring = textutil.EnvOrDefault("SIMD_KEYRING", defaultSimdKeyring)
+	s.simdHome = textutil.EnvOrDefault("SIMD_HOME", defaultSimdHome)
+	s.simdGasPrices = textutil.EnvOrDefault("SIMD_GAS_PRICES", defaultSimdGasPrices)
+	s.simdAddrFile = textutil.EnvOrDefault("SIMD_OWNER_ADDR_FILE", defaultSimdAddrFile)
+	s.lumera = ChainInfo{
+		ChainID:      textutil.EnvOrDefault("LUMERA_CHAIN_ID", defaultLumeraChainID),
+		GRPC:         normalizeGRPCAddr(textutil.EnvOrDefault("LUMERA_GRPC_ADDR", defaultLumeraGRPCAddr)),
+		RPC:          textutil.EnvOrDefault("LUMERA_RPC_ADDR", defaultLumeraRPCAddr),
+		REST:         textutil.EnvOrDefault("LUMERA_REST_ADDR", defaultLumeraREST),
+		Denom:        textutil.EnvOrDefault("LUMERA_DENOM", defaultLumeraDenom),
+		KeyName:      textutil.EnvOrDefault("LUMERA_KEY_NAME", defaultLumeraKeyName),
+		MnemonicFile: textutil.EnvOrDefault("LUMERA_KEY_MNEMONIC_FILE", defaultLumeraMnemonic),
+	}
+	s.lumeraICAFund = textutil.EnvOrDefault("LUMERA_ICA_FUND_AMOUNT", defaultLumeraICAFund)
+	s.lumeraICAFeeBuffer = textutil.EnvOrDefault("LUMERA_ICA_FUND_FEE_BUFFER", defaultLumeraICAFeeBuf)
+	s.lumeraKeyStyle = resolveLumeraKeyStyle()
+	s.T().Logf("Lumera key style for Hermes tests: %s", s.lumeraKeyStyle)
 
 	info, err := ibcutil.LoadChannelInfo(s.channelInfoPath)
 	s.Require().NoError(err, "load channel info")
@@ -140,7 +151,7 @@ func (s *ibcSimdSuite) SetupSuite() {
 		info.PortID, info.ChannelID, info.CounterpartyChainID, info.AChainID, info.BChainID)
 
 	// Resolve port/channel IDs from env or the generated channel info file.
-	portID := getenv("PORT_ID", "")
+	portID := textutil.EnvOrDefault("PORT_ID", "")
 	if portID == "" {
 		portID = info.PortID
 	}
@@ -149,11 +160,11 @@ func (s *ibcSimdSuite) SetupSuite() {
 	}
 	s.portID = portID
 
-	s.counterpartyChannel = getenv("LUMERA_CHANNEL_ID", info.ChannelID)
+	s.counterpartyChannel = textutil.EnvOrDefault("LUMERA_CHANNEL_ID", info.ChannelID)
 	s.Require().NotEmpty(s.counterpartyChannel, "channel_id missing in %s", s.channelInfoPath)
 
 	// Load the lumera recipient for transfer tests.
-	lumeraAddrFile := getenv("LUMERA_RECIPIENT_ADDR_FILE", defaultLumeraAddrFile)
+	lumeraAddrFile := textutil.EnvOrDefault("LUMERA_RECIPIENT_ADDR_FILE", defaultLumeraAddrFile)
 	addr, err := ibcutil.ReadAddress(lumeraAddrFile)
 	s.Require().NoError(err, "read lumera recipient address")
 	s.lumeraRecipient = addr
@@ -212,7 +223,7 @@ func (s *ibcSimdSuite) SetupSuite() {
 	s.csType = csType
 }
 
-func (s *ibcSimdSuite) TestChannelOpen() {
+func (s *lumeraHermesSuite) TestChannelOpen() {
 	s.Require().NotNil(s.channel, "channel is nil")
 	s.True(ibcutil.IsOpenState(s.channel.State), "channel %s/%s not open: %s", s.channel.PortID, s.channel.ChannelID, s.channel.State)
 	if s.channel.Counterparty.ChannelID != "" {
@@ -220,16 +231,16 @@ func (s *ibcSimdSuite) TestChannelOpen() {
 	}
 }
 
-func (s *ibcSimdSuite) TestConnectionOpen() {
+func (s *lumeraHermesSuite) TestConnectionOpen() {
 	s.Require().NotNil(s.connection, "connection is nil")
 	s.True(ibcutil.IsOpenState(s.connection.State), "connection %s not open: %s", s.connection.ID, s.connection.State)
 }
 
-func (s *ibcSimdSuite) TestClientActive() {
+func (s *lumeraHermesSuite) TestClientActive() {
 	s.True(ibcutil.IsActiveStatus(s.clientStatus), "client %s not active: %s", s.connection.ClientID, s.clientStatus)
 }
 
-func (s *ibcSimdSuite) TestChannelClientState() {
+func (s *lumeraHermesSuite) TestChannelClientState() {
 	if s.csClientID != "" {
 		s.Equal(s.connection.ClientID, s.csClientID, "client-state mismatch")
 	}
@@ -237,9 +248,98 @@ func (s *ibcSimdSuite) TestChannelClientState() {
 	s.T().Logf("Client status active; client-state height=%d type=%s", s.csHeight, s.csType)
 }
 
-func (s *ibcSimdSuite) TestTransferToLumera() {
+func (s *lumeraHermesSuite) TestTransferToLumera() {
 	// Exercise a real packet flow from simd -> lumera and confirm balance change.
-	amount := getenv("SIMD_IBC_AMOUNT", "100"+s.simd.Denom)
+	amount := "100" + s.simd.Denom
+	s.transferFromSimdToLumeraAndAssert(amount)
+}
+
+func (s *lumeraHermesSuite) TestIBCTransferWithEVMModeStillRelays() {
+	s.requireLumeraEVMModeOrSkip()
+	amount := "77" + s.simd.Denom
+	s.transferFromSimdToLumeraAndAssert(amount)
+}
+
+func (s *lumeraHermesSuite) TestIBCUnapprovedBaseDenomDoesNotRegisterERC20Pair() {
+	s.requireLumeraEVMModeOrSkip()
+
+	ibcDenom := ibcutil.IBCDenom(s.portID, s.channel.ChannelID, s.simd.Denom)
+	pairsBefore, err := ibcutil.QueryERC20TokenPairsREST(s.lumera.REST)
+	if err != nil {
+		s.T().Skipf("skip ERC20 auto-registration rejection check: %v", err)
+		return
+	}
+	if erc20TokenPairExists(pairsBefore, ibcDenom) {
+		s.T().Skipf("skip ERC20 auto-registration rejection check: token pair already exists for %s", ibcDenom)
+		return
+	}
+
+	s.transferFromSimdToLumeraAndAssert("19" + s.simd.Denom)
+
+	pairsAfter, err := ibcutil.QueryERC20TokenPairsREST(s.lumera.REST)
+	s.Require().NoError(err, "query erc20 token pairs after IBC transfer")
+	s.Require().False(
+		erc20TokenPairExists(pairsAfter, ibcDenom),
+		"unapproved IBC denom %s should not auto-register an ERC20 token pair",
+		ibcDenom,
+	)
+}
+
+func (s *lumeraHermesSuite) TestIBCAllowlistedBaseDenomWrongChannelDoesNotRegisterERC20Pair() {
+	s.requireLumeraEVMModeOrSkip()
+	s.requireERC20WrongChannelPolicyProfileOrSkip()
+
+	baseDenom := s.simd.Denom
+	allowedChannel := strings.TrimSpace(os.Getenv("LUMERA_ERC20_ALLOWED_TRACE_CHANNEL"))
+	s.Require().NotEmpty(allowedChannel, "LUMERA_ERC20_ALLOWED_TRACE_CHANNEL must name the channel pre-bound by governance")
+	s.Require().NotEqual(
+		allowedChannel,
+		s.channel.ChannelID,
+		"wrong-channel profile must bind %s to a different channel than the live simd->Lumera channel",
+		baseDenom,
+	)
+
+	ibcDenom := ibcutil.IBCDenom(s.portID, s.channel.ChannelID, baseDenom)
+	pairsBefore, err := ibcutil.QueryERC20TokenPairsREST(s.lumera.REST)
+	if err != nil {
+		s.T().Skipf("skip wrong-channel ERC20 rejection check: %v", err)
+		return
+	}
+	if erc20TokenPairExists(pairsBefore, ibcDenom) {
+		s.T().Skipf("skip wrong-channel ERC20 rejection check: token pair already exists for %s", ibcDenom)
+		return
+	}
+
+	s.transferFromSimdToLumeraAndAssert("23" + baseDenom)
+
+	pairsAfter, err := ibcutil.QueryERC20TokenPairsREST(s.lumera.REST)
+	s.Require().NoError(err, "query erc20 token pairs after wrong-channel IBC transfer")
+	s.Require().False(
+		erc20TokenPairExists(pairsAfter, ibcDenom),
+		"base denom %s sent over unbound channel %s should not auto-register ERC20 pair %s",
+		baseDenom,
+		s.channel.ChannelID,
+		ibcDenom,
+	)
+}
+
+func TestIBCSimdSideSuite(t *testing.T) {
+	suite.Run(t, new(lumeraHermesSuite))
+}
+
+func normalizeGRPCAddr(addr string) string {
+	out := strings.TrimSpace(addr)
+	out = strings.TrimPrefix(out, "http://")
+	out = strings.TrimPrefix(out, "https://")
+	return out
+}
+
+func isHermesContainerRuntime() bool {
+	value := strings.TrimSpace(os.Getenv(hermesContainerEnv))
+	return value == "1" || strings.EqualFold(value, "true")
+}
+
+func (s *lumeraHermesSuite) transferFromSimdToLumeraAndAssert(amount string) {
 	ibcDenom := ibcutil.IBCDenom(s.portID, s.channel.ChannelID, s.simd.Denom)
 
 	before, err := ibcutil.QueryBalanceREST(s.lumera.REST, s.lumeraRecipient, ibcDenom)
@@ -252,36 +352,30 @@ func (s *ibcSimdSuite) TestTransferToLumera() {
 	)
 	s.Require().NoError(err, "send ibc transfer to lumera")
 
-	after, err := ibcutil.WaitForBalanceIncreaseREST(s.lumera.REST, s.lumeraRecipient, ibcDenom, before, 20, 3*time.Second)
+	after, err := ibcutil.WaitForBalanceIncreaseREST(s.lumera.REST, s.lumeraRecipient, ibcDenom, before, defaultIBCRetries, defaultIBCRetryDelay)
 	s.Require().NoError(err, "wait for lumera recipient balance increase")
 	s.T().Logf("lumera recipient balance increased: %d -> %d", before, after)
 }
 
-func TestIBCSimdSideSuite(t *testing.T) {
-	suite.Run(t, new(ibcSimdSuite))
-}
-
-func getenv(key, fallback string) string {
-	if val := os.Getenv(key); val != "" {
-		return val
+func erc20TokenPairExists(pairs []ibcutil.ERC20TokenPair, denom string) bool {
+	for _, pair := range pairs {
+		if strings.EqualFold(pair.Denom, denom) {
+			return true
+		}
 	}
-	return fallback
+	return false
 }
 
-func normalizeGRPCAddr(addr string) string {
-	out := strings.TrimSpace(addr)
-	out = strings.TrimPrefix(out, "http://")
-	out = strings.TrimPrefix(out, "https://")
-	return out
-}
-
-func ensureLumeraBech32Prefixes() {
-	cfg := sdk.GetConfig()
-	if cfg.GetBech32AccountAddrPrefix() == "lumera" {
+func (s *lumeraHermesSuite) requireERC20WrongChannelPolicyProfileOrSkip() {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("LUMERA_ERC20_WRONG_CHANNEL_POLICY_TESTS")), "true") {
 		return
 	}
-	cfg.SetBech32PrefixForAccount("lumera", "lumerapub")
-	cfg.SetBech32PrefixForValidator("lumeravaloper", "lumeravaloperpub")
-	cfg.SetBech32PrefixForConsensusNode("lumeravalcons", "lumeravalconspub")
-	cfg.Seal()
+	s.T().Skip("skip wrong-channel ERC20 provenance test: set LUMERA_ERC20_WRONG_CHANNEL_POLICY_TESTS=true with a pre-bound policy profile")
+}
+
+func (s *lumeraHermesSuite) requireLumeraEVMModeOrSkip() {
+	if strings.EqualFold(strings.TrimSpace(s.lumeraKeyStyle), "evm") {
+		return
+	}
+	s.T().Skipf("skip EVM-mode transfer assertion: lumera key style is %q", s.lumeraKeyStyle)
 }

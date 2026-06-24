@@ -1,10 +1,14 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 
+	tmcmd "github.com/cometbft/cometbft/cmd/cometbft/commands"
+	cmttypes "github.com/cometbft/cometbft/types"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -21,15 +25,21 @@ import (
 	"github.com/cosmos/cosmos-sdk/server"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	"github.com/cosmos/cosmos-sdk/version"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
+	evmserver "github.com/cosmos/evm/server"
 
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmcli "github.com/CosmWasm/wasmd/x/wasm/client/cli"
 	wasmKeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/LumeraProtocol/lumera/app"
+	appopenrpc "github.com/LumeraProtocol/lumera/app/openrpc"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
+	"github.com/cosmos/cosmos-sdk/x/genutil"
 )
 
 func initRootCmd(
@@ -37,21 +47,25 @@ func initRootCmd(
 	txConfig client.TxConfig,
 	basicManager module.BasicManager,
 ) {
+	if err := appopenrpc.RegisterJSONRPCNamespace(); err != nil {
+		panic(err)
+	}
+
 	rootCmd.AddCommand(
-		genutilcli.InitCmd(basicManager, app.DefaultNodeHome),
+		initCmdWithEVMDefaults(basicManager),
 		NewTestnetCmd(basicManager, banktypes.GenesisBalancesIterator{}),
 		debugCommand(),
 		confixcmd.ConfigCommand(),
 		pruning.Cmd(newApp, app.DefaultNodeHome),
 		snapshot.Cmd(newApp),
 	)
-	// Register --claims-path persistent flag
-	rootCmd.PersistentFlags().String(claimtypes.FlagClaimsPath, "",
-		fmt.Sprintf("Path to %s file or directory containing it", claimtypes.DefaultClaimsFileName))
-	// Bind to viper
-	_ = viper.BindPFlag(claimtypes.FlagClaimsPath, rootCmd.PersistentFlags().Lookup(claimtypes.FlagClaimsPath))
 
-	server.AddCommands(rootCmd, app.DefaultNodeHome, newApp, appExport, addModuleInitFlags)
+	addEVMServerCommands(
+		rootCmd,
+		evmserver.NewDefaultStartOptions(newEVMApp, app.DefaultNodeHome),
+		appExport,
+		addModuleInitFlags,
+	)
 
 	// add keybase, auxiliary RPC, query, genesis, and tx child commands
 	rootCmd.AddCommand(
@@ -64,8 +78,152 @@ func initRootCmd(
 	wasmcli.ExtendUnsafeResetAllCmd(rootCmd)
 }
 
+func addEVMServerCommands(
+	rootCmd *cobra.Command,
+	opts evmserver.StartOptions,
+	appExport servertypes.AppExporter,
+	addStartFlags servertypes.ModuleInitFlags,
+) {
+	cometbftCmd := &cobra.Command{
+		Use:     "comet",
+		Aliases: []string{"cometbft"},
+		Short:   "CometBFT subcommands",
+	}
+
+	cometbftCmd.AddCommand(
+		server.ShowNodeIDCmd(),
+		server.ShowValidatorCmd(),
+		server.ShowAddressCmd(),
+		server.VersionCmd(),
+		tmcmd.ResetAllCmd,
+		tmcmd.ResetStateCmd,
+		server.BootstrapStateCmd(opts.AppCreator),
+	)
+
+	startCmd := evmserver.StartCmd(opts)
+	wrapJSONRPCAliasStartPreRun(startCmd)
+	addStartFlags(startCmd)
+
+	rootCmd.AddCommand(
+		startCmd,
+		cometbftCmd,
+		server.ExportCmd(appExport, opts.DefaultNodeHome),
+		version.NewVersionCommand(),
+		server.NewRollbackCmd(opts.AppCreator, opts.DefaultNodeHome),
+		evmserver.NewIndexTxCmd(),
+	)
+}
+
+func wrapJSONRPCAliasStartPreRun(startCmd *cobra.Command) {
+	originalPreRunE := startCmd.PreRunE
+	startCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		if originalPreRunE != nil {
+			if err := originalPreRunE(cmd, args); err != nil {
+				return err
+			}
+		}
+
+		serverCtx := server.GetServerContextFromCmd(cmd)
+		v := serverCtx.Viper
+		if !v.GetBool("json-rpc.enable") {
+			return nil
+		}
+
+		publicAddr := v.GetString("json-rpc.address")
+		if publicAddr == "" {
+			return nil
+		}
+
+		internalAddr, err := reserveLoopbackAddr()
+		if err != nil {
+			return err
+		}
+
+		v.Set(app.JSONRPCAliasPublicAddrAppOpt, publicAddr)
+		v.Set(app.JSONRPCAliasUpstreamAddrAppOpt, internalAddr)
+		v.Set("json-rpc.address", internalAddr)
+		return nil
+	}
+}
+
+func reserveLoopbackAddr() (string, error) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", err
+	}
+	addr := ln.Addr().String()
+	if closeErr := ln.Close(); closeErr != nil {
+		return "", closeErr
+	}
+	return addr, nil
+}
+
 func addModuleInitFlags(startCmd *cobra.Command) {
 	wasm.AddModuleInitFlags(startCmd)
+
+	// Claim module flags for genesis CSV loading.
+	// Registered on the start command so cobra accepts them, then bound to global
+	// viper so x/claim's InitGenesis (which uses viper.GetBool/GetString) sees them.
+	startCmd.Flags().String(claimtypes.FlagClaimsPath, "",
+		fmt.Sprintf("Path to %s file or directory containing it", claimtypes.DefaultClaimsFileName))
+	startCmd.Flags().Bool(claimtypes.FlagSkipClaimsCheck, true,
+		"Skip claims.csv loading at genesis (default true; set false to load claim records)")
+	_ = viper.BindPFlag(claimtypes.FlagClaimsPath, startCmd.Flags().Lookup(claimtypes.FlagClaimsPath))
+	_ = viper.BindPFlag(claimtypes.FlagSkipClaimsCheck, startCmd.Flags().Lookup(claimtypes.FlagSkipClaimsCheck))
+}
+
+// initCmdWithEVMDefaults wraps the SDK init command and patches genesis defaults:
+//   - chain bank metadata for EVM denom resolution
+//   - consensus block max gas for EIP-1559 base fee calculations
+func initCmdWithEVMDefaults(basicManager module.BasicManager) *cobra.Command {
+	initCmd := genutilcli.InitCmd(basicManager, app.DefaultNodeHome)
+	originalRunE := initCmd.RunE
+	initCmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if err := originalRunE(cmd, args); err != nil {
+			return err
+		}
+		return patchInitGenesisBankMetadata(cmd)
+	}
+	return initCmd
+}
+
+func patchInitGenesisBankMetadata(cmd *cobra.Command) error {
+	clientCtx := client.GetClientContextFromCmd(cmd)
+	serverCtx := server.GetServerContextFromCmd(cmd)
+	serverCtx.Config.SetRoot(clientCtx.HomeDir)
+	genFile := serverCtx.Config.GenesisFile()
+
+	appGenesis, err := genutiltypes.AppGenesisFromFile(genFile)
+	if err != nil {
+		return err
+	}
+
+	var appState map[string]json.RawMessage
+	if err := json.Unmarshal(appGenesis.AppState, &appState); err != nil {
+		return err
+	}
+
+	var bankGenesis banktypes.GenesisState
+	clientCtx.Codec.MustUnmarshalJSON(appState[banktypes.ModuleName], &bankGenesis)
+	bankGenesis.DenomMetadata = lcfg.UpsertChainBankMetadata(bankGenesis.DenomMetadata)
+	appState[banktypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&bankGenesis)
+
+	appStateBz, err := json.MarshalIndent(appState, "", " ")
+	if err != nil {
+		return err
+	}
+
+	appGenesis.AppState = appStateBz
+
+	if appGenesis.Consensus == nil {
+		appGenesis.Consensus = &genutiltypes.ConsensusGenesis{}
+	}
+	if appGenesis.Consensus.Params == nil {
+		appGenesis.Consensus.Params = cmttypes.DefaultConsensusParams()
+	}
+	appGenesis.Consensus.Params.Block.MaxGas = lcfg.ChainDefaultConsensusMaxGas
+
+	return genutil.ExportGenesisFile(appGenesis, genFile)
 }
 
 // genesisCommand builds genesis-related `lumerad genesis` command. Users may provide application specific commands as a parameter
@@ -142,6 +300,24 @@ func newApp(
 	traceStore io.Writer,
 	appOpts servertypes.AppOptions,
 ) servertypes.Application {
+	baseappOptions := server.DefaultBaseappOptions(appOpts)
+	wasmOpts := []wasmKeeper.Option{}
+
+	return app.New(
+		logger, db, traceStore, true,
+		appOpts,
+		wasmOpts,
+		baseappOptions...,
+	)
+}
+
+// newEVMApp creates the application with the cosmos/evm server.Application type.
+func newEVMApp(
+	logger log.Logger,
+	db dbm.DB,
+	traceStore io.Writer,
+	appOpts servertypes.AppOptions,
+) evmserver.Application {
 	baseappOptions := server.DefaultBaseappOptions(appOpts)
 	wasmOpts := []wasmKeeper.Option{}
 

@@ -3,7 +3,7 @@ package keeper_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/merkle"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"

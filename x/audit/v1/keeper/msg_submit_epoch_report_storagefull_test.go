@@ -18,6 +18,8 @@ func TestSubmitEpochReport_TransitionsReporterToStorageFullFromHostReport(t *tes
 
 	reporter := sdk.AccAddress([]byte("reporter_address_20b")).String()
 	reporterVal := sdk.ValAddress([]byte("reporter_val_addr_20")).String()
+	valAddr, err := sdk.ValAddressFromBech32(reporterVal)
+	require.NoError(t, err)
 
 	reporterSN := sntypes.SuperNode{
 		ValidatorAddress: reporterVal,
@@ -36,12 +38,8 @@ func TestSubmitEpochReport_TransitionsReporterToStorageFullFromHostReport(t *tes
 		Return(sntypes.DefaultParams()).
 		Times(1)
 	f.supernodeKeeper.EXPECT().
-		SetSuperNode(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ sdk.Context, sn sntypes.SuperNode) error {
-			require.NotEmpty(t, sn.States)
-			require.Equal(t, sntypes.SuperNodeStateStorageFull, sn.States[len(sn.States)-1].State)
-			return nil
-		}).
+		MarkSuperNodeStorageFull(gomock.Any(), valAddr).
+		Return(nil).
 		Times(1)
 	f.supernodeKeeper.EXPECT().
 		GetMetricsState(gomock.Any(), gomock.Any()).
@@ -52,7 +50,7 @@ func TestSubmitEpochReport_TransitionsReporterToStorageFullFromHostReport(t *tes
 		Return(nil).
 		AnyTimes()
 
-	err := f.keeper.SetEpochAnchor(f.ctx, types.EpochAnchor{
+	err = f.keeper.SetEpochAnchor(f.ctx, types.EpochAnchor{
 		EpochId:                 0,
 		EpochStartHeight:        1,
 		EpochEndHeight:          400,
@@ -103,6 +101,9 @@ func TestSubmitEpochReport_DoesNotTransitionPostponedReporterToStorageFull(t *te
 		Times(1)
 	f.supernodeKeeper.EXPECT().
 		SetSuperNode(gomock.Any(), gomock.Any()).
+		Times(0)
+	f.supernodeKeeper.EXPECT().
+		MarkSuperNodeStorageFull(gomock.Any(), gomock.Any()).
 		Times(0)
 	f.supernodeKeeper.EXPECT().
 		GetMetricsState(gomock.Any(), gomock.Any()).

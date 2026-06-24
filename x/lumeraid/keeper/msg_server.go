@@ -15,7 +15,7 @@ type msgServer struct {
 func NewMsgServerImpl(keeper Keeper) types.MsgServer {
 	return &msgServer{
 		UnimplementedMsgServer: types.UnimplementedMsgServer{},
-		Keeper: keeper,
+		Keeper:                 keeper,
 	}
 }
 

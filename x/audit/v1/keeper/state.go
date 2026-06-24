@@ -40,6 +40,10 @@ func (k Keeper) SetReport(ctx sdk.Context, r types.EpochReport) error {
 		ctx.EventManager().EmitEvent(sdk.NewEvent("audit_set_report_transition", sdk.NewAttribute("disk_usage_percent", "0"), sdk.NewAttribute("transition_skipped", "true")))
 		return nil
 	}
+	if !isValidHostUsagePercent(r.HostReport.DiskUsagePercent) {
+		ctx.EventManager().EmitEvent(sdk.NewEvent("audit_set_report_transition", sdk.NewAttribute("transition_skipped", "true"), sdk.NewAttribute("reason", "invalid_disk_usage_percent")))
+		return nil
+	}
 	reporterSN, found, err := k.supernodeKeeper.GetSuperNodeByAccount(ctx, r.SupernodeAccount)
 	if err != nil {
 		return err
@@ -58,9 +62,8 @@ func (k Keeper) SetReport(ctx sdk.Context, r types.EpochReport) error {
 	}
 
 	if isStorageFull && latest != supernodetypes.SuperNodeStateStorageFull {
-		reporterSN.States = append(reporterSN.States, &supernodetypes.SuperNodeStateRecord{State: supernodetypes.SuperNodeStateStorageFull, Height: ctx.BlockHeight()})
 		ctx.EventManager().EmitEvent(sdk.NewEvent("audit_set_report_transition", sdk.NewAttribute("to_state", "storage_full")))
-		return k.supernodeKeeper.SetSuperNode(ctx, reporterSN)
+		return k.markSupernodeStorageFull(ctx, reporterSN)
 	}
 	if !isStorageFull && latest == supernodetypes.SuperNodeStateStorageFull {
 		reporterSN.States = append(reporterSN.States, &supernodetypes.SuperNodeStateRecord{State: supernodetypes.SuperNodeStateActive, Height: ctx.BlockHeight()})
@@ -91,7 +94,7 @@ func (k Keeper) GetAllReportsForGenesis(ctx sdk.Context) ([]types.EpochReport, e
 	prefix := types.ReportPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.EpochReport, 0)
 	for ; it.Valid(); it.Next() {
@@ -121,7 +124,7 @@ func (k Keeper) GetAllReportIndicesForGenesis(ctx sdk.Context) []types.GenesisRe
 	prefix := types.ReportIndexRootPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisReportIndex, 0)
 	for ; it.Valid(); it.Next() {
@@ -152,7 +155,7 @@ func (k Keeper) GetAllHostReportIndicesForGenesis(ctx sdk.Context) []types.Genes
 	prefix := types.HostReportIndexRootPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisHostReportIndex, 0)
 	for ; it.Valid(); it.Next() {
@@ -177,7 +180,7 @@ func (k Keeper) GetAllStorageChallengeIndicesForGenesis(ctx sdk.Context) []types
 	prefix := types.StorageChallengeReportIndexRootPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisStorageChallengeIndex, 0)
 	for ; it.Valid(); it.Next() {

@@ -8,7 +8,7 @@ import (
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/cosmos/cosmos-sdk/x/simulation"
 
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 	actionsimulation "github.com/LumeraProtocol/lumera/x/action/v1/simulation"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 )

@@ -157,6 +157,7 @@ func (k Keeper) setStorageTruthReporterResult(ctx sdk.Context, epochID uint64, r
 	store.Set(types.ReporterStorageTruthResultKey(reporterAccount, epochID, result.TicketId, result.TargetSupernodeAccount), bz)
 	// Per 122-Copilot-3 + 122-F1 — indexed lookup avoids DeliverTx full-table scan.
 	store.Set(types.ReporterStorageTruthResultByTargetKey(result.TargetSupernodeAccount, epochID, result.TicketId, reporterAccount), bz)
+	store.Set(types.ReporterStorageTruthResultByEpochReporterKey(epochID, reporterAccount), []byte{})
 	return nil
 }
 
@@ -268,7 +269,7 @@ func (k Keeper) distinctNodeFailedTickets(ctx sdk.Context, supernodeAccount stri
 	// Bounded epoch scan per CP-NEW-A-11 residue.
 	start, end := types.NodeStorageTruthFailureEpochScanRange(supernodeAccount, startEpoch, endEpoch)
 	it := k.kvStore(ctx).Iterator(start, end)
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 	for ; it.Valid(); it.Next() {
 		var record storageTruthNodeFailureRecord
 		if err := json.Unmarshal(it.Value(), &record); err != nil {
@@ -305,7 +306,7 @@ func (k Keeper) hasIndependentReporterPassInWindow(
 	// for each epoch in [startEpoch, endEpoch].
 	startKey, endKey := types.ReporterStorageTruthResultByTargetEpochScanRange(targetAccount, startEpoch, endEpoch)
 	it := k.kvStore(ctx).Iterator(startKey, endKey)
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	for ; it.Valid(); it.Next() {
 		var record storageTruthReporterResultRecord
@@ -338,7 +339,7 @@ func (k Keeper) hasCleanRecheckInWindow(
 	recheckBucket := uint32(types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK)
 	startKey, endKey := types.TranscriptByTargetBucketEpochScanRange(targetAccount, recheckBucket, startEpoch, endEpoch)
 	it := k.kvStore(ctx).Iterator(startKey, endKey)
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	for ; it.Valid(); it.Next() {
 		var record storageProofTranscriptRecord
@@ -370,7 +371,7 @@ func (k Keeper) setStorageTruthFailedHeal(ctx sdk.Context, supernodeAccount stri
 func (k Keeper) hasStorageTruthFailedHeal(ctx sdk.Context, supernodeAccount string, startEpoch uint64, endEpoch uint64) bool {
 	prefix := types.StorageTruthFailedHealPrefix(supernodeAccount)
 	it := k.kvStore(ctx).Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 	for ; it.Valid(); it.Next() {
 		key := it.Key()
 		if len(key) < len(prefix)+8 {
@@ -390,7 +391,7 @@ func (k Keeper) GetAllStorageProofTranscriptsForGenesis(ctx sdk.Context) []types
 	prefix := types.StorageProofTranscriptPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisStorageProofTranscript, 0)
 	for ; it.Valid(); it.Next() {
@@ -432,7 +433,7 @@ func (k Keeper) GetAllNodeFailureFactsForGenesis(ctx sdk.Context) []types.Genesi
 	prefix := types.NodeStorageTruthFailureRootPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisNodeFailureFact, 0)
 	for ; it.Valid(); it.Next() {
@@ -485,13 +486,12 @@ func (k Keeper) importNodeFailureFactForGenesis(ctx sdk.Context, fact types.Gene
 }
 
 // GetAllReporterResultFactsForGenesis exports all st/rrs/ records.
-// Per NEW-C-1: secondary index st/rrs-tt/ is rebuilt by setStorageTruthReporterResult-equivalent
-// import path on InitGenesis.
+// Per NEW-C-1: secondary indexes are rebuilt by the import path on InitGenesis.
 func (k Keeper) GetAllReporterResultFactsForGenesis(ctx sdk.Context) []types.GenesisReporterResultFact {
 	prefix := types.ReporterStorageTruthResultRootPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisReporterResultFact, 0)
 	for ; it.Valid(); it.Next() {
@@ -535,11 +535,12 @@ func (k Keeper) GetAllReporterResultFactsForGenesis(ctx sdk.Context) []types.Gen
 	return out
 }
 
-// importReporterResultFactForGenesis writes both the primary and secondary indexes.
+// importReporterResultFactForGenesis writes the primary and secondary indexes.
 func (k Keeper) importReporterResultFactForGenesis(ctx sdk.Context, f types.GenesisReporterResultFact) {
 	store := k.kvStore(ctx)
 	store.Set(types.ReporterStorageTruthResultKey(f.ReporterAccount, f.EpochId, f.TicketId, f.TargetAccount), f.RecordJson)
 	store.Set(types.ReporterStorageTruthResultByTargetKey(f.TargetAccount, f.EpochId, f.TicketId, f.ReporterAccount), f.RecordJson)
+	store.Set(types.ReporterStorageTruthResultByEpochReporterKey(f.EpochId, f.ReporterAccount), []byte{})
 }
 
 // GetAllFailedHealMarkersForGenesis exports all st/fh/ marker keys.
@@ -547,7 +548,7 @@ func (k Keeper) GetAllFailedHealMarkersForGenesis(ctx sdk.Context) []types.Genes
 	prefix := types.StorageTruthFailedHealRootPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisFailedHealMarker, 0)
 	for ; it.Valid(); it.Next() {

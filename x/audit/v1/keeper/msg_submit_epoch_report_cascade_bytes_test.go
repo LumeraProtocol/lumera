@@ -149,6 +149,49 @@ func TestSubmitEpochReport_CascadeBytes_InvalidValuesRejected(t *testing.T) {
 	}
 }
 
+func TestSubmitEpochReport_HostUsagePercent_InvalidValuesRejected(t *testing.T) {
+	cases := []struct {
+		name   string
+		report types.HostReport
+	}{
+		{"cpu_nan", types.HostReport{CpuUsagePercent: math.NaN()}},
+		{"cpu_negative", types.HostReport{CpuUsagePercent: -1}},
+		{"cpu_over_100", types.HostReport{CpuUsagePercent: 100.1}},
+		{"mem_inf", types.HostReport{MemUsagePercent: math.Inf(1)}},
+		{"mem_negative", types.HostReport{MemUsagePercent: -1}},
+		{"mem_over_100", types.HostReport{MemUsagePercent: 100.1}},
+		{"disk_inf", types.HostReport{DiskUsagePercent: math.Inf(-1)}},
+		{"disk_negative", types.HostReport{DiskUsagePercent: -1}},
+		{"disk_over_100", types.HostReport{DiskUsagePercent: 100.1}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := initFixture(t)
+			f.ctx = f.ctx.WithBlockHeight(1)
+			ms := keeper.NewMsgServerImpl(f.keeper)
+
+			reporter := sdk.AccAddress([]byte("reporter_address_20b")).String()
+			valAddrStr := sdk.ValAddress([]byte("validator_addr__20b")).String()
+
+			f.supernodeKeeper.EXPECT().
+				GetSuperNodeByAccount(gomock.Any(), reporter).
+				Return(sntypes.SuperNode{SupernodeAccount: reporter, ValidatorAddress: valAddrStr}, true, nil).
+				AnyTimes()
+			f.supernodeKeeper.EXPECT().
+				SetMetricsState(gomock.Any(), gomock.Any()).
+				Times(0)
+
+			_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+				Creator:    reporter,
+				EpochId:    0,
+				HostReport: tc.report,
+			})
+			require.Error(t, err)
+			require.ErrorIs(t, err, types.ErrInvalidHostMetric)
+		})
+	}
+}
+
 // TestSubmitEpochReport_Bridge_PreservesPriorNonCascadeMetrics covers I3: the
 // bridge is read-modify-write; pre-existing metrics fields owned by other
 // writers must not be clobbered to zero by the cascade-bytes write.

@@ -11,15 +11,15 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	distributiontypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	v1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
-	
+
+	wasmvmtypes "github.com/CosmWasm/wasmvm/v3/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	wasmvmtypes "github.com/CosmWasm/wasmvm/v3/types"
 
 	"github.com/LumeraProtocol/lumera/app"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 	wasmtest "github.com/LumeraProtocol/lumera/tests/system/wasm"
-	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestGovVoteByContract(t *testing.T) {

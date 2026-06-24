@@ -2,6 +2,7 @@ package keeper
 
 import "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
+//nolint:unused // wired by SetGlobalAuditKeeper for keepers that cannot reach the audit keeper via depinject.
 var globalAuditKeeper types.AuditKeeper
 
 // SetGlobalAuditKeeper wires audit keeper for supernode keepers that cannot be mutably reached

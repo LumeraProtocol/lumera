@@ -122,6 +122,10 @@ var (
 	// Format: "st/rrs-tt/" + target + "/" + u64be(epoch) + "/" + ticketID + 0x00 + reporter
 	reporterResultByTargetPrefix = []byte("st/rrs-tt/")
 
+	// Secondary index: reporter activity keyed by (epoch, reporter).
+	// Format: "st/rrs-e/" + u64be(epoch) + "/" + reporter_account -> empty
+	reporterResultByEpochPrefix = []byte("st/rrs-e/")
+
 	// Secondary index: transcript keyed by (target, bucket, epoch, transcriptHash).
 	// Format: "st/spt-tbe/" + target + "/" + u32be(bucket) + "/" + u64be(epoch) + "/" + transcriptHash
 	transcriptByTargetBucketEpochPrefix = []byte("st/spt-tbe/")
@@ -555,6 +559,10 @@ func ReporterStorageTruthResultRootPrefix() []byte {
 	return reporterStorageTruthResultPrefix
 }
 
+func ReporterStorageTruthResultByEpochRootPrefix() []byte {
+	return reporterResultByEpochPrefix
+}
+
 // NodeStorageTruthFailureEpochScanRange returns [start, end) iterator bounds
 // for scanning a supernode's failure facts within the inclusive epoch range
 // [startEpoch, endEpoch]. Key shape unchanged — start/end built from the
@@ -652,6 +660,28 @@ func ReporterStorageTruthResultByTargetEpochPrefix(targetAccount string, epochID
 	key = append(key, reporterResultByTargetPrefix...)
 	key = append(key, targetAccount...)
 	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	return key
+}
+
+// ReporterStorageTruthResultByEpochReporterKey returns the secondary-index key
+// marking that reporterAccount has at least one reporter-result fact in epochID.
+// Format: "st/rrs-e/" + u64be(epoch) + "/" + reporter_account
+func ReporterStorageTruthResultByEpochReporterKey(epochID uint64, reporterAccount string) []byte {
+	key := make([]byte, 0, len(reporterResultByEpochPrefix)+8+1+len(reporterAccount))
+	key = append(key, reporterResultByEpochPrefix...)
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, reporterAccount...)
+	return key
+}
+
+// ReporterStorageTruthResultByEpochPrefix returns the prefix for scanning
+// reporter accounts that have at least one reporter-result fact in epochID.
+func ReporterStorageTruthResultByEpochPrefix(epochID uint64) []byte {
+	key := make([]byte, 0, len(reporterResultByEpochPrefix)+8+1)
+	key = append(key, reporterResultByEpochPrefix...)
 	key = binary.BigEndian.AppendUint64(key, epochID)
 	key = append(key, '/')
 	return key

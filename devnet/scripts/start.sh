@@ -10,7 +10,7 @@
 #   bootstrap        Runs setup scripts supernode-setup.sh & validator-setup.sh in the foreground.
 #                    Exits when setup_complete is created. Does NOT start lumerad.
 #
-#   run              Waits for setup_complete, starts lumerad, and tails logs.
+#   run              Waits for setup_complete, starts lumerad, verifies block production, and tails logs.
 #
 #   wait  (optional) Wait for setup_complete and exit.
 #
@@ -24,6 +24,10 @@
 # --------------------------------------------------------------------------------------------------
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/common.sh"
+
 START_MODE="${START_MODE:-auto}"
 
 SHARED_DIR="/shared"
@@ -31,11 +35,18 @@ CFG_DIR="${SHARED_DIR}/config"
 CFG_CHAIN="${CFG_DIR}/config.json"
 CFG_VALS="${CFG_DIR}/validators.json"
 RELEASE_DIR="${SHARED_DIR}/release"
-NM_UI_DIR="${RELEASE_DIR}/nm-ui"
+NM_UI_DIR="${RELEASE_DIR}/uploader-ui"
 STATUS_DIR="${SHARED_DIR}/status"
 SETUP_COMPLETE="${STATUS_DIR}/setup_complete"
 SN="supernode-linux-amd64"
-NM="network-maker"
+# Detect which uploader binary is in the release dir
+if [ -f "${RELEASE_DIR}/lumera-uploader" ]; then
+	NM="lumera-uploader"
+elif [ -f "${RELEASE_DIR}/network-maker" ]; then
+	NM="network-maker"
+else
+	NM="lumera-uploader"
+fi
 LUMERAD="lumerad"
 LUMERA_SRC_BIN="${RELEASE_DIR}/${LUMERAD}"
 LUMERA_DST_BIN="/usr/local/bin/${LUMERAD}"
@@ -47,18 +58,20 @@ DAEMON_HOME="${DAEMON_HOME:-/root/.lumera}"
 
 SCRIPTS_DIR="/root/scripts"
 LOGS_DIR="/root/logs"
+OLD_LOGS_DIR="${LOGS_DIR}/old"
 VALIDATOR_LOG="${LOGS_DIR}/validator.log"
 SUPERNODE_LOG="${LOGS_DIR}/supernode.log"
 VALIDATOR_SETUP_OUT="${LOGS_DIR}/validator-setup.out"
 SUPERNODE_SETUP_OUT="${LOGS_DIR}/supernode-setup.out"
-NETWORK_MAKER_SETUP_OUT="${LOGS_DIR}/network-maker-setup.out"
+UPLOADER_SETUP_OUT="${LOGS_DIR}/lumera-uploader-setup.out"
+TEST_ACCOUNTS_SETUP_OUT="${LOGS_DIR}/test-accounts-setup.out"
 NM_UI_PORT="${NM_UI_PORT:-8088}"
 
 LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
 LUMERA_GRPC_PORT="${LUMERA_GRPC_PORT:-9090}"
 LUMERA_RPC_ADDR="http://localhost:${LUMERA_RPC_PORT}"
 
-mkdir -p "${LOGS_DIR}" "${DAEMON_HOME}/config" "${STATUS_DIR}"
+mkdir -p "${LOGS_DIR}" "${OLD_LOGS_DIR}" "${DAEMON_HOME}/config" "${STATUS_DIR}"
 
 # Require MONIKER env (compose already sets it)
 : "${MONIKER:?MONIKER environment variable must be set}"
@@ -107,13 +120,13 @@ inject_nm_ui_env() {
 	local files
 	files="$(grep -rl "http://127.0.0.1:8080" "${NM_UI_DIR}" || true)"
 	if [ -z "${files}" ]; then
-		echo "[BOOT] network-maker UI: no API base placeholder found to inject."
+		echo "[BOOT] ${NM} UI: no API base placeholder found to inject."
 		return 0
 	fi
 
 	local escaped_base="${api_base//\//\\/}"
 	escaped_base="${escaped_base//&/\\&}"
-	echo "[BOOT] network-maker UI: injecting API base ${api_base}"
+	echo "[BOOT] ${NM} UI: injecting API base ${api_base}"
 	# Replace default API base baked into the static bundle with runtime value
 	while IFS= read -r f; do
 		sed -i "s|http://127.0.0.1:8080|${escaped_base}|g" "$f"
@@ -122,13 +135,13 @@ inject_nm_ui_env() {
 
 start_nm_ui_if_present() {
 	if [ ! -d "${NM_UI_DIR}" ] || [ ! -f "${NM_UI_DIR}/index.html" ]; then
-		echo "[BOOT] network-maker UI not found at ${NM_UI_DIR}; skipping nginx"
+		echo "[BOOT] ${NM} UI not found at ${NM_UI_DIR}; skipping nginx"
 		return
 	fi
 
 	inject_nm_ui_env
 
-	cat >/etc/nginx/conf.d/network-maker-ui.conf <<EOF
+	cat >/etc/nginx/conf.d/lumera-uploader-ui.conf <<EOF
 server {
     listen ${NM_UI_PORT};
     server_name _;
@@ -141,17 +154,41 @@ server {
 EOF
 
 	if pgrep -x nginx >/dev/null 2>&1; then
-		echo "[BOOT] nginx already running; skipping start for network-maker UI."
+		echo "[BOOT] nginx already running; skipping start for ${NM} UI."
 		return
 	fi
 
-	echo "[BOOT] Starting nginx to serve network-maker UI on port ${NM_UI_PORT}"
+	echo "[BOOT] Starting nginx to serve ${NM} UI on port ${NM_UI_PORT}"
 	nginx
 }
 
-run() {
-	echo "+ $*"
-	"$@"
+archive_log_file() {
+	local log_file="$1"
+	local ts base target suffix=1
+
+	[ -f "${log_file}" ] || return 0
+	[ -s "${log_file}" ] || return 0
+
+	ts="$(date '+%Y%m%d_%H_%M')"
+	base="$(basename "${log_file}")"
+	target="${OLD_LOGS_DIR}/${ts}.${base}"
+
+	while [ -e "${target}" ]; do
+		target="${OLD_LOGS_DIR}/${ts}.${suffix}.${base}"
+		suffix=$((suffix + 1))
+	done
+
+	mv "${log_file}" "${target}"
+	echo "[BOOT] Archived ${log_file} -> ${target}"
+}
+
+archive_existing_logs() {
+	archive_log_file "${VALIDATOR_LOG}"
+	archive_log_file "${SUPERNODE_LOG}"
+	archive_log_file "${VALIDATOR_SETUP_OUT}"
+	archive_log_file "${SUPERNODE_SETUP_OUT}"
+	archive_log_file "${UPLOADER_SETUP_OUT}"
+	archive_log_file "${TEST_ACCOUNTS_SETUP_OUT}"
 }
 
 # Get current block height (integer), 0 if unknown
@@ -261,11 +298,29 @@ launch_validator_setup() {
 	fi
 }
 
-launch_network_maker_setup() {
-	if [ -x "${SCRIPTS_DIR}/network-maker-setup.sh" ] && [ -f "${RELEASE_DIR}/${NM}" ]; then
-		echo "[BOOT] ${MONIKER}: Launching Network Maker setup in background..."
-		nohup bash "${SCRIPTS_DIR}/network-maker-setup.sh" >"${NETWORK_MAKER_SETUP_OUT}" 2>&1 &
+launch_uploader_setup() {
+	if [ -x "${SCRIPTS_DIR}/lumera-uploader-setup.sh" ] && [ -f "${RELEASE_DIR}/${NM}" ]; then
+		echo "[BOOT] ${MONIKER}: Launching Lumera Uploader setup in background..."
+		nohup bash "${SCRIPTS_DIR}/lumera-uploader-setup.sh" >"${UPLOADER_SETUP_OUT}" 2>&1 &
 	fi
+}
+
+launch_test_accounts_setup() {
+	# Only fire if the validators.json entry for this node has a non-empty
+	# test_accounts block with count > 0. Fund and creation run against the
+	# live chain so this is launched in background after start_lumera.
+	if [ ! -x "${SCRIPTS_DIR}/test-accounts-setup.sh" ]; then
+		return
+	fi
+	local count
+	count="$(jq -r --arg m "${MONIKER}" '
+		[.[] | select(.moniker==$m)][0] | try .test_accounts.count // 0
+	' "${CFG_VALS}" 2>/dev/null || echo 0)"
+	if ! [[ "${count}" =~ ^[0-9]+$ ]] || [ "${count}" -eq 0 ]; then
+		return
+	fi
+	echo "[BOOT] ${MONIKER}: Launching test-accounts setup in background (count=${count})..."
+	nohup bash "${SCRIPTS_DIR}/test-accounts-setup.sh" >"${TEST_ACCOUNTS_SETUP_OUT}" 2>&1 &
 }
 
 start_lumera() {
@@ -275,7 +330,26 @@ start_lumera() {
 	fi
 
 	echo "[BOOT] ${MONIKER}: Starting lumerad..."
-	run "${DAEMON}" start --home "${DAEMON_HOME}" >"${VALIDATOR_LOG}" 2>&1 &
+	CLAIMS_LOCAL="${DAEMON_HOME}/config/claims.csv"
+	EXTRA_START_FLAGS="$(lumerad_claims_start_flags "${DAEMON}" "${CLAIMS_LOCAL}")"
+	if [ -n "${EXTRA_START_FLAGS}" ]; then
+		echo "[BOOT] ${MONIKER}: Claims CSV found, loading claim records at genesis"
+	fi
+	# The EVM JSON-RPC metrics server is enabled by the --metrics start flag and
+	# only exists on EVM-enabled builds; pre-EVM lumerad does not know the flag.
+	if lumera_supports_evm; then
+		local enable_metrics
+		enable_metrics="$(jq -r '.["json-rpc"].enable_metrics // true' "${CFG_CHAIN}" 2>/dev/null || echo true)"
+		if [ "${enable_metrics}" = "true" ]; then
+			EXTRA_START_FLAGS="${EXTRA_START_FLAGS} --metrics"
+			echo "[BOOT] ${MONIKER}: EVM build detected, enabling JSON-RPC metrics (--metrics)"
+		fi
+	fi
+	echo "+ ${DAEMON} start --home ${DAEMON_HOME} ${EXTRA_START_FLAGS}"
+	# shellcheck disable=SC2086
+	"${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
+	LUMERAD_PID=$!
+	echo "[BOOT] ${MONIKER}: lumerad started, pid=${LUMERAD_PID}"
 
 	if [ "${MONIKER}" = "${PRIMARY_MONIKER}" ]; then
 		mkdir -p "$(dirname "${PRIMARY_STARTED_FLAG}")"
@@ -285,18 +359,53 @@ start_lumera() {
 }
 
 tail_logs() {
-	touch "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${NETWORK_MAKER_SETUP_OUT}"
-	exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${NETWORK_MAKER_SETUP_OUT}"
+	touch "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}" "${TEST_ACCOUNTS_SETUP_OUT}"
+	tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}" "${TEST_ACCOUNTS_SETUP_OUT}" &
+	TAIL_PID=$!
+}
+
+# Wait on the lumerad process and propagate its exit code as the container's
+# exit code. If lumerad dies (crash, SIGKILL on host that matches `pkill -f
+# 'lumerad start'`, OOM, etc.) PID 1 exits too. The docker-compose
+# `restart: unless-stopped` policy handles recovery on any container exit while
+# the propagated code keeps crash/kill status visible to docker / observability.
+#
+# History: 2026-06-02 — a host `pkill -9 -f 'lumerad start'` matched lumerad
+# inside the 5 validator containers. PID 1 was bash + tail -F, so containers
+# stayed "Up" for 6 days while chain was dead. See PR description.
+wait_for_lumera() {
+	if [ -z "${LUMERAD_PID:-}" ]; then
+		echo "[BOOT] ${MONIKER}: lumerad pid not set; cannot supervise."
+		# Fall back to old tail-forever behaviour rather than exit 0 silently.
+		wait "${TAIL_PID:-}" 2>/dev/null || true
+		return 0
+	fi
+	# `wait <pid>` returns the exit status of that process. We deliberately do
+	# NOT use `set -e` here so we can capture the code.
+	set +e
+	wait "${LUMERAD_PID}"
+	local rc=$?
+	set -e
+	echo "[BOOT] ${MONIKER}: lumerad exited rc=${rc} — terminating container so docker restart policy can recover."
+	if [ -n "${TAIL_PID:-}" ]; then
+		kill "${TAIL_PID}" 2>/dev/null || true
+	fi
+	# Sleep briefly so the last log lines are flushed by tail -F before we exit.
+	sleep 1
+	exit "${rc}"
 }
 
 run_auto_flow() {
-	launch_network_maker_setup
+	archive_existing_logs
+	launch_uploader_setup
 	launch_supernode_setup
 	launch_validator_setup
 	wait_for_validator_setup
 	start_lumera
+	launch_test_accounts_setup
 	start_nm_ui_if_present
 	tail_logs
+	wait_for_lumera
 }
 
 case "${START_MODE}" in
@@ -305,7 +414,8 @@ auto | "")
 	;;
 
 bootstrap)
-	launch_network_maker_setup
+	archive_existing_logs
+	launch_uploader_setup
 	launch_supernode_setup
 	launch_validator_setup
 	wait_for_validator_setup
@@ -313,14 +423,17 @@ bootstrap)
 	;;
 
 run)
+	archive_existing_logs
 	wait_for_validator_setup
+	start_lumera
 	wait_for_n_blocks 3 || {
 		echo "[SN] Lumera chain not producing blocks in time; exiting."
 		exit 1
 	}
-	start_lumera
+	launch_test_accounts_setup
 	start_nm_ui_if_present
 	tail_logs
+	wait_for_lumera
 	;;
 
 wait)

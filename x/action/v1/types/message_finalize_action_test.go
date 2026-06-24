@@ -3,7 +3,7 @@ package types
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 	"github.com/stretchr/testify/require"
 )
 

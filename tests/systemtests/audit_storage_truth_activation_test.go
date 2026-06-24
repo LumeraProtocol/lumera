@@ -386,8 +386,12 @@ func TestStorageTruth_SoftMode_PostponesNodeOnHighSuspicion(t *testing.T) {
 	_, _, target := findAssignedProberAndTarget(t, epochID1, nodes)
 
 	// Seed the transcript record so the subsequent recheck evidence call is accepted.
-	rechecker := seedProofTranscripts(t, cli, epochID1, nodes, target.accAddr,
-		[]transcriptSeed{{ticketID: ticketID, transcriptHash: "challenged-hash"}}, false)
+	// Use HASH_MISMATCH so the seeded fact counts as a Class A fault on a RECENT bucket;
+	// combined with the recheck below this satisfies the postpone predicate (recent
+	// Class A + secondFailureEvents>=2).
+	rechecker := seedProofTranscriptsWithClass(t, cli, epochID1, nodes, target.accAddr,
+		[]transcriptSeed{{ticketID: ticketID, transcriptHash: "challenged-hash"}}, false,
+		"STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH")
 
 	// rechecker submits recheck evidence against target; target suspicion score becomes 15.
 	// This exceeds the postpone_threshold of 10.

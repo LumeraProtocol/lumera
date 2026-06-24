@@ -1,9 +1,9 @@
 package claim
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
-	"fmt"
 	"strings"
 
 	"cosmossdk.io/core/appmodule"
@@ -12,11 +12,12 @@ import (
 	"cosmossdk.io/depinject/appconfig"
 	"cosmossdk.io/log"
 
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/codec"
+	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	servertypes "github.com/cosmos/cosmos-sdk/server/types"
-	"github.com/cosmos/cosmos-sdk/client/flags"
+	"github.com/spf13/viper"
 
 	"github.com/LumeraProtocol/lumera/x/claim/keeper"
 	"github.com/LumeraProtocol/lumera/x/claim/types"
@@ -53,7 +54,7 @@ func searchForClaimsFile(appOpts servertypes.AppOptions) (string, error) {
 
 	// Gather candidate fallback paths
 	var dirs []string
-	
+
 	// App home dir (from --home)
 	if appHomeRaw := appOpts.Get(flags.FlagHome); appHomeRaw != nil {
 		// Ensure appHomeRaw is a string
@@ -61,12 +62,12 @@ func searchForClaimsFile(appOpts servertypes.AppOptions) (string, error) {
 		dirs = append(dirs,
 			filepath.Join(appHome, "config"),
 			appHome,
-		)		
+		)
 	}
 
 	// Executable directory
 	if exePath, err := os.Executable(); err == nil {
-		dirs = append(dirs,	filepath.Dir(exePath))
+		dirs = append(dirs, filepath.Dir(exePath))
 	}
 
 	if userHome, err := os.UserHomeDir(); err == nil {
@@ -94,6 +95,10 @@ func searchForClaimsFile(appOpts servertypes.AppOptions) (string, error) {
 // ----------------------------------------------------------------------------
 
 func init() {
+	// Claiming period ended 2025-01-01; skip the claims.csv check by default.
+	// Operators who need the check can pass --skip-claims-check=false.
+	viper.SetDefault(types.FlagSkipClaimsCheck, true)
+
 	appconfig.Register(
 		&Module{},
 		appconfig.Provide(ProvideModule),
@@ -127,7 +132,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 	if in.Config.Authority != "" {
 		authority = authtypes.NewModuleAddressOrBech32Address(in.Config.Authority)
 	}
-	
+
 	// Search for claims.csv file in expected locations
 	claimsPath, _ := searchForClaimsFile(in.AppOpts)
 

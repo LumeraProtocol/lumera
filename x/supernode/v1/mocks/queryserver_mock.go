@@ -324,6 +324,21 @@ func (mr *MockQueryServerMockRecorder) ListSuperNodes(arg0, arg1 any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSuperNodes", reflect.TypeOf((*MockQueryServer)(nil).ListSuperNodes), arg0, arg1)
 }
 
+// Params mocks base method.
+func (m *MockQueryServer) Params(arg0 context.Context, arg1 *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Params", arg0, arg1)
+	ret0, _ := ret[0].(*types.QueryParamsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Params indicates an expected call of Params.
+func (mr *MockQueryServerMockRecorder) Params(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Params", reflect.TypeOf((*MockQueryServer)(nil).Params), arg0, arg1)
+}
+
 // PayoutHistory mocks base method.
 func (m *MockQueryServer) PayoutHistory(arg0 context.Context, arg1 *types.QueryPayoutHistoryRequest) (*types.QueryPayoutHistoryResponse, error) {
 	m.ctrl.T.Helper()
@@ -367,19 +382,4 @@ func (m *MockQueryServer) SNEligibility(arg0 context.Context, arg1 *types.QueryS
 func (mr *MockQueryServerMockRecorder) SNEligibility(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SNEligibility", reflect.TypeOf((*MockQueryServer)(nil).SNEligibility), arg0, arg1)
-}
-
-// Params mocks base method.
-func (m *MockQueryServer) Params(arg0 context.Context, arg1 *types.QueryParamsRequest) (*types.QueryParamsResponse, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Params", arg0, arg1)
-	ret0, _ := ret[0].(*types.QueryParamsResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Params indicates an expected call of Params.
-func (mr *MockQueryServerMockRecorder) Params(arg0, arg1 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Params", reflect.TypeOf((*MockQueryServer)(nil).Params), arg0, arg1)
 }

@@ -1,0 +1,9 @@
+{
+  "account": {
+    "@type": "/cosmos.auth.v1beta1.BaseAccount",
+    "address": "lumera1nilpubkey1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "pub_key": null,
+    "account_number": "11",
+    "sequence": "0"
+  }
+}

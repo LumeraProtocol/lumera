@@ -263,20 +263,6 @@ func sortedUniqueStrings(in []string) []string {
 	return out
 }
 
-func intersectionInOrder(values []string, allowed []string) []string {
-	allowedSet := make(map[string]struct{}, len(allowed))
-	for _, value := range allowed {
-		allowedSet[value] = struct{}{}
-	}
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		if _, ok := allowedSet[value]; ok {
-			out = append(out, value)
-		}
-	}
-	return out
-}
-
 func (k Keeper) storageTruthEligibleChallengers(ctx sdk.Context, activeSorted []string, epochID uint64, params types.Params) []string {
 	if params.StorageTruthEnforcementMode == types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED {
 		return append([]string(nil), activeSorted...)

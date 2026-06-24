@@ -5,12 +5,12 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestMsgServer_UpdateSupernode(t *testing.T) {

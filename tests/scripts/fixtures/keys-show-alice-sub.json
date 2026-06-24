@@ -1,0 +1,6 @@
+{
+  "name": "alice-sub",
+  "type": "local",
+  "address": "lumera1alicesub1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "pubkey": "{\"@type\":\"/cosmos.crypto.secp256k1.PubKey\",\"key\":\"A1111111111111111111111111111111111111111111\"}"
+}

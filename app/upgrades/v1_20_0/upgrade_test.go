@@ -40,7 +40,12 @@ func upgradeParamsForChain(app *lumeraapp.App, chainID string) appParams.AppUpgr
 // block time (block time + 2 days) so rehearsals run against a real deadline.
 func TestV1200SetsDevnetMigrationEndTime(t *testing.T) {
 	app := lumeraapp.Setup(t)
-	ctx := app.BaseApp.NewContext(false)
+	// The handler identifies the network from the SDK context (genesis-derived
+	// chain ID), not the app-level ChainID captured during setup — which on a
+	// default `lumerad start` is the non-empty "lumera" flag default. Seed the
+	// context with the real chain ID and pass the misleading default in params
+	// to pin that ctx.ChainID() is what's used.
+	ctx := app.BaseApp.NewContext(false).WithChainID("lumera-devnet-1")
 
 	// Default genesis params seed migration with no deadline.
 	before, err := app.EvmigrationKeeper.Params.Get(ctx)
@@ -49,7 +54,7 @@ func TestV1200SetsDevnetMigrationEndTime(t *testing.T) {
 
 	want := ctx.BlockTime().Add(2 * 24 * time.Hour).Unix()
 
-	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera-devnet-1"))
+	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera"))
 	_, err = handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
 	require.NoError(t, err)
 
@@ -66,11 +71,12 @@ func TestV1200SetsDevnetMigrationEndTime(t *testing.T) {
 // upgrade block time.
 func TestV1200SetsTestnetMigrationEndTime(t *testing.T) {
 	app := lumeraapp.Setup(t)
-	ctx := app.BaseApp.NewContext(false)
+	// See TestV1200SetsDevnetMigrationEndTime: network is taken from ctx.ChainID().
+	ctx := app.BaseApp.NewContext(false).WithChainID("lumera-testnet-1")
 
 	want := ctx.BlockTime().AddDate(0, 3, 0).Unix()
 
-	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera-testnet-1"))
+	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera"))
 	_, err := handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
 	require.NoError(t, err)
 
@@ -84,7 +90,10 @@ func TestV1200SetsTestnetMigrationEndTime(t *testing.T) {
 // upgrade block time, the same window as testnet.
 func TestV1200SetsMainnetMigrationEndTime(t *testing.T) {
 	app := lumeraapp.Setup(t)
-	ctx := app.BaseApp.NewContext(false)
+	// See TestV1200SetsDevnetMigrationEndTime: network is taken from ctx.ChainID().
+	// This is the case the review flagged — the app-level ChainID would be the
+	// "lumera" default, leaving the mainnet deadline silently unset if used.
+	ctx := app.BaseApp.NewContext(false).WithChainID("lumera-mainnet-1")
 
 	// Default genesis params seed migration with no deadline.
 	before, err := app.EvmigrationKeeper.Params.Get(ctx)
@@ -93,7 +102,7 @@ func TestV1200SetsMainnetMigrationEndTime(t *testing.T) {
 
 	want := ctx.BlockTime().AddDate(0, 3, 0).Unix()
 
-	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera-mainnet-1"))
+	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera"))
 	_, err = handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
 	require.NoError(t, err)
 
@@ -101,6 +110,22 @@ func TestV1200SetsMainnetMigrationEndTime(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, want, after.MigrationEndTime,
 		"mainnet upgrade should set migration_end_time to upgrade block time + 3 months")
+}
+
+// The bare "lumera" CLI default is not a real network ID; the handler must not
+// treat it as one and must leave migration_end_time unset (0).
+func TestV1200LeavesMigrationEndTimeUnsetForDefaultChainID(t *testing.T) {
+	app := lumeraapp.Setup(t)
+	ctx := app.BaseApp.NewContext(false).WithChainID("lumera")
+
+	handler := upgradev1200.CreateUpgradeHandler(upgradeParamsForChain(app, "lumera"))
+	_, err := handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
+	require.NoError(t, err)
+
+	after, err := app.EvmigrationKeeper.Params.Get(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), after.MigrationEndTime,
+		"unrecognized chain ID must leave migration_end_time at the default 0")
 }
 
 func TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped(t *testing.T) {

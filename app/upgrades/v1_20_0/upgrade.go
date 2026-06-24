@@ -162,7 +162,14 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 		// default params (enable_migration=true, migration_end_time=0); here we
 		// only override the deadline. Devnet gets a short rehearsal window;
 		// testnet and mainnet both get a 3-calendar-month window.
-		if endTime, ok := autoMigrationEndTime(p.ChainID, ctx.BlockTime()); ok {
+		//
+		// The network is identified from the SDK context (ctx.ChainID()), which
+		// carries the genesis-derived chain ID from the block header. We must not
+		// use the app-level ChainID captured during setupUpgrades: that value
+		// comes from the --chain-id flag, which defaults to the non-empty
+		// "lumera" and so never falls back to genesis, leaving mainnet's deadline
+		// silently unset on the common `lumerad start` path.
+		if endTime, ok := autoMigrationEndTime(ctx.ChainID(), ctx.BlockTime()); ok {
 			if p.EvmigrationKeeper == nil {
 				return nil, fmt.Errorf("%s upgrade requires evmigration keeper to be wired", UpgradeName)
 			}
@@ -175,7 +182,7 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 				return nil, fmt.Errorf("set evmigration migration_end_time: %w", err)
 			}
 			p.Logger.Info("Set migration_end_time from upgrade block time",
-				"chain_id", p.ChainID,
+				"chain_id", ctx.ChainID(),
 				"migration_end_time", emParams.MigrationEndTime,
 			)
 		}

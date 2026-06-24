@@ -92,7 +92,7 @@ For each target, runs:
 - `evmigration migration-record` (already migrated?)
 - `auth account` (does the pubkey exist on chain?)
 - `bank balances` and `bank spendable-balances` (does the account hold ulume
-  it can actually spend on fees?)
+  it can actually spend on the pubkey-publishing self-send amount plus fees?)
 
 and prints one of:
 
@@ -101,11 +101,12 @@ and prints one of:
 - `needs-pubkey`  — has **spendable** balance but no pubkey on chain. Will
                     self-send to publish the pubkey, then migrate.
 - `needs-funding` — pubkey missing AND spendable balance is below the
-                    self-send fee threshold. Covers **two** real cases:
+                    self-send amount plus fee threshold. Covers **two** real cases:
                     (a) zero total balance (classic fresh foundation
                     account), and (b) non-zero total balance but
-                    **vesting-locked** so spendable < fee. Both require
-                    `--funder` during `execute`.
+                    **vesting-locked** so spendable cannot cover the
+                    self-send amount plus fee. Both require `--funder`
+                    during `execute`.
 - `unknown`       — RPC failure (re-check connectivity / endpoint).
 
 `status` surfaces both `balance` and `spendable` per target so an operator
@@ -123,7 +124,7 @@ Common flags:
 |---|---|
 | `--target <name>` | Process only the named target. Use this for the first run. |
 | `--funder <key>` | Operator-keyring key that pays fees for **any** target classified `needs-funding`, including vesting-locked accounts whose total balance is large but spendable is zero. Must have spendable balance ≥ `N_needs_funding × (--top-up-amount + broadcast-fee)`. Required whenever any target is `needs-funding`; the script aborts that target otherwise. |
-| `--top-up-amount <coins>` | How much the funder sends to each `needs-funding` target. Default `200000ulume`. Sizing rule: must cover the downstream self-send (`100000ulume`) + its broadcast fee (`5000ulume`) with comfortable headroom (default leaves ~95000ulume slack). If you've overridden fees in the multisig scripts, set this to at least `2 × (self_send_amount + multisig_self_send_fee)` and never less than `200000ulume`. |
+| `--top-up-amount <coins>` | How much the funder sends to each `needs-funding` target. Default `200000ulume`. Sizing rule: must cover the downstream self-send (`100000ulume`) + its broadcast fee (`5000ulume`) with comfortable headroom (default leaves ~95000ulume slack). If you've overridden the self-send amount or fees in the script, set this to at least `2 × (self_send_amount + self_send_fee)` and never less than `200000ulume`. |
 | `--funder-keyring-{backend,dir,home}` | How to reach the funder key. Defaults: `test` backend, `lumerad`'s default home / keyring dir. Example: `--funder-keyring-backend file --funder-keyring-home /etc/lumerad`. |
 | `--log-file <path>` | Append one JSONL audit record per lifecycle milestone (batch_start, target_start, classify, keyring_setup, reconstructed, funding_*, self_send_*, ceremony_start, target_done, batch_done). `classify` events include both `balance` and `spendable`. Mode 0600 on create, append-only, correlated by per-run `batch_id`. Operator handles rotation. |
 | `--dry-run` | Stop after read-only steps + address reconstruction; no broadcasts. |

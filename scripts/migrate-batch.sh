@@ -17,7 +17,8 @@
 #   - For multisigs, reconstructs both legacy and new multisigs by pubkey-
 #     matched signer order, and asserts the reconstructed legacy address
 #     equals the address in the mnemonics file.
-#   - Optionally tops up the legacy address from --funder, if balance is 0.
+#   - Optionally tops up the legacy address from --funder, if the target cannot
+#     pay for its own pubkey-publishing self-send from spendable balance.
 #   - If on-chain pubkey is missing, performs a self-send to publish it
 #     (multisig variant: --generate-only + sign×K + multisign + broadcast).
 #   - Delegates the migration ceremony itself to:
@@ -200,11 +201,16 @@ _mb_filter_targets() {
   printf '%s' "$out"
 }
 
+# Self-send amount and fee used to publish a missing legacy pubkey.
+# Keep these as the single source of truth for both the classifier threshold and
+# the actual single-sig/multisig self-send broadcasts.
+_MB_SELF_SEND_AMOUNT_ULUME=100000
+_MB_SELF_SEND_FEE_ULUME=5000
+
 # Minimum spendable ulume required for the target to broadcast its own
-# self-send (publishes pubkey). Sized to cover the multisig self-send fee
-# (5000ulume) with headroom. Targets below this threshold MUST be funded by
+# self-send (publishes pubkey). Targets below this threshold MUST be funded by
 # --funder even if their TOTAL balance is large (the vesting-locked case).
-_MB_MIN_SELF_SEND_SPENDABLE_ULUME=10000
+_MB_MIN_SELF_SEND_SPENDABLE_ULUME=$((_MB_SELF_SEND_AMOUNT_ULUME + _MB_SELF_SEND_FEE_ULUME))
 
 # _mb_classify_target <legacy_addr>
 # Probes chain and prints one of:
@@ -212,13 +218,14 @@ _MB_MIN_SELF_SEND_SPENDABLE_ULUME=10000
 #   ready          — auth pubkey present, no migration record
 #   needs-pubkey   — auth account exists (or has balance) but no pubkey
 #                    AND has enough SPENDABLE balance to self-fund the
-#                    self-send fee
+#                    self-send amount plus fee
 #   needs-funding  — pubkey missing AND spendable balance is insufficient
-#                    for the self-send fee. This covers two cases:
+#                    for the self-send amount plus fee. This covers two cases:
 #                      a) account does not exist on auth and balance==0
 #                         (classic fresh foundation account)
 #                      b) account exists with non-zero TOTAL balance but
-#                         that balance is vesting-locked → spendable < fee
+#                         that balance is vesting-locked → spendable below
+#                         the self-send amount plus fee
 #   unknown        — RPC failure (cannot even read bank balances)
 # Plus prints `balance=<ulume>` and `spendable=<ulume>` on subsequent lines.
 #
@@ -288,7 +295,7 @@ _mb_classify_target() {
     *)
       # No pubkey on chain. Decide between needs-pubkey (self-fund) and
       # needs-funding (caller must provide --funder) based on whether the
-      # target can pay its own self-send fee from SPENDABLE balance.
+      # target can pay its own self-send amount plus fee from SPENDABLE balance.
       #
       # An account is self-fundable iff:
       #   - auth knows it OR total balance > 0  (so it can plausibly broadcast)
@@ -416,8 +423,9 @@ Phase B — per-target chain-state probe. READ-ONLY. No signing, no broadcast.
 Per target, classifies into one of:
   migrated       — already migrated, will be skipped by `execute`
   ready          — pubkey on chain, ready to migrate
-  needs-pubkey   — has spendable balance but no pubkey on chain (will self-send)
-  needs-funding  — pubkey missing and spendable balance < self-send fee
+  needs-pubkey   — has enough spendable balance for self-send amount + fee
+                   but no pubkey on chain (will self-send)
+  needs-funding  — pubkey missing and spendable balance < self-send amount + fee
                    (zero-balance OR vesting-locked; will need --funder during execute)
   unknown        — RPC failure (re-check)
 
@@ -666,22 +674,22 @@ _mb_send_with_funder() {
 }
 
 # _mb_multisig_self_send <multisig_name> <multisig_addr> <signers_csv> <threshold>
-# Performs a multisig self-send (multisig -> multisig) of 100000ulume to publish
-# the multisig's pubkey on chain. All signer keys must already be present in
-# the ephemeral keyring under legacy-* names.
+# Performs a multisig self-send (multisig -> multisig) to publish the multisig's
+# pubkey on chain. All signer keys must already be present in the ephemeral
+# keyring under legacy-* names.
 _mb_multisig_self_send() {
   local multi_name="$1" multi_addr="$2" signers_csv="$3" threshold="$4"
   local workdir
   workdir=$(mktemp -d "${_MB_EPHEMERAL_DIR}/selfsend-XXXXXX")
   local unsigned="${workdir}/unsigned.json"
 
-  # 1. Unsigned tx (self-send 100000ulume to publish pubkey). The first
+  # 1. Unsigned tx (self-send to publish pubkey). The first
   # positional argument is the FROM key NAME (looked up in the keyring), not
   # an address. lumerad rejects an address here as "no key name or address
   # provided; have you forgotten the --from flag?".
-  "$BIN" tx bank send "$multi_name" "$multi_addr" 100000ulume \
+  "$BIN" tx bank send "$multi_name" "$multi_addr" "${_MB_SELF_SEND_AMOUNT_ULUME}ulume" \
     --node "$NODE" --chain-id "$CHAIN_ID" \
-    --fees 5000ulume --gas auto --gas-adjustment 1.3 \
+    --fees "${_MB_SELF_SEND_FEE_ULUME}ulume" --gas auto --gas-adjustment 1.3 \
     --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
     --generate-only --output json >"$unsigned"
 
@@ -882,9 +890,9 @@ _mb_execute_one() {
     else
       log_info "  publishing single-sig pubkey via self-send"
       local out tx_hash
-      if ! out=$("$BIN" tx bank send "$legacy_key_name" "$addr" 100000ulume \
+      if ! out=$("$BIN" tx bank send "$legacy_key_name" "$addr" "${_MB_SELF_SEND_AMOUNT_ULUME}ulume" \
                    --node "$NODE" --chain-id "$CHAIN_ID" \
-                   --fees 5000ulume --gas auto --gas-adjustment 1.3 \
+                   --fees "${_MB_SELF_SEND_FEE_ULUME}ulume" --gas auto --gas-adjustment 1.3 \
                    --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
                    --output json -y); then
         log_error "  single-sig self-send broadcast exited non-zero"
@@ -1010,7 +1018,7 @@ _mb_execute() {
   _MB_DRY_RUN=0
   local yes=0
   _MB_FUNDER=""
-  # Must cover the self-send (100000ulume) + its fee (5000ulume) with headroom.
+  # Must cover the self-send amount + its fee with headroom.
   # 200000ulume = self-send + fee + ~2x headroom. Lower defaults will make the
   # downstream self-send fail with insufficient funds on a freshly-funded target.
   _MB_TOP_UP_AMOUNT="200000ulume"
@@ -1054,7 +1062,7 @@ Per target:
   2) set up an ephemeral mode-0700 keyring (wiped on exit)
   3) import each signer's mnemonic as legacy (118/secp256k1) + new (60/eth_secp256k1)
   4) reconstruct legacy multisig; assert address matches file (multisig targets)
-  5) fund if balance==0 (requires --funder)
+  5) fund if spendable balance is below self-send amount + fee (requires --funder)
   6) self-send to publish multisig pubkey on chain (if missing)
   7) delegate to migrate-multisig.sh / migrate-account.sh
   8) verify via evmigration migration-record
@@ -1066,11 +1074,11 @@ Optional:
   --target <name>            Process ONLY the named target. Highly recommended
                              for the first run.
   --funder <key>             Operator keyring key that pays fees for targets
-                             with zero balance. Lives in the OPERATOR's main
-                             keyring (NOT the ephemeral one).
-  --top-up-amount <coins>    Amount to send to a zero-balance target before
+                             classified needs-funding. Lives in the OPERATOR's
+                             main keyring (NOT the ephemeral one).
+  --top-up-amount <coins>    Amount to send to a needs-funding target before
                              self-send. Default: 200000ulume (covers the
-                             100000ulume self-send + 5000ulume fee + headroom).
+                             self-send amount + fee + headroom).
   --funder-keyring-*         How to reach the funder key (defaults: backend=test,
                              dir=$HOME default).
   --log-file <path>          Append JSONL audit records (one event per line)

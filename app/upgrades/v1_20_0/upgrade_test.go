@@ -72,7 +72,7 @@ func TestV1200SetsDevnetMigrationEndTime(t *testing.T) {
 func TestV1200SetsTestnetMigrationEndTime(t *testing.T) {
 	app := lumeraapp.Setup(t)
 	// See TestV1200SetsDevnetMigrationEndTime: network is taken from ctx.ChainID().
-	ctx := app.BaseApp.NewContext(false).WithChainID("lumera-testnet-1")
+	ctx := app.BaseApp.NewContext(false).WithChainID("lumera-testnet-2")
 
 	want := ctx.BlockTime().AddDate(0, 3, 0).Unix()
 

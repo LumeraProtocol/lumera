@@ -161,14 +161,14 @@ Once connected, the state panel fills in all four rows, and the **Connected Wall
 
 In this screenshot:
 
-- The state panel shows**Portal profile: lumera-devnet-1 / coin-type 118**,**Keplr chain config: coin-type 118**,**Keplr account key: legacy key / coin-type 118** — all in yellow (legacy 118 derivation everywhere). The**on-chain network** row confirms`lumera-devnet-1 / EVM support`.
-- The **Migration Window** card shows how long migration stays open (e.g.`1d 22h 35m left`) and the exact close time. This reflects the chain's `migration_end_time` parameter; when it shows no deadline, migration has no time limit.
+- The state panel shows **Portal profile: lumera-devnet-1 / coin-type 118**, **Keplr chain config: coin-type 118**, **Keplr account key: legacy key / coin-type 118** — all in yellow (legacy 118 derivation everywhere). The **on-chain network** row confirms `lumera-devnet-1 / EVM support`.
+- The **Migration Window** card shows how long migration stays open (e.g. `1d 22h 35m left`) and the exact close time. This reflects the chain's `migration_end_time` parameter; when it shows no deadline, migration has no time limit.
 - The progress stats report global counters, refreshed every 5 minutes:
   - **Migrated** — accounts already migrated
   - **Remaining** — accounts still to migrate, split into **with key** (have signed on-chain, so a key is known) and **without key** (never signed)
   - **Staked (legacy)** — legacy accounts still holding delegations
   - **Validators** — migrated / total validators
-- The**Ready to Migrate** breakdown under the connected address shows what will move:
+- The **Ready to Migrate** breakdown under the connected address shows what will move:
   - **Balance** — your available LUME balance
   - **Delegations** — active staking delegations
   - **Unbonding** — pending unbonding entries

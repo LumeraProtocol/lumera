@@ -26,11 +26,12 @@ import (
 // UpgradeName is the on-chain name used for this upgrade.
 const UpgradeName = "v1.20.0"
 
-// All networks derive a finite migration_end_time automatically from the
-// upgrade block time so they run against a real deadline without hardcoding an
-// absolute timestamp. Devnet uses a short fixed window for rehearsals; testnet
-// and mainnet both run against a 3-calendar-month window measured from the
-// upgrade block.
+// Recognized Lumera networks (devnet/testnet/mainnet) derive a finite
+// migration_end_time automatically from the upgrade block time so they run
+// against a real deadline without hardcoding an absolute timestamp. Devnet uses
+// a short fixed window for rehearsals; testnet and mainnet both run against a
+// 3-calendar-month window measured from the upgrade block. Unrecognized chain
+// IDs (custom networks/forks) are left with no deadline.
 const devnetMigrationWindow = 2 * 24 * time.Hour
 
 // autoMigrationEndTime returns the migration_end_time to auto-apply for the

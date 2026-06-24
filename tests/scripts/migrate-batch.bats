@@ -95,6 +95,55 @@ write_fixture_mixed() {
 JSON
 }
 
+write_fixture_standalone() {
+  local out="$1"
+  cat >"$out" <<'JSON'
+{
+  "standalone": {
+    "address": "lumera1standalone",
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+    "pubkey": "{\"@type\":\"/cosmos.crypto.secp256k1.PubKey\",\"key\":\"STANDALONE\"}",
+    "type": "local"
+  }
+}
+JSON
+}
+
+write_lumerad_status_shim() {
+  local out="$1"
+  cat >"$out" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$*" == *"--help"* ]]; then
+  exit 0
+fi
+
+if [[ "${1-}" == "query" && "${2-}" == "evmigration" && "${3-}" == "migration-record" ]]; then
+  exit 1
+fi
+
+if [[ "${1-}" == "query" && "${2-}" == "bank" && "${3-}" == "balances" ]]; then
+  printf '{"balances":[{"denom":"ulume","amount":"%s"}]}\n' "${FAKE_BALANCE_ULUME:-500000}"
+  exit 0
+fi
+
+if [[ "${1-}" == "query" && "${2-}" == "bank" && "${3-}" == "spendable-balances" ]]; then
+  printf '{"balances":[{"denom":"ulume","amount":"%s"}]}\n' "${FAKE_SPENDABLE_ULUME:-0}"
+  exit 0
+fi
+
+if [[ "${1-}" == "query" && "${2-}" == "auth" && "${3-}" == "account" ]]; then
+  printf '{"account":{"@type":"/cosmos.auth.v1beta1.BaseAccount","address":"%s"}}\n' "${4-}"
+  exit 0
+fi
+
+printf 'unexpected lumerad shim args: %s\n' "$*" >&2
+exit 1
+SH
+  chmod +x "$out"
+}
+
 ###############################################################################
 # Tests
 ###############################################################################
@@ -271,4 +320,34 @@ JSON
   [ -s "$plan" ]
   run jq -e 'type == "object" and (.targets | type == "array")' "$plan"
   [ "$status" -eq 0 ]
+}
+
+@test "status: spendable below self-send amount plus fee requires funding" {
+  local fix="$TMPDIR/fix.json"
+  local shim="$TMPDIR/lumerad-shim"
+  write_fixture_standalone "$fix"
+  write_lumerad_status_shim "$shim"
+
+  run env FAKE_SPENDABLE_ULUME=104999 "$MIGRATE_BATCH" status \
+    --mnemonics "$fix" \
+    --chain-id lumera-test \
+    --binary "$shim"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"needs-funding"* ]]
+  [[ "$output" == *"spendable=104999ulume"* ]]
+}
+
+@test "status: spendable equal to self-send amount plus fee can self-send" {
+  local fix="$TMPDIR/fix.json"
+  local shim="$TMPDIR/lumerad-shim"
+  write_fixture_standalone "$fix"
+  write_lumerad_status_shim "$shim"
+
+  run env FAKE_SPENDABLE_ULUME=105000 "$MIGRATE_BATCH" status \
+    --mnemonics "$fix" \
+    --chain-id lumera-test \
+    --binary "$shim"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"needs-pubkey"* ]]
+  [[ "$output" == *"spendable=105000ulume"* ]]
 }

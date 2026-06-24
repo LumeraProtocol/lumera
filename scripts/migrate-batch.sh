@@ -17,7 +17,8 @@
 #   - For multisigs, reconstructs both legacy and new multisigs by pubkey-
 #     matched signer order, and asserts the reconstructed legacy address
 #     equals the address in the mnemonics file.
-#   - Optionally tops up the legacy address from --funder, if balance is 0.
+#   - Optionally tops up the legacy address from --funder, if the target cannot
+#     pay for its own pubkey-publishing self-send from spendable balance.
 #   - If on-chain pubkey is missing, performs a self-send to publish it
 #     (multisig variant: --generate-only + sign×K + multisign + broadcast).
 #   - Delegates the migration ceremony itself to:
@@ -200,14 +201,33 @@ _mb_filter_targets() {
   printf '%s' "$out"
 }
 
+# Self-send amount and fee used to publish a missing legacy pubkey.
+# Keep these as the single source of truth for both the classifier threshold and
+# the actual single-sig/multisig self-send broadcasts.
+_MB_SELF_SEND_AMOUNT_ULUME=100000
+_MB_SELF_SEND_FEE_ULUME=5000
+
+# Minimum spendable ulume required for the target to broadcast its own
+# self-send (publishes pubkey). Targets below this threshold MUST be funded by
+# --funder even if their TOTAL balance is large (the vesting-locked case).
+_MB_MIN_SELF_SEND_SPENDABLE_ULUME=$((_MB_SELF_SEND_AMOUNT_ULUME + _MB_SELF_SEND_FEE_ULUME))
+
 # _mb_classify_target <legacy_addr>
 # Probes chain and prints one of:
 #   migrated       — migration-record exists
 #   ready          — auth pubkey present, no migration record
 #   needs-pubkey   — auth account exists (or has balance) but no pubkey
-#   needs-funding  — account not found on auth AND balance==0
+#                    AND has enough SPENDABLE balance to self-fund the
+#                    self-send amount plus fee
+#   needs-funding  — pubkey missing AND spendable balance is insufficient
+#                    for the self-send amount plus fee. This covers two cases:
+#                      a) account does not exist on auth and balance==0
+#                         (classic fresh foundation account)
+#                      b) account exists with non-zero TOTAL balance but
+#                         that balance is vesting-locked → spendable below
+#                         the self-send amount plus fee
 #   unknown        — RPC failure (cannot even read bank balances)
-# Plus prints `balance=<ulume>` on second line.
+# Plus prints `balance=<ulume>` and `spendable=<ulume>` on subsequent lines.
 #
 # NOTE: the existing auth_pubkey_type helper hard-exits (exit 2) when the
 # account does not exist on auth, which is a LEGITIMATE state for fresh
@@ -215,9 +235,18 @@ _mb_filter_targets() {
 # ourselves and disambiguate "account not found" from "RPC down" by using
 # `bank balances` as the RPC-liveness probe (which succeeds with an empty
 # balances array for unknown addresses).
+#
+# WHY we look at SPENDABLE, not TOTAL: foundation multisigs on the mainnet
+# launch bundle are continuous-vesting accounts. Until their end_time they
+# carry a large TOTAL balance but spendable=0, so any tx they sign — even a
+# self-send to themselves — is rejected at the ante handler with
+# "insufficient funds" against the fee. A classifier that only looks at
+# TOTAL balance silently routes those targets onto the no-funder code path,
+# which then fails at broadcast. Looking at spendable lets the funder bail
+# them out instead.
 _mb_classify_target() {
   local addr="$1"
-  local rec_json balance_json balance auth_json pk_type_str
+  local rec_json balance_json balance spendable_json spendable auth_json pk_type_str
 
   # 1) already migrated?
   if rec_json=$(lumerad_q_capture evmigration migration-record "$addr" 2>/dev/null); then
@@ -232,9 +261,19 @@ _mb_classify_target() {
   if ! balance_json=$(lumerad_q_capture bank balances "$addr" 2>/dev/null); then
     printf 'unknown\n'
     printf 'balance=0\n'
+    printf 'spendable=0\n'
     return 0
   fi
   balance=$(jq -r '[.balances[]? | select(.denom == "ulume").amount | tonumber] | add // 0' <<<"$balance_json")
+
+  # 2b) spendable balance — same denom. For vesting-locked accounts this is
+  # strictly less than balance until end_time. We tolerate RPC failure here
+  # (treat as spendable=0 so we route to needs-funding, which is the safe
+  # default — the funder will top up).
+  spendable=0
+  if spendable_json=$(lumerad_q_capture bank spendable-balances "$addr" 2>/dev/null); then
+    spendable=$(jq -r '[.balances[]? | select(.denom == "ulume").amount | tonumber] | add // 0' <<<"$spendable_json")
+  fi
 
   # 3) auth account — may legitimately be absent for a fresh foundation
   # account. We treat that as "not on auth" (acct_known=0), NOT as RPC failure.
@@ -254,12 +293,16 @@ _mb_classify_target() {
       printf 'ready\n'
       ;;
     *)
-      # No pubkey on chain. Two sub-cases:
-      #   - account exists on auth but no pubkey (genesis / received-only) → needs-pubkey
-      #   - account does NOT exist on auth at all → needs-funding to create it,
-      #     unless someone has already sent to it (balance > 0), in which case
-      #     it's effectively needs-pubkey.
-      if (( acct_known == 1 )) || [[ "$balance" != "0" ]]; then
+      # No pubkey on chain. Decide between needs-pubkey (self-fund) and
+      # needs-funding (caller must provide --funder) based on whether the
+      # target can pay its own self-send amount plus fee from SPENDABLE balance.
+      #
+      # An account is self-fundable iff:
+      #   - auth knows it OR total balance > 0  (so it can plausibly broadcast)
+      #   - AND spendable >= _MB_MIN_SELF_SEND_SPENDABLE_ULUME
+      # Otherwise we hand it to the funder path.
+      if { (( acct_known == 1 )) || [[ "$balance" != "0" ]]; } \
+         && (( spendable >= _MB_MIN_SELF_SEND_SPENDABLE_ULUME )); then
         printf 'needs-pubkey\n'
       else
         printf 'needs-funding\n'
@@ -267,6 +310,7 @@ _mb_classify_target() {
       ;;
   esac
   printf 'balance=%s\n' "$balance"
+  printf 'spendable=%s\n' "$spendable"
 }
 
 ###############################################################################
@@ -379,8 +423,10 @@ Phase B — per-target chain-state probe. READ-ONLY. No signing, no broadcast.
 Per target, classifies into one of:
   migrated       — already migrated, will be skipped by `execute`
   ready          — pubkey on chain, ready to migrate
-  needs-pubkey   — has balance but no pubkey on chain (will self-send)
-  needs-funding  — zero balance, no pubkey (will need --funder during execute)
+  needs-pubkey   — has enough spendable balance for self-send amount + fee
+                   but no pubkey on chain (will self-send)
+  needs-funding  — pubkey missing and spendable balance < self-send amount + fee
+                   (zero-balance OR vesting-locked; will need --funder during execute)
   unknown        — RPC failure (re-check)
 
 Required:
@@ -423,7 +469,7 @@ S_USAGE
 
   local count_migrated=0 count_ready=0 count_needs_pubkey=0 count_needs_funding=0 count_unknown=0
   log_info "=== Status (chain: $CHAIN_ID, node: $NODE) ==="
-  local row name addr kind status_lines status balance extra
+  local row name addr kind status_lines status balance spendable extra
   local n_rows
   n_rows=$(jq -r 'length' <<<"$targets")
   local i=0
@@ -435,13 +481,15 @@ S_USAGE
     status_lines=$(_mb_classify_target "$addr")
     status=$(awk 'NR==1' <<<"$status_lines")
     # Parse extras by key, not by line number — _mb_classify_target emits
-    # `balance=...` for non-migrated statuses and `new_address=...` when
-    # migrated. Positional parsing would mis-label one as the other.
+    # `balance=...` and `spendable=...` for non-migrated statuses and
+    # `new_address=...` when migrated. Positional parsing would mis-label.
     balance=$(awk -F= 'NR>1 && $1=="balance" {print $2}' <<<"$status_lines")
+    spendable=$(awk -F= 'NR>1 && $1=="spendable" {print $2}' <<<"$status_lines")
     extra=""
     if [[ "$status" == "migrated" ]]; then
       extra=" -> $(awk -F= 'NR>1 && $1=="new_address" {print $2}' <<<"$status_lines")"
       balance=""
+      spendable=""
     fi
     case "$status" in
       migrated)       count_migrated=$((count_migrated+1)) ;;
@@ -450,13 +498,18 @@ S_USAGE
       needs-funding)  count_needs_funding=$((count_needs_funding+1)) ;;
       *)              count_unknown=$((count_unknown+1)) ;;
     esac
-    printf '  %-12s [%-10s] %-30s %s%s%s\n' \
+    # Surface spendable alongside balance so operators understand why a
+    # vesting-locked account (balance>0, spendable=0) is needs-funding.
+    printf '  %-12s [%-10s] %-30s %s%s%s%s\n' \
       "$status" "$kind" "$name" "$addr" \
-      "${balance:+  balance=${balance}ulume}" "$extra"
+      "${balance:+  balance=${balance}ulume}" \
+      "${spendable:+  spendable=${spendable}ulume}" \
+      "$extra"
     i=$((i+1))
   done
   printf '\nSummary: migrated=%s ready=%s needs-pubkey=%s needs-funding=%s unknown=%s\n' \
     "$count_migrated" "$count_ready" "$count_needs_pubkey" "$count_needs_funding" "$count_unknown"
+  printf 'Note: needs-funding includes targets where spendable=0 even when balance>0 (vesting-locked).\n'
 }
 
 ###############################################################################
@@ -621,22 +674,22 @@ _mb_send_with_funder() {
 }
 
 # _mb_multisig_self_send <multisig_name> <multisig_addr> <signers_csv> <threshold>
-# Performs a multisig self-send (multisig -> multisig) of 100000ulume to publish
-# the multisig's pubkey on chain. All signer keys must already be present in
-# the ephemeral keyring under legacy-* names.
+# Performs a multisig self-send (multisig -> multisig) to publish the multisig's
+# pubkey on chain. All signer keys must already be present in the ephemeral
+# keyring under legacy-* names.
 _mb_multisig_self_send() {
   local multi_name="$1" multi_addr="$2" signers_csv="$3" threshold="$4"
   local workdir
   workdir=$(mktemp -d "${_MB_EPHEMERAL_DIR}/selfsend-XXXXXX")
   local unsigned="${workdir}/unsigned.json"
 
-  # 1. Unsigned tx (self-send 100000ulume to publish pubkey). The first
+  # 1. Unsigned tx (self-send to publish pubkey). The first
   # positional argument is the FROM key NAME (looked up in the keyring), not
   # an address. lumerad rejects an address here as "no key name or address
   # provided; have you forgotten the --from flag?".
-  "$BIN" tx bank send "$multi_name" "$multi_addr" 100000ulume \
+  "$BIN" tx bank send "$multi_name" "$multi_addr" "${_MB_SELF_SEND_AMOUNT_ULUME}ulume" \
     --node "$NODE" --chain-id "$CHAIN_ID" \
-    --fees 5000ulume --gas auto --gas-adjustment 1.3 \
+    --fees "${_MB_SELF_SEND_FEE_ULUME}ulume" --gas auto --gas-adjustment 1.3 \
     --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
     --generate-only --output json >"$unsigned"
 
@@ -698,10 +751,11 @@ _mb_execute_one() {
   # lines. For status=migrated the extra line is `new_address=...` (no balance).
   # For other statuses the extra line is `balance=...`. Parse by key so we
   # don't mis-label new_address as balance in the operator log + JSONL audit.
-  local cls cls_status balance new_addr_cls
+  local cls cls_status balance spendable new_addr_cls
   cls=$(_mb_classify_target "$addr")
   cls_status=$(awk 'NR==1' <<<"$cls")
   balance=$(awk -F= 'NR>1 && $1=="balance" {print $2}' <<<"$cls")
+  spendable=$(awk -F= 'NR>1 && $1=="spendable" {print $2}' <<<"$cls")
   new_addr_cls=$(awk -F= 'NR>1 && $1=="new_address" {print $2}' <<<"$cls")
 
   if [[ "$cls_status" == "migrated" ]]; then
@@ -711,8 +765,8 @@ _mb_execute_one() {
     _mb_log_event target_done target "$name" outcome skipped_already_migrated
     return 0
   fi
-  log_info "  on-chain status: $cls_status  (balance=${balance}ulume)"
-  _mb_log_event classify target "$name" status "$cls_status" balance "$balance"
+  log_info "  on-chain status: $cls_status  (balance=${balance}ulume spendable=${spendable:-0}ulume)"
+  _mb_log_event classify target "$name" status "$cls_status" balance "$balance" spendable "${spendable:-0}"
 
   if [[ "$cls_status" == "unknown" ]]; then
     log_error "  could not classify on-chain state; check RPC and re-run"
@@ -835,9 +889,9 @@ _mb_execute_one() {
     else
       log_info "  publishing single-sig pubkey via self-send"
       local out tx_hash
-      if ! out=$("$BIN" tx bank send "$legacy_key_name" "$addr" 100000ulume \
+      if ! out=$("$BIN" tx bank send "$legacy_key_name" "$addr" "${_MB_SELF_SEND_AMOUNT_ULUME}ulume" \
                    --node "$NODE" --chain-id "$CHAIN_ID" \
-                   --fees 5000ulume --gas auto --gas-adjustment 1.3 \
+                   --fees "${_MB_SELF_SEND_FEE_ULUME}ulume" --gas auto --gas-adjustment 1.3 \
                    --keyring-backend test --keyring-dir "$_MB_EPHEMERAL_DIR" \
                    --output json -y); then
         log_error "  single-sig self-send broadcast exited non-zero"
@@ -963,7 +1017,7 @@ _mb_execute() {
   _MB_DRY_RUN=0
   local yes=0
   _MB_FUNDER=""
-  # Must cover the self-send (100000ulume) + its fee (5000ulume) with headroom.
+  # Must cover the self-send amount + its fee with headroom.
   # 200000ulume = self-send + fee + ~2x headroom. Lower defaults will make the
   # downstream self-send fail with insufficient funds on a freshly-funded target.
   _MB_TOP_UP_AMOUNT="200000ulume"
@@ -1007,7 +1061,7 @@ Per target:
   2) set up an ephemeral mode-0700 keyring (wiped on exit)
   3) import each signer's mnemonic as legacy (118/secp256k1) + new (60/eth_secp256k1)
   4) reconstruct legacy multisig; assert address matches file (multisig targets)
-  5) fund if balance==0 (requires --funder)
+  5) fund if spendable balance is below self-send amount + fee (requires --funder)
   6) self-send to publish multisig pubkey on chain (if missing)
   7) delegate to migrate-multisig.sh / migrate-account.sh
   8) verify via evmigration migration-record
@@ -1019,11 +1073,11 @@ Optional:
   --target <name>            Process ONLY the named target. Highly recommended
                              for the first run.
   --funder <key>             Operator keyring key that pays fees for targets
-                             with zero balance. Lives in the OPERATOR's main
-                             keyring (NOT the ephemeral one).
-  --top-up-amount <coins>    Amount to send to a zero-balance target before
+                             classified needs-funding. Lives in the OPERATOR's
+                             main keyring (NOT the ephemeral one).
+  --top-up-amount <coins>    Amount to send to a needs-funding target before
                              self-send. Default: 200000ulume (covers the
-                             100000ulume self-send + 5000ulume fee + headroom).
+                             self-send amount + fee + headroom).
   --funder-keyring-*         How to reach the funder key (defaults: backend=test,
                              dir=$HOME default).
   --log-file <path>          Append JSONL audit records (one event per line)

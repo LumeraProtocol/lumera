@@ -491,12 +491,12 @@ Priority levels: **CRITICAL** = must review before mainnet, **HIGH** = should re
 | **CRITICAL** | `min_gas_price` | 0.0005 ulume/gas | Ensure non-zero cost at launch price |
 | **CRITICAL** | `allow-unprotected-txs` | `false` | Verify remains `false` in all configs |
 | **CRITICAL** | `migration_end_time` | `0` (none) | **Set a mainnet deadline** |
-| **CRITICAL** | `minimum_stake` (supernode) | TBD | Price-sensitive — review at launch price |
+| **CRITICAL** | `minimum_stake` (supernode) | `0 ulume` (code default) | Price-sensitive — review at launch price |
 | **HIGH** | `base_fee_change_denominator` | 16 | Decide: stability (16) vs responsiveness (8) |
 | **HIGH** | `consensus_max_gas` | 25,000,000 | Confirm validator hardware supports it |
 | **HIGH** | ERC20 registration policy | configurable | **Set to "allowlist" for mainnet** |
-| **HIGH** | `base_action_fee` / `fee_per_kbyte` | TBD | Economic modeling needed |
-| **HIGH** | `supernode_fee_share` | TBD | Incentive alignment review |
+| **HIGH** | `base_action_fee` / `fee_per_kbyte` | `0.01 LUME` / `0.00001 LUME/kB` (code defaults) | Economic modeling needed |
+| **HIGH** | `supernode_fee_share` | `2%` (200 bps, code default) | Incentive alignment review |
 | **HIGH** | Rate limiter | `disabled` | **Enable on public RPC nodes** |
 | **MEDIUM** | `gas-cap` (JSON-RPC) | 25,000,000 | Lower to 10M for public nodes |
 | **MEDIUM** | `logs-cap` / `block-range-cap` | 10,000 | Lower to 2,000 for public nodes |

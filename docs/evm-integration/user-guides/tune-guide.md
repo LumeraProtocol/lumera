@@ -496,7 +496,7 @@ Priority levels: **CRITICAL** = must review before mainnet, **HIGH** = should re
 | **HIGH** | `consensus_max_gas` | 25,000,000 | Confirm validator hardware supports it |
 | **HIGH** | ERC20 registration policy | configurable | **Set to "allowlist" for mainnet** |
 | **HIGH** | `base_action_fee` / `fee_per_kbyte` | `0.01 LUME` / `0.00001 LUME/kB` (code defaults) | Economic modeling needed |
-| **HIGH** | `supernode_fee_share` | `2%` (200 bps, code default) | Incentive alignment review |
+| **HIGH** | `supernode_fee_share` | `1.0` (100%, code default) | Incentive alignment review |
 | **HIGH** | Rate limiter | `disabled` | **Enable on public RPC nodes** |
 | **MEDIUM** | `gas-cap` (JSON-RPC) | 25,000,000 | Lower to 10M for public nodes |
 | **MEDIUM** | `logs-cap` / `block-range-cap` | 10,000 | Lower to 2,000 for public nodes |

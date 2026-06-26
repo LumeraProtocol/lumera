@@ -29,7 +29,7 @@ Reference for the bundled `scripts/migrate-account.sh`, `scripts/migrate-validat
 
 ### [validator-migration.md](validator-migration.md) — Validator Operator Migration
 
-The validator-specific procedure: maintenance window planning against `downtime_jail_duration` (1 hour on mainnet), the `max_validator_delegations` cap (default 2000), the `unjail` recovery flow if pre-flight reports the validator is jailed or unbonded, and the consensus-key safety guarantee (`priv_validator_key.json` is **not** affected — only the operator key changes from `secp256k1` to `eth_secp256k1`). Includes the multisig validator operator path.
+The validator-specific procedure: maintenance window planning against `downtime_jail_duration` (1 hour on mainnet), the `max_validator_delegations` cap (default 2500), the `unjail` recovery flow if pre-flight reports the validator is jailed or unbonded, and the consensus-key safety guarantee (`priv_validator_key.json` is **not** affected — only the operator key changes from `secp256k1` to `eth_secp256k1`). Includes the multisig validator operator path.
 
 ### [supernode-migration.md](supernode-migration.md) — Supernode Operator Migration
 

@@ -2,10 +2,23 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-DEFAULT_CHAIN_ID="lumera-mainnet-1"
-DEFAULT_RPC="https://rpc.lumera.io:443"
-DEFAULT_GRPC="grpc.lumera.io:443"
-DEFAULT_CURRENT_CAP="2000"
+DEVNET_CHAIN_ID="lumera-devnet-1"
+DEVNET_RPC="https://rpc.pastel.network"
+DEVNET_GRPC="grpc.pastel.network"
+
+TESTNET_CHAIN_ID="lumera-testnet-2"
+#TESTNET_RPC="https://lumera-testnet-rpc.polkachu.com:443"
+TESTNET_RPC="https://rpc.testnet.lumera.io:443"
+TESTNET_GRPC="grpc.testnet.lumera.io:443"
+
+MAINNET_CHAIN_ID="lumera-mainnet-1"
+MAINNET_RPC="https://rpc.lumera.io:443"
+MAINNET_GRPC="grpc.lumera.io:443"
+
+DEFAULT_CHAIN_ID="$TESTNET_CHAIN_ID"
+DEFAULT_RPC="$TESTNET_RPC"
+DEFAULT_GRPC="$TESTNET_GRPC"
+DEFAULT_CURRENT_CAP="2500"
 
 CHAIN_ID="${LUMERA_CHAIN_ID:-$DEFAULT_CHAIN_ID}"
 NODE="${LUMERA_NODE:-${LUMERA_RPC:-$DEFAULT_RPC}}"
@@ -18,6 +31,9 @@ JSON_OUTPUT=0
 ALLOW_PARTIAL=0
 GRPC_INSECURE="${LUMERA_GRPC_INSECURE:-0}"
 GRPC_MAX_TIME="${LUMERA_GRPC_MAX_TIME:-30}"
+CHAIN_ID_FLAG_SET=0
+NODE_FLAG_SET=0
+GRPC_FLAG_SET=0
 
 usage() {
   cat <<'USAGE'
@@ -33,11 +49,12 @@ Commands:
       total supernodes grouped by their current state.
 
 Common flags:
+  --network <name>          Use default endpoints for devnet, testnet, or mainnet
   --node, --rpc <url>        Tendermint RPC endpoint
-                             default: https://rpc.lumera.io:443
+                             default: selected network RPC
   --grpc <host:port>        gRPC endpoint for commands that need it
-                             default: grpc.lumera.io:443
-  --chain-id <id>           Chain ID; default: lumera-mainnet-1
+                             default: selected network gRPC
+  --chain-id <id>           Chain ID; default: selected network chain ID
   --binary <path>           lumerad binary; default: lumerad
   --grpcurl <path>          grpcurl binary; default: grpcurl
   --grpc-insecure           use plaintext gRPC for grpcurl queries
@@ -99,6 +116,40 @@ require_tools() {
 
 require_grpcurl() {
   command -v "$GRPCURL" >/dev/null 2>&1 || return 1
+}
+
+apply_network_defaults() {
+  local network="$1" chain_id rpc grpc
+  case "$network" in
+    devnet)
+      chain_id="$DEVNET_CHAIN_ID"
+      rpc="$DEVNET_RPC"
+      grpc="$DEVNET_GRPC"
+      ;;
+    testnet)
+      chain_id="$TESTNET_CHAIN_ID"
+      rpc="$TESTNET_RPC"
+      grpc="$TESTNET_GRPC"
+      ;;
+    mainnet)
+      chain_id="$MAINNET_CHAIN_ID"
+      rpc="$MAINNET_RPC"
+      grpc="$MAINNET_GRPC"
+      ;;
+    *)
+      die 1 "unknown network '$network'; expected devnet, testnet, or mainnet"
+      ;;
+  esac
+
+  if [[ "$CHAIN_ID_FLAG_SET" -eq 0 ]]; then
+    CHAIN_ID="$chain_id"
+  fi
+  if [[ "$NODE_FLAG_SET" -eq 0 ]]; then
+    NODE="$rpc"
+  fi
+  if [[ "$GRPC_FLAG_SET" -eq 0 ]]; then
+    GRPC="$grpc"
+  fi
 }
 
 lumerad_query() {
@@ -315,19 +366,27 @@ emit_result_human() {
 parse_max_validator_flags() {
   while (($#)); do
     case "$1" in
+      --network)
+        require_value "$1" "${2:-}"
+        apply_network_defaults "$2"
+        shift 2
+        ;;
       --node|--rpc)
         require_value "$1" "${2:-}"
         NODE="$2"
+        NODE_FLAG_SET=1
         shift 2
         ;;
       --grpc)
         require_value "$1" "${2:-}"
         GRPC="$2"
+        GRPC_FLAG_SET=1
         shift 2
         ;;
       --chain-id)
         require_value "$1" "${2:-}"
         CHAIN_ID="$2"
+        CHAIN_ID_FLAG_SET=1
         shift 2
         ;;
       --binary)
@@ -587,14 +646,27 @@ fetch_all() {
 parse_stats_flags() {
   while (($#)); do
     case "$1" in
+      --network)
+        require_value "$1" "${2:-}"
+        apply_network_defaults "$2"
+        shift 2
+        ;;
       --node|--rpc)
         require_value "$1" "${2:-}"
         NODE="$2"
+        NODE_FLAG_SET=1
+        shift 2
+        ;;
+      --grpc)
+        require_value "$1" "${2:-}"
+        GRPC="$2"
+        GRPC_FLAG_SET=1
         shift 2
         ;;
       --chain-id)
         require_value "$1" "${2:-}"
         CHAIN_ID="$2"
+        CHAIN_ID_FLAG_SET=1
         shift 2
         ;;
       --binary)

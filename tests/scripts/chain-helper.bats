@@ -262,6 +262,83 @@ teardown() {
   '
 }
 
+@test "max-validator-delegations applies network defaults" {
+  run "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
+    --binary "$FAKE_LUMERAD" \
+    --grpcurl "$FAKE_GRPCURL" \
+    --network mainnet \
+    --json
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '
+    .chain_id == "lumera-mainnet-1"
+    and .rpc == "https://rpc.lumera.io:443"
+    and .grpc == "grpc.lumera.io:443"
+  '
+}
+
+@test "max-validator-delegations points devnet network at configured devnet" {
+  run "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
+    --binary "$FAKE_LUMERAD" \
+    --grpcurl "$FAKE_GRPCURL" \
+    --network devnet \
+    --json
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '
+    .chain_id == "lumera-devnet-1"
+    and .rpc == "https://rpc.pastel.network"
+    and .grpc == "grpc.pastel.network"
+  '
+}
+
+@test "max-validator-delegations lets explicit endpoint flags override network defaults" {
+  run "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
+    --binary "$FAKE_LUMERAD" \
+    --grpcurl "$FAKE_GRPCURL" \
+    --network mainnet \
+    --chain-id custom-chain \
+    --node tcp://custom-rpc:26657 \
+    --grpc custom-grpc:9090 \
+    --json
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '
+    .chain_id == "custom-chain"
+    and .rpc == "tcp://custom-rpc:26657"
+    and .grpc == "custom-grpc:9090"
+  '
+}
+
+@test "network overrides work even when endpoint flags appear before network" {
+  run "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
+    --binary "$FAKE_LUMERAD" \
+    --grpcurl "$FAKE_GRPCURL" \
+    --chain-id custom-chain \
+    --node tcp://custom-rpc:26657 \
+    --grpc custom-grpc:9090 \
+    --network testnet \
+    --json
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '
+    .chain_id == "custom-chain"
+    and .rpc == "tcp://custom-rpc:26657"
+    and .grpc == "custom-grpc:9090"
+  '
+}
+
+@test "max-validator-delegations rejects unknown network" {
+  run "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
+    --binary "$FAKE_LUMERAD" \
+    --grpcurl "$FAKE_GRPCURL" \
+    --network staging \
+    --json
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unknown network"* ]]
+}
+
 @test "max-validator-delegations uses staking and grpcurl on pre-evm chain" {
   run env FAKE_EXACT_UNAVAILABLE=1 \
     "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
@@ -370,6 +447,19 @@ teardown() {
       {"state": "SUPERNODE_STATE_ACTIVE", "count": 2},
       {"state": "SUPERNODE_STATE_POSTPONED", "count": 1}
     ]
+  '
+}
+
+@test "stats applies testnet network defaults" {
+  run "$SCRIPTS_DIR/chain-helper.sh" stats \
+    --binary "$FAKE_LUMERAD" \
+    --network testnet \
+    --json
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '
+    .chain_id == "lumera-testnet-2"
+    and .rpc == "https://rpc.testnet.lumera.io:443"
   '
 }
 

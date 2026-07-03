@@ -87,16 +87,11 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	// Count redelegations where the validator appears as EITHER source or
 	// destination. The execution path (MigrateValidatorDelegations) re-keys
 	// both directions, so the safety bound must account for both.
-	var redCount int
-	if err := ms.stakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) bool {
-		if red.ValidatorSrcAddress == oldValAddr.String() || red.ValidatorDstAddress == oldValAddr.String() {
-			redCount++
-		}
-		return false
-	}); err != nil {
+	reds, err := ms.redelegationsForValidator(ctx, oldValAddr)
+	if err != nil {
 		return nil, err
 	}
-	totalRecords := uint64(len(delegations) + len(ubds) + redCount)
+	totalRecords := uint64(len(delegations) + len(ubds) + len(reds))
 	if totalRecords > params.MaxValidatorDelegations {
 		return nil, types.ErrTooManyDelegators.Wrapf(
 			"total records %d exceeds max %d", totalRecords, params.MaxValidatorDelegations,

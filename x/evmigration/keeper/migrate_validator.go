@@ -154,13 +154,8 @@ func (k Keeper) MigrateValidatorDelegations(ctx sdk.Context, oldValAddr, newValA
 	// Re-key redelegations where oldValAddr appears as either source or
 	// destination validator. Existing in-flight redelegations must continue to
 	// point at the migrated validator record after operator migration.
-	var reds []stakingtypes.Redelegation
-	if err := k.stakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) bool {
-		if red.ValidatorSrcAddress == oldValAddr.String() || red.ValidatorDstAddress == oldValAddr.String() {
-			reds = append(reds, red)
-		}
-		return false
-	}); err != nil {
+	reds, err := k.redelegationsForValidator(ctx, oldValAddr)
+	if err != nil {
 		return err
 	}
 
@@ -236,17 +231,10 @@ func (k Keeper) MigrateValidatorDistribution(ctx sdk.Context, oldValAddr, newVal
 	}
 
 	// ValidatorHistoricalRewards — collect all periods for oldValAddr, then re-key.
-	type historicalEntry struct {
-		period  uint64
-		rewards distrtypes.ValidatorHistoricalRewards
+	historicalRewards, err := k.validatorHistoricalRewards(ctx, oldValAddr)
+	if err != nil {
+		return err
 	}
-	var historicalRewards []historicalEntry
-	k.distributionKeeper.IterateValidatorHistoricalRewards(ctx, func(val sdk.ValAddress, period uint64, rewards distrtypes.ValidatorHistoricalRewards) (stop bool) {
-		if val.Equals(oldValAddr) {
-			historicalRewards = append(historicalRewards, historicalEntry{period, rewards})
-		}
-		return false
-	})
 	k.distributionKeeper.DeleteValidatorHistoricalRewards(ctx, oldValAddr)
 	for _, hr := range historicalRewards {
 		if err := k.distributionKeeper.SetValidatorHistoricalRewards(ctx, newValAddr, hr.period, hr.rewards); err != nil {
@@ -255,17 +243,10 @@ func (k Keeper) MigrateValidatorDistribution(ctx sdk.Context, oldValAddr, newVal
 	}
 
 	// ValidatorSlashEvents — collect all for oldValAddr, then re-key.
-	type slashEntry struct {
-		height uint64
-		event  distrtypes.ValidatorSlashEvent
+	slashEvents, err := k.validatorSlashEvents(ctx, oldValAddr)
+	if err != nil {
+		return err
 	}
-	var slashEvents []slashEntry
-	k.distributionKeeper.IterateValidatorSlashEvents(ctx, func(val sdk.ValAddress, height uint64, event distrtypes.ValidatorSlashEvent) (stop bool) {
-		if val.Equals(oldValAddr) {
-			slashEvents = append(slashEvents, slashEntry{height, event})
-		}
-		return false
-	})
 	k.distributionKeeper.DeleteValidatorSlashEvents(ctx, oldValAddr)
 	for _, se := range slashEvents {
 		if err := k.distributionKeeper.SetValidatorSlashEvent(ctx, newValAddr, se.height, se.event.ValidatorPeriod, se.event); err != nil {

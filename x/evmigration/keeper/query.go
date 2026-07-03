@@ -181,14 +181,9 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 		}
 		// Count redelegations where the validator is source OR destination
 		// (both are re-keyed during migration).
-		var redCount uint64
-		_ = qs.k.stakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) bool {
-			if red.ValidatorSrcAddress == valAddr.String() || red.ValidatorDstAddress == valAddr.String() {
-				redCount++
-			}
-			return false
-		})
-		resp.ValRedelegationCount = redCount
+		if reds, err := qs.k.redelegationsForValidator(ctx, valAddr); err == nil {
+			resp.ValRedelegationCount = uint64(len(reds))
+		}
 
 		// Surface the validator's BondStatus + Jailed flag so callers can
 		// display the actionable cause when WouldSucceed is false. Jailed

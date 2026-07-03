@@ -312,6 +312,87 @@ func TestQueryMigrationEstimate_AlreadyMigrated(t *testing.T) {
 	require.False(t, resp.HasSupernode)
 }
 
+func TestQueryMigrationEstimate_ValidatorUsesScopedRedelegationIndexesForLimit(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	params := types.NewParams(true, 0, 50, 2, 20)
+	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
+
+	addr := testAccAddr()
+	valAddr := sdk.ValAddress(addr)
+	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
+	delegator := testAccAddr()
+
+	f.writeRedelegation(stakingtypes.Redelegation{
+		DelegatorAddress:    delegator.String(),
+		ValidatorSrcAddress: valAddr.String(),
+		ValidatorDstAddress: sdk.ValAddress(testAccAddr()).String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 10,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(100),
+			SharesDst:      math.LegacyNewDec(100),
+			UnbondingId:    301,
+		}},
+	})
+	f.writeRedelegation(stakingtypes.Redelegation{
+		DelegatorAddress:    delegator.String(),
+		ValidatorSrcAddress: sdk.ValAddress(testAccAddr()).String(),
+		ValidatorDstAddress: valAddr.String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 11,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(200),
+			SharesDst:      math.LegacyNewDec(200),
+			UnbondingId:    302,
+		}},
+	})
+	f.writeRedelegation(stakingtypes.Redelegation{
+		DelegatorAddress:    testAccAddr().String(),
+		ValidatorSrcAddress: sdk.ValAddress(testAccAddr()).String(),
+		ValidatorDstAddress: sdk.ValAddress(testAccAddr()).String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 12,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(300),
+			SharesDst:      math.LegacyNewDec(300),
+			UnbondingId:    303,
+		}},
+	})
+
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{OperatorAddress: valAddr.String(), Status: stakingtypes.Bonded}, nil,
+	)
+	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), valAddr).Return(
+		[]stakingtypes.Delegation{
+			stakingtypes.NewDelegation(delegator.String(), valAddr.String(), math.LegacyNewDec(50)),
+		}, nil,
+	)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), valAddr).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
+	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
+
+	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: addr.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.IsValidator)
+	require.Equal(t, uint64(1), resp.ValDelegationCount)
+	require.Equal(t, uint64(2), resp.ValRedelegationCount)
+	require.Equal(t, uint64(3), resp.TotalTouched)
+	require.False(t, resp.WouldSucceed)
+	require.Equal(t, "too many delegators", resp.RejectionReason)
+}
+
 // --- LegacyAccounts query tests ---
 
 // TestQueryLegacyAccounts_WithSecp256k1 verifies that accounts with secp256k1

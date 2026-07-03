@@ -111,9 +111,17 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 	encCfg := moduletestutil.MakeTestEncodingConfig(module.AppModule{})
 	addrCodec := addresscodec.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix())
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
+	stakingStoreKey := storetypes.NewKVStoreKey(stakingtypes.StoreKey)
 	storeService := runtime.NewKVStoreService(storeKey)
-	ctx := testutil.DefaultContextWithDB(t, storeKey, storetypes.NewTransientStoreKey("transient_test")).Ctx.
-		WithChainID(testChainID)
+	stakingStoreService := runtime.NewKVStoreService(stakingStoreKey)
+	ctx := testutil.DefaultContextWithKeys(
+		map[string]*storetypes.KVStoreKey{
+			types.StoreKey:        storeKey,
+			stakingtypes.StoreKey: stakingStoreKey,
+		},
+		map[string]*storetypes.TransientStoreKey{"transient_test": storetypes.NewTransientStoreKey("transient_test")},
+		nil,
+	).WithChainID(testChainID).WithBlockTime(time.Now())
 
 	authority := authtypes.NewModuleAddress(types.GovModuleName)
 
@@ -133,10 +141,10 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 		claimKeeper,
 	)
 
-	// Wire a dummy staking store service so DeleteValidatorRecordNoHooks can run
-	// in unit tests (the store itself is isolated and any delete is a safe no-op
-	// against non-existent keys). Production wiring happens in app.go.
-	k.SetStakingStoreService(storeService)
+	// Wire an isolated staking store service so scoped redelegation iteration
+	// and DeleteValidatorRecordNoHooks can run in unit tests. Production wiring
+	// happens in app.go.
+	k.SetStakingStoreService(stakingStoreService)
 
 	// Initialize params with migration enabled.
 	params := types.NewParams(true, 0, 50, 2000, 20)
@@ -147,6 +155,8 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 	mf := &mockFixture{
 		ctx:                ctx,
 		keeper:             k,
+		cdc:                encCfg.Codec,
+		stakingStore:       stakingStoreService,
 		accountKeeper:      accountKeeper,
 		bankKeeper:         bankKeeper,
 		stakingKeeper:      stakingKeeper,
@@ -936,7 +946,6 @@ func setupPassingValPreChecks(t *testing.T, f *msgServerFixture) (
 	// No delegations/ubds/reds (under limit).
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).Return(nil)
 
 	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
@@ -995,7 +1004,6 @@ func setupV1toV4(f *mockFixture, oldValAddr, newValAddr sdk.ValAddress) {
 	// V4: no delegations.
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).Return(nil)
 }
 
 // TestMigrateValidator_FailAtValidatorRecord verifies that a failure in

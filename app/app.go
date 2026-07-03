@@ -54,6 +54,7 @@ import (
 	consensuskeeper "github.com/cosmos/cosmos-sdk/x/consensus/keeper"
 	_ "github.com/cosmos/cosmos-sdk/x/distribution" // import for side-effects
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
+	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	"github.com/cosmos/cosmos-sdk/x/gov"
@@ -365,6 +366,9 @@ func New(
 	// DeleteValidatorRecordNoHooks). Unsafe / migration-only.
 	app.EvmigrationKeeper.SetStakingStoreService(
 		runtime.NewKVStoreService(app.GetKey(stakingtypes.StoreKey)),
+	)
+	app.EvmigrationKeeper.SetDistributionStoreService(
+		runtime.NewKVStoreService(app.GetKey(distrtypes.StoreKey)),
 	)
 
 	// configure EVM coin info (must happen before EVM module keepers are created)

@@ -20,6 +20,13 @@ type stakingStoreHandle struct {
 	svc corestore.KVStoreService
 }
 
+// distributionStoreHandle holds a mutable reference to distribution's
+// KVStoreService. It is wired post-depinject via SetDistributionStoreService and
+// used only by migration code that must range over validator-scoped prefixes.
+type distributionStoreHandle struct {
+	svc corestore.KVStoreService
+}
+
 type Keeper struct {
 	storeService corestore.KVStoreService
 	cdc          codec.Codec
@@ -33,6 +40,9 @@ type Keeper struct {
 	// x/staking's KV namespace. Wired post-build in app.go via
 	// SetStakingStoreService; used exclusively by DeleteValidatorRecordNoHooks.
 	stakingStoreHandle *stakingStoreHandle
+	// distributionStoreHandle grants this keeper migration-only raw read access
+	// to x/distribution's KV namespace for validator-scoped iteration.
+	distributionStoreHandle *distributionStoreHandle
 
 	// MigrationRecords stores completed migration records keyed by legacy address.
 	MigrationRecords collections.Map[string, types.MigrationRecord]
@@ -107,7 +117,8 @@ func NewKeeper(
 		// Allocate once so value-copies of Keeper (e.g. app.EvmigrationKeeper
 		// and AppModule.keeper) share the same mutable handle. app.go writes
 		// the staking store service into it post-build.
-		stakingStoreHandle: &stakingStoreHandle{},
+		stakingStoreHandle:      &stakingStoreHandle{},
+		distributionStoreHandle: &distributionStoreHandle{},
 	}
 
 	schema, err := sb.Build()
@@ -134,4 +145,14 @@ func (k Keeper) GetAuthority() []byte {
 // for any other purpose.
 func (k *Keeper) SetStakingStoreService(svc corestore.KVStoreService) {
 	k.stakingStoreHandle.svc = svc
+}
+
+// SetDistributionStoreService wires the distribution module's KVStoreService
+// into this keeper. Required for production validator migration to iterate only
+// validator-scoped distribution prefixes instead of chain-wide stores.
+//
+// UNSAFE / MIGRATION-ONLY: this grants raw read access to x/distribution's KV
+// namespace. Do NOT use for unrelated keeper logic.
+func (k *Keeper) SetDistributionStoreService(svc corestore.KVStoreService) {
+	k.distributionStoreHandle.svc = svc
 }

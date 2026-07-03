@@ -17,6 +17,7 @@ import (
 	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
 	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
+	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -41,6 +42,7 @@ import (
 // | v1.11.1 | custom   | conditional add audit store       | Supports direct v1.10.1->v1.11.1 and enforces audit min_disk_free_percent floor (>=15)
 // | v1.12.0 | custom   | none (Everlight in supernode)     | Runs migrations; Everlight logic embedded in x/supernode
 // | v1.20.0 | custom   | add feemarket, precisebank, vm, erc20 | Adds EVM stores and applies Lumera EVM param finalization
+// | v1.20.1 | custom   | none                              | Hotfix release; migrations only
 // =================================================================================================================================
 
 type UpgradeConfig struct {
@@ -72,6 +74,7 @@ var upgradeNames = []string{
 	upgrade_v1_11_1.UpgradeName,
 	upgrade_v1_12_0.UpgradeName,
 	upgrade_v1_20_0.UpgradeName,
+	upgrade_v1_20_1.UpgradeName,
 }
 
 var NoUpgradeConfig = UpgradeConfig{
@@ -155,6 +158,10 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 		return UpgradeConfig{
 			StoreUpgrade: &upgrade_v1_20_0.StoreUpgrades,
 			Handler:      upgrade_v1_20_0.CreateUpgradeHandler(params),
+		}, true
+	case upgrade_v1_20_1.UpgradeName:
+		return UpgradeConfig{
+			Handler: upgrade_v1_20_1.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

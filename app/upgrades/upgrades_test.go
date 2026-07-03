@@ -17,6 +17,7 @@ import (
 	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
 	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
+	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -45,6 +46,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_11_1.UpgradeName,
 		upgrade_v1_12_0.UpgradeName,
 		upgrade_v1_20_0.UpgradeName,
+		upgrade_v1_20_1.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }
@@ -134,6 +136,19 @@ func TestV1200SkipsEVMInitGenesis(t *testing.T) {
 	// upgrade handler is intended to guard against).
 	require.Equal(t, evmtypes.DefaultEVMExtendedDenom, evmtypes.DefaultParams().EvmDenom,
 		"upstream DefaultParams().EvmDenom should be the extended EVM denom — if this changes, review the fromVM skip in v1.20.0")
+}
+
+func TestV1201IsRegisteredAsMigrationOnlyUpgrade(t *testing.T) {
+	params := newTestUpgradeParams("lumera-testnet-2")
+	config, found := SetupUpgrades(upgrade_v1_20_1.UpgradeName, params)
+	require.True(t, found)
+	require.NotNil(t, config.Handler)
+	require.Nil(t, config.StoreUpgrade, "v1.20.1 should not declare store changes")
+
+	ctx := sdk.NewContext(nil, tmproto.Header{ChainID: "lumera-testnet-2"}, false, params.Logger)
+	vm, err := config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
+	require.NoError(t, err)
+	require.NotNil(t, vm)
 }
 
 func newTestUpgradeParams(chainID string) appParams.AppUpgradeParams {

@@ -920,7 +920,7 @@ func TestClaimLegacyAccount_FailAtClaim(t *testing.T) {
 // setupPassingValPreChecks configures mocks so that preChecks, validator-specific
 // checks, and signature verification pass for MigrateValidator, returning the
 // addresses, validator addresses, and the ready message.
-func setupPassingValPreChecks(t *testing.T, f *msgServerFixture) (
+func setupPassingValPreChecks(t *testing.T, f *msgServerFixture, ubds ...stakingtypes.UnbondingDelegation) (
 	sdk.AccAddress, sdk.AccAddress, sdk.ValAddress, sdk.ValAddress, *types.MsgMigrateValidator,
 ) {
 	t.Helper()
@@ -943,9 +943,11 @@ func setupPassingValPreChecks(t *testing.T, f *msgServerFixture) (
 		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
 	)
 
-	// No delegations/ubds/reds (under limit).
+	// Pre-check count read: no delegations; ubds default to empty unless a caller
+	// supplies records to drive a later V4 re-key step. The reds scan hits the
+	// wired (empty) store.
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(ubds, nil)
 
 	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
@@ -1001,9 +1003,10 @@ func setupV1toV4(f *mockFixture, oldValAddr, newValAddr sdk.ValAddress) {
 	f.distributionKeeper.EXPECT().IterateValidatorSlashEvents(gomock.Any(), gomock.Any())
 	f.distributionKeeper.EXPECT().DeleteValidatorSlashEvents(gomock.Any(), oldValAddr)
 
-	// V4: no delegations.
-	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
+	// V4: no delegations. The pre-check already read delegations/ubds and V4
+	// reuses those slices instead of re-fetching, so no staking Get mocks here.
+	// With both slices empty and no redelegations in the wired store, V4 makes
+	// no staking calls.
 }
 
 // TestMigrateValidator_FailAtValidatorRecord verifies that a failure in
@@ -1065,7 +1068,16 @@ func TestMigrateValidator_FailAtValidatorDistribution(t *testing.T) {
 // MigrateValidatorDelegations (step V4) propagates and no record is stored.
 func TestMigrateValidator_FailAtValidatorDelegations(t *testing.T) {
 	f := initMsgServerFixture(t)
-	legacyAddr, _, oldValAddr, newValAddr, msg := setupPassingValPreChecks(t, f)
+	// The delegation/ubd read moved into the pre-check, so V4 now fails while
+	// *re-keying* a record, not while fetching one. Feed one unbonding delegation
+	// through the pre-check count read; V4's RemoveUnbondingDelegation then errors.
+	// An unbonding delegation avoids the V1 per-delegator reward withdrawal that a
+	// regular delegation would trigger, keeping this focused on the V4 re-key.
+	ubd := stakingtypes.UnbondingDelegation{
+		DelegatorAddress: testAccAddr().String(),
+		ValidatorAddress: sdk.ValAddress(testAccAddr()).String(),
+	}
+	legacyAddr, _, oldValAddr, newValAddr, msg := setupPassingValPreChecks(t, f, ubd)
 
 	// Steps V1-V3 succeed.
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)
@@ -1094,9 +1106,9 @@ func TestMigrateValidator_FailAtValidatorDelegations(t *testing.T) {
 	f.distributionKeeper.EXPECT().IterateValidatorSlashEvents(gomock.Any(), gomock.Any())
 	f.distributionKeeper.EXPECT().DeleteValidatorSlashEvents(gomock.Any(), oldValAddr)
 
-	// Step V4: delegation re-key fails.
-	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(
-		nil, fmt.Errorf("delegation index corrupted"),
+	// Step V4: unbonding-delegation re-key fails on its first store op.
+	f.stakingKeeper.EXPECT().RemoveUnbondingDelegation(gomock.Any(), ubd).Return(
+		fmt.Errorf("unbonding index corrupted"),
 	)
 
 	_, err := f.msgServer.MigrateValidator(f.ctx, msg)

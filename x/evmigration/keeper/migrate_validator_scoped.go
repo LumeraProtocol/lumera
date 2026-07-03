@@ -60,7 +60,7 @@ func (k Keeper) collectRedelegationsByIndex(
 	if err != nil {
 		return err
 	}
-	defer iterator.Close()
+	defer func() { _ = iterator.Close() }()
 
 	for ; iterator.Valid(); iterator.Next() {
 		redKey := indexToRedelegationKey(iterator.Key())
@@ -98,7 +98,7 @@ func (k Keeper) validatorHistoricalRewards(ctx sdk.Context, valAddr sdk.ValAddre
 	if err != nil {
 		return nil, err
 	}
-	defer iterator.Close()
+	defer func() { _ = iterator.Close() }()
 
 	var entries []historicalRewardsEntry
 	for ; iterator.Valid(); iterator.Next() {
@@ -108,6 +108,42 @@ func (k Keeper) validatorHistoricalRewards(ctx sdk.Context, valAddr sdk.ValAddre
 		entries = append(entries, historicalRewardsEntry{period: period, rewards: rewards})
 	}
 	return entries, nil
+}
+
+// validatorHistoricalReward fetches a single (valAddr, period) historical
+// rewards row. With the distribution store wired it is an O(1) key lookup;
+// it only falls back to a full IterateValidatorHistoricalRewards scan when the
+// store service is unwired (tests that do not wire the scoped stores).
+func (k Keeper) validatorHistoricalReward(ctx sdk.Context, valAddr sdk.ValAddress, period uint64) (distrtypes.ValidatorHistoricalRewards, bool, error) {
+	if k.distributionStoreHandle == nil || k.distributionStoreHandle.svc == nil {
+		var (
+			found      bool
+			historical distrtypes.ValidatorHistoricalRewards
+		)
+		k.distributionKeeper.IterateValidatorHistoricalRewards(ctx, func(val sdk.ValAddress, p uint64, rewards distrtypes.ValidatorHistoricalRewards) bool {
+			if val.Equals(valAddr) && p == period {
+				found = true
+				historical = rewards
+				return true
+			}
+			return false
+		})
+		return historical, found, nil
+	}
+
+	store := k.distributionStoreHandle.svc.OpenKVStore(ctx)
+	bz, err := store.Get(distrtypes.GetValidatorHistoricalRewardsKey(valAddr, period))
+	if err != nil {
+		return distrtypes.ValidatorHistoricalRewards{}, false, err
+	}
+	if bz == nil {
+		return distrtypes.ValidatorHistoricalRewards{}, false, nil
+	}
+	var historical distrtypes.ValidatorHistoricalRewards
+	if err := k.cdc.Unmarshal(bz, &historical); err != nil {
+		return distrtypes.ValidatorHistoricalRewards{}, false, err
+	}
+	return historical, true, nil
 }
 
 func (k Keeper) validatorSlashEvents(ctx sdk.Context, valAddr sdk.ValAddress) ([]slashEventEntry, error) {
@@ -128,7 +164,7 @@ func (k Keeper) validatorSlashEvents(ctx sdk.Context, valAddr sdk.ValAddress) ([
 	if err != nil {
 		return nil, err
 	}
-	defer iterator.Close()
+	defer func() { _ = iterator.Close() }()
 
 	var entries []slashEventEntry
 	for ; iterator.Valid(); iterator.Next() {

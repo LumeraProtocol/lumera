@@ -175,7 +175,11 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	}
 
 	// --- Step V4: Re-key all delegations pointing to this validator ---
-	if err := ms.MigrateValidatorDelegations(ctx, oldValAddr, newValAddr); err != nil {
+	// Reuse the delegations/unbondings/redelegations already read for the
+	// MaxValidatorDelegations pre-check above; nothing since (reward withdrawal,
+	// record re-key, distribution re-key) mutates these staking records, so a
+	// second read would be pure overhead on a validator with many delegations.
+	if err := ms.MigrateValidatorDelegations(ctx, oldValAddr, newValAddr, delegations, ubds, reds); err != nil {
 		return nil, fmt.Errorf("migrate validator delegations: %w", err)
 	}
 

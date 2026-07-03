@@ -61,16 +61,25 @@ func (k Keeper) MigrateValidatorRecord(ctx sdk.Context, oldValAddr, newValAddr s
 
 // MigrateValidatorDelegations re-keys all delegations pointing to oldValAddr
 // to point to newValAddr. This affects ALL delegators, not just the operator.
-func (k Keeper) MigrateValidatorDelegations(ctx sdk.Context, oldValAddr, newValAddr sdk.ValAddress) error {
-	// Re-key active delegations.
-	delegations, err := k.stakingKeeper.GetValidatorDelegations(ctx, oldValAddr)
-	if err != nil {
-		return err
-	}
-
-	// All delegations will reference the same period (currentRewards.Period - 1).
-	// Reset its reference count to 1 (base) since old delegator references are stale
-	// after re-keying distribution state.
+//
+// The delegations, unbonding delegations, and redelegations are supplied by the caller
+// (MigrateValidator), which already read them for the pre-migration
+// MaxValidatorDelegations count check. Threading them in avoids a second O(N)
+// scan of the same staking records on the hot path — for a validator with
+// thousands of delegations that redundant read dominated the block time. Passing
+// redelegations also avoids a second validator-scoped index scan. Tests may pass
+// nil redelegations to exercise the internal scoped scan directly.
+func (k Keeper) MigrateValidatorDelegations(
+	ctx sdk.Context,
+	oldValAddr, newValAddr sdk.ValAddress,
+	delegations []stakingtypes.Delegation,
+	ubds []stakingtypes.UnbondingDelegation,
+	reds []stakingtypes.Redelegation,
+) error {
+	// All delegations reference the same period (currentRewards.Period - 1). Its
+	// reference count becomes base(1) + one per re-keyed delegation. Set it in a
+	// single write here instead of resetting to 1 and incrementing once per
+	// delegation, which cost N+1 full-chain scans of ValidatorHistoricalRewards.
 	var targetPeriod uint64
 	if len(delegations) > 0 {
 		currentRewards, err := k.distributionKeeper.GetValidatorCurrentRewards(ctx, newValAddr)
@@ -78,7 +87,7 @@ func (k Keeper) MigrateValidatorDelegations(ctx sdk.Context, oldValAddr, newValA
 			return err
 		}
 		targetPeriod = currentRewards.Period - 1
-		if err := k.resetHistoricalRewardsReferenceCount(ctx, newValAddr, targetPeriod); err != nil {
+		if err := k.setHistoricalRewardsReferenceCount(ctx, newValAddr, targetPeriod, uint32(1+len(delegations))); err != nil {
 			return err
 		}
 	}
@@ -106,25 +115,19 @@ func (k Keeper) MigrateValidatorDelegations(ctx sdk.Context, oldValAddr, newValA
 
 		// Initialize fresh distribution starting info for (newValAddr, delegator).
 		// The old starting info was deleted above, so we always construct new info.
+		// The historical rewards reference count for targetPeriod was already set
+		// to base(1) + len(delegations) in one write above.
 		startingInfo := distrtypes.DelegatorStartingInfo{
 			PreviousPeriod: targetPeriod,
 			Height:         uint64(ctx.BlockHeight()),
 			Stake:          del.Shares,
-		}
-		if err := k.incrementHistoricalRewardsReferenceCount(ctx, newValAddr, targetPeriod); err != nil {
-			return err
 		}
 		if err := k.distributionKeeper.SetDelegatorStartingInfo(ctx, newValAddr, delAddr, startingInfo); err != nil {
 			return err
 		}
 	}
 
-	// Re-key unbonding delegations.
-	ubds, err := k.stakingKeeper.GetUnbondingDelegationsFromValidator(ctx, oldValAddr)
-	if err != nil {
-		return err
-	}
-
+	// Re-key unbonding delegations. (ubds supplied by the caller.)
 	for _, ubd := range ubds {
 		if err := k.stakingKeeper.RemoveUnbondingDelegation(ctx, ubd); err != nil {
 			return err
@@ -154,9 +157,12 @@ func (k Keeper) MigrateValidatorDelegations(ctx sdk.Context, oldValAddr, newValA
 	// Re-key redelegations where oldValAddr appears as either source or
 	// destination validator. Existing in-flight redelegations must continue to
 	// point at the migrated validator record after operator migration.
-	reds, err := k.redelegationsForValidator(ctx, oldValAddr)
-	if err != nil {
-		return err
+	if reds == nil {
+		var err error
+		reds, err = k.redelegationsForValidator(ctx, oldValAddr)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, red := range reds {

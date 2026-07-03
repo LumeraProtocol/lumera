@@ -339,6 +339,51 @@ teardown() {
   [[ "$output" == *"unknown network"* ]]
 }
 
+@test "max-validator-delegations defaults to testnet when no network is selected" {
+  # LUMERA_* env vars would otherwise seed CHAIN_ID/NODE/GRPC before parsing and
+  # mask the built-in default, so scrub them to assert on the shipped default.
+  run env -u LUMERA_CHAIN_ID -u LUMERA_NODE -u LUMERA_RPC -u LUMERA_GRPC \
+    "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
+    --binary "$FAKE_LUMERAD" \
+    --grpcurl "$FAKE_GRPCURL" \
+    --json
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '
+    .chain_id == "lumera-testnet-2"
+    and .rpc == "https://rpc.testnet.lumera.io:443"
+    and .grpc == "grpc.testnet.lumera.io:443"
+  '
+}
+
+@test "network defaults fill only the endpoints not passed explicitly" {
+  run "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
+    --binary "$FAKE_LUMERAD" \
+    --grpcurl "$FAKE_GRPCURL" \
+    --network mainnet \
+    --node tcp://custom-rpc:26657 \
+    --json
+
+  [ "$status" -eq 0 ]
+  # Only --node was given: chain-id and grpc must still come from the mainnet
+  # defaults, proving the per-field flag-set checks are independent.
+  echo "$output" | jq -e '
+    .chain_id == "lumera-mainnet-1"
+    and .rpc == "tcp://custom-rpc:26657"
+    and .grpc == "grpc.lumera.io:443"
+  '
+}
+
+@test "max-validator-delegations rejects --network without a value" {
+  run "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
+    --binary "$FAKE_LUMERAD" \
+    --grpcurl "$FAKE_GRPCURL" \
+    --network
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"--network requires a value"* ]]
+}
+
 @test "max-validator-delegations uses staking and grpcurl on pre-evm chain" {
   run env FAKE_EXACT_UNAVAILABLE=1 \
     "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \

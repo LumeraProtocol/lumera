@@ -15,7 +15,8 @@ import (
 // Populated post-depinject via SetStakingStoreService. The pointer is shared
 // across all Keeper copies (value-type Keeper returned by NewKeeper gets
 // cloned to app.EvmigrationKeeper and AppModule.keeper; both copies see the
-// same underlying cell). Only used by DeleteValidatorRecordNoHooks.
+// same underlying cell). Used by DeleteValidatorRecordNoHooks (raw writes)
+// and redelegationsForValidator (validator-scoped redelegation index reads).
 type stakingStoreHandle struct {
 	svc corestore.KVStoreService
 }
@@ -36,9 +37,10 @@ type Keeper struct {
 	Schema collections.Schema
 	Params collections.Item[types.Params]
 
-	// stakingStoreHandle grants this keeper migration-only raw write access to
-	// x/staking's KV namespace. Wired post-build in app.go via
-	// SetStakingStoreService; used exclusively by DeleteValidatorRecordNoHooks.
+	// stakingStoreHandle grants this keeper migration-only raw read/write access
+	// to x/staking's KV namespace. Wired post-build in app.go via
+	// SetStakingStoreService; used by DeleteValidatorRecordNoHooks (writes) and
+	// redelegationsForValidator (validator-scoped redelegation index reads).
 	stakingStoreHandle *stakingStoreHandle
 	// distributionStoreHandle grants this keeper migration-only raw read access
 	// to x/distribution's KV namespace for validator-scoped iteration.

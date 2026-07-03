@@ -114,6 +114,18 @@ Files: `x/evmigration/types/sigverify/sigverify_test.go`, `x/evmigration/keeper/
 | `TestQueryParams_Valid` | Valid request returns stored params. |
 | `TestUpdateParams_InvalidAuthority` | Non-authority address rejected with ErrInvalidSigner. |
 | `TestUpdateParams_ValidAuthority` | Correct authority updates params successfully. |
+| `TestMigrateValidatorDelegations_UsesScopedRedelegationIndexes` | V4's internal scoped scan discovers redelegations where the validator is source or destination (via the val-src/val-dst indexes) and re-keys exactly those, skipping unrelated ones. |
+| `TestMigrateValidatorDelegations_DeduplicatesSourceAndDestinationIndexes` | A redelegation with the migrating validator as both source and destination appears in both indexes but is collected and re-keyed exactly once. |
+| `TestMigrateValidatorDelegations_UsesPreloadedRedelegations` | A non-nil caller-supplied redelegation slice is re-keyed directly with no scoped-index rescan (store intentionally holds no redelegation rows). |
+| `TestMigrateValidatorDelegations_ReturnsErrorForStaleRedelegationIndex` | A redelegation index entry with no backing record aborts V4 with a "points to missing record" error before re-keying anything. |
+| `TestMigrateValidatorDistribution_UsesScopedDistributionPrefixes` | Distribution migration reads only the migrating validator's historical-rewards/slash-event prefixes, leaving an unrelated validator's rows untouched. |
+| `TestMigrateValidatorDelegations_RekeysMultipleSourceRedelegations` | Two redelegations sharing the val-src index prefix are both collected (iterator advances past the first key) and re-keyed to the new operator. |
+| `TestMigrateValidatorDelegations_SetsHistoricalRewardsRefCountOnce` | The target period's historical-rewards reference count is written exactly once as base(1)+N via the scoped O(1) lookup, not reset-then-incremented per delegation. |
+| `TestMigrateValidatorDistribution_RekeysAllPeriodsAndSlashEvents` | All of the validator's historical-rewards periods and slash events are re-keyed to the new address; height (from key) and period (from value) are not swapped. |
+| `TestMigrateValidatorScopedIteration_SimulatesGlobalStateImprovement` | Simulates a large-chain state shape and asserts validator-scoped iteration touches ~215x fewer KV keys than the old full-chain scan. |
+| `TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic` | Redelegations from the scoped scan replay in deterministic store-key order, guarding against Go map-iteration nondeterminism that would diverge app hashes across nodes. |
+| `TestMigrateValidator_TooManyDelegatorsIncludesScopedRedelegations` | The MaxValidatorDelegations pre-check counts scoped redelegations (source and destination); exceeding the limit rejects with `ErrTooManyDelegators` even with no plain delegations/unbondings. |
+| `TestQueryMigrationEstimate_ValidatorUsesScopedRedelegationIndexesForLimit` | The `MigrationEstimate` query counts a validator's redelegations via scoped indexes (source and destination, excluding unrelated) when reporting the delegation count. |
 
 **Additional regression coverage**: `TestKeeper_GetSuperNodeByAccount` (in `x/supernode/v1/keeper/`) confirms `GetSuperNodeByAccount` returns the correct supernode for a given account address, exercising the index used by `MigrateSupernode`.
 

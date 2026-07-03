@@ -17,7 +17,6 @@ import (
 	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
 	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
-	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -46,7 +45,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_11_1.UpgradeName,
 		upgrade_v1_12_0.UpgradeName,
 		upgrade_v1_20_0.UpgradeName,
-		upgrade_v1_20_1.UpgradeName,
+		upgradeNameV1201,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }
@@ -140,7 +139,7 @@ func TestV1200SkipsEVMInitGenesis(t *testing.T) {
 
 func TestV1201IsRegisteredAsMigrationOnlyUpgrade(t *testing.T) {
 	params := newTestUpgradeParams("lumera-testnet-2")
-	config, found := SetupUpgrades(upgrade_v1_20_1.UpgradeName, params)
+	config, found := SetupUpgrades(upgradeNameV1201, params)
 	require.True(t, found)
 	require.NotNil(t, config.Handler)
 	require.Nil(t, config.StoreUpgrade, "v1.20.1 should not declare store changes")

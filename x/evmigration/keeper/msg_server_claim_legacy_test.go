@@ -1244,6 +1244,7 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), valAddr).Return(
 		distrtypes.ValidatorCurrentRewards{Period: 5}, nil,
 	)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(testValidatorWithRate(valAddr, 100, 100), nil)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)
 

@@ -213,6 +213,18 @@ func testAccAddr() sdk.AccAddress {
 	return sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
 }
 
+// testValidatorWithRate returns a bonded validator whose tokens/shares define
+// the exchange rate used by TokensFromSharesTruncated when migration rebuilds
+// DelegatorStartingInfo. tokens < shares models a previously slashed validator.
+func testValidatorWithRate(val sdk.ValAddress, tokens, shares int64) stakingtypes.Validator {
+	return stakingtypes.Validator{
+		OperatorAddress: val.String(),
+		Status:          stakingtypes.Bonded,
+		Tokens:          math.NewInt(tokens),
+		DelegatorShares: math.LegacyNewDec(shares),
+	}
+}
+
 func expectHistoricalRewardsLookup(
 	mock *evmigrationmocks.MockDistributionKeeper,
 	val sdk.ValAddress,
@@ -1277,6 +1289,7 @@ func TestMigrateStaking_ActiveDelegations(t *testing.T) {
 	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), valAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 5}, nil)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(testValidatorWithRate(valAddr, 100, 100), nil)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)
 
@@ -1386,6 +1399,7 @@ func TestMigrateStaking_WithUnbondingDelegation(t *testing.T) {
 	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), valAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 5}, nil)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(testValidatorWithRate(valAddr, 100, 100), nil)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)
 
@@ -1444,6 +1458,7 @@ func TestMigrateStaking_WithRedelegation(t *testing.T) {
 	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), srcValAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 3}, nil)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), srcValAddr).Return(testValidatorWithRate(srcValAddr, 100, 100), nil)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, srcValAddr, 2, 1)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), srcValAddr, newAddr, gomock.Any()).Return(nil)
 
@@ -1925,6 +1940,10 @@ func TestMigrateValidatorDelegations_SetsHistoricalRewardsRefCountOnce(t *testin
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), newValAddr).Return(
 		distrtypes.ValidatorCurrentRewards{Period: 5}, nil,
 	)
+	// Shares→token stake conversion reads the re-keyed validator (1:1 rate here).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		testValidatorWithRate(newValAddr, 100, 100), nil,
+	)
 	// Seed a stale base row so the scoped O(1) lookup succeeds; its count must be
 	// overwritten in a single write, not incremented from.
 	f.writeValidatorHistoricalRewards(newValAddr, targetPeriod, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1})
@@ -1956,6 +1975,90 @@ func TestMigrateValidatorDelegations_SetsHistoricalRewardsRefCountOnce(t *testin
 	require.NoError(t, err)
 	// base(1) + 3 delegations.
 	require.Equal(t, uint32(4), capturedRefCount)
+}
+
+// TestMigrateValidatorDelegations_SlashedValidatorUsesTokenStake pins the
+// DelegatorStartingInfo.Stake semantics: stake is the delegation's token value
+// (shares × exchange rate, truncated), matching the SDK's initializeDelegation.
+// A validator slashed after the delegation was made has tokens < shares;
+// storing raw shares would overstate the stake and make the SDK's
+// calculateDelegationRewards panic ("calculated final stake ... greater than
+// current stake") on the delegator's next withdrawal or share-modifying tx.
+func TestMigrateValidatorDelegations_SlashedValidatorUsesTokenStake(t *testing.T) {
+	f := initMockFixture(t)
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	delegator := testAccAddr()
+
+	// 1000 shares against a validator with 900 tokens / 1000 shares (10% slash
+	// history) → token stake 900.
+	del := stakingtypes.NewDelegation(delegator.String(), oldValAddr.String(), math.LegacyNewDec(1000))
+
+	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), newValAddr).Return(
+		distrtypes.ValidatorCurrentRewards{Period: 5}, nil,
+	)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		testValidatorWithRate(newValAddr, 900, 1000), nil,
+	)
+	expectHistoricalRewardsSet(f.distributionKeeper, newValAddr, 4, 1)
+
+	f.distributionKeeper.EXPECT().DeleteDelegatorStartingInfo(gomock.Any(), oldValAddr, delegator).Return(nil)
+	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
+	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), newValAddr, delegator, gomock.Any()).DoAndReturn(
+		func(_ sdk.Context, _ sdk.ValAddress, _ sdk.AccAddress, info distrtypes.DelegatorStartingInfo) error {
+			require.True(t, info.Stake.Equal(math.LegacyNewDec(900)),
+				"stake must be tokens-from-shares (900), not raw shares (1000); got %s", info.Stake)
+			return nil
+		},
+	)
+
+	// Empty (non-nil) redelegations skip the internal scoped scan.
+	err := f.keeper.MigrateValidatorDelegations(
+		f.ctx, oldValAddr, newValAddr,
+		[]stakingtypes.Delegation{del}, nil, []stakingtypes.Redelegation{},
+	)
+	require.NoError(t, err)
+}
+
+// TestMigrateStaking_SlashedValidatorUsesTokenStake pins the same
+// stake-conversion semantics on the account-migration path
+// (migrateActiveDelegations): re-keyed starting info must store token stake,
+// not raw shares, for a delegation to an ever-slashed validator.
+func TestMigrateStaking_SlashedValidatorUsesTokenStake(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+	newAddr := testAccAddr()
+	valAddr := sdk.ValAddress(testAccAddr())
+
+	del := stakingtypes.NewDelegation(legacy.String(), valAddr.String(), math.LegacyNewDec(1000))
+
+	// migrateActiveDelegations
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return([]stakingtypes.Delegation{del}, nil)
+	f.distributionKeeper.EXPECT().DeleteDelegatorStartingInfo(gomock.Any(), valAddr, legacy).Return(nil)
+	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
+	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
+	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), valAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 5}, nil)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(testValidatorWithRate(valAddr, 900, 1000), nil)
+	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).DoAndReturn(
+		func(_ sdk.Context, _ sdk.ValAddress, _ sdk.AccAddress, info distrtypes.DelegatorStartingInfo) error {
+			require.True(t, info.Stake.Equal(math.LegacyNewDec(900)),
+				"stake must be tokens-from-shares (900), not raw shares (1000); got %s", info.Stake)
+			return nil
+		},
+	)
+
+	// migrateUnbondingDelegations / migrateRedelegations — none.
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
+
+	// migrateWithdrawAddress — origWithdrawAddr is legacy (self).
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
+
+	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr, legacy)
+	require.NoError(t, err)
 }
 
 func TestMigrateValidatorDistribution_RekeysAllPeriodsAndSlashEvents(t *testing.T) {

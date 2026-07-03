@@ -67,12 +67,21 @@ func (k Keeper) migrateActiveDelegations(ctx sdk.Context, legacyAddr, newAddr sd
 		if err != nil {
 			return err
 		}
+		// Stake must be the delegation's TOKEN value (shares × exchange rate,
+		// truncated), matching the SDK's initializeDelegation — storing raw shares
+		// overstates the stake for an ever-slashed validator and makes the SDK's
+		// calculateDelegationRewards panic on the delegator's next withdrawal.
+		// See the same conversion in MigrateValidatorDelegations.
+		validator, err := k.stakingKeeper.GetValidator(ctx, valAddr)
+		if err != nil {
+			return err
+		}
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
 		previousPeriod := currentRewards.Period - 1
 		startingInfo := distrtypes.DelegatorStartingInfo{
 			Height:         uint64(sdkCtx.BlockHeight()),
 			PreviousPeriod: previousPeriod,
-			Stake:          del.Shares,
+			Stake:          validator.TokensFromSharesTruncated(del.Shares),
 		}
 		if err := k.incrementHistoricalRewardsReferenceCount(ctx, valAddr, previousPeriod); err != nil {
 			return err

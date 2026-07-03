@@ -126,6 +126,8 @@ Files: `x/evmigration/types/sigverify/sigverify_test.go`, `x/evmigration/keeper/
 | `TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic` | Redelegations from the scoped scan replay in deterministic store-key order, guarding against Go map-iteration nondeterminism that would diverge app hashes across nodes. |
 | `TestMigrateValidator_TooManyDelegatorsIncludesScopedRedelegations` | The MaxValidatorDelegations pre-check counts scoped redelegations (source and destination); exceeding the limit rejects with `ErrTooManyDelegators` even with no plain delegations/unbondings. |
 | `TestQueryMigrationEstimate_ValidatorUsesScopedRedelegationIndexesForLimit` | The `MigrationEstimate` query counts a validator's redelegations via scoped indexes (source and destination, excluding unrelated) when reporting the delegation count. |
+| `TestMigrateValidatorDelegations_SlashedValidatorUsesTokenStake` | V4 stores `DelegatorStartingInfo.Stake` as tokens-from-shares (truncated) via the re-keyed validator's exchange rate, not raw shares, so an ever-slashed validator (tokens < shares) cannot trip the SDK's final-stake panic on later withdrawals. |
+| `TestMigrateStaking_SlashedValidatorUsesTokenStake` | Account-path delegation re-keying (`migrateActiveDelegations`) applies the same shares→token stake conversion for a delegation to an ever-slashed validator. |
 
 **Additional regression coverage**: `TestKeeper_GetSuperNodeByAccount` (in `x/supernode/v1/keeper/`) confirms `GetSuperNodeByAccount` returns the correct supernode for a given account address, exercising the index used by `MigrateSupernode`.
 

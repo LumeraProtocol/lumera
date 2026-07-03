@@ -80,7 +80,10 @@ func (k Keeper) MigrateValidatorDelegations(
 	// reference count becomes base(1) + one per re-keyed delegation. Set it in a
 	// single write here instead of resetting to 1 and incrementing once per
 	// delegation, which cost N+1 full-chain scans of ValidatorHistoricalRewards.
-	var targetPeriod uint64
+	var (
+		targetPeriod uint64
+		validator    stakingtypes.Validator
+	)
 	if len(delegations) > 0 {
 		currentRewards, err := k.distributionKeeper.GetValidatorCurrentRewards(ctx, newValAddr)
 		if err != nil {
@@ -88,6 +91,12 @@ func (k Keeper) MigrateValidatorDelegations(
 		}
 		targetPeriod = currentRewards.Period - 1
 		if err := k.setHistoricalRewardsReferenceCount(ctx, newValAddr, targetPeriod, uint32(1+len(delegations))); err != nil {
+			return err
+		}
+		// Needed to convert delegation shares to token stake below. The validator
+		// record was re-keyed to newValAddr in step V2, so read it from there.
+		validator, err = k.stakingKeeper.GetValidator(ctx, newValAddr)
+		if err != nil {
 			return err
 		}
 	}
@@ -117,10 +126,17 @@ func (k Keeper) MigrateValidatorDelegations(
 		// The old starting info was deleted above, so we always construct new info.
 		// The historical rewards reference count for targetPeriod was already set
 		// to base(1) + len(delegations) in one write above.
+		//
+		// Stake must be the delegation's TOKEN value (shares × exchange rate,
+		// truncated), matching the SDK's initializeDelegation. Storing raw shares
+		// overstates the stake for any validator that has ever been slashed
+		// (tokens < shares), and calculateDelegationRewards then panics with
+		// "calculated final stake ... greater than current stake" on every
+		// subsequent withdrawal or share-modifying tx from a migrated delegator.
 		startingInfo := distrtypes.DelegatorStartingInfo{
 			PreviousPeriod: targetPeriod,
 			Height:         uint64(ctx.BlockHeight()),
-			Stake:          del.Shares,
+			Stake:          validator.TokensFromSharesTruncated(del.Shares),
 		}
 		if err := k.distributionKeeper.SetDelegatorStartingInfo(ctx, newValAddr, delAddr, startingInfo); err != nil {
 			return err

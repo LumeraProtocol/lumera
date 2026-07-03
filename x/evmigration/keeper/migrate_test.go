@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"testing"
 
 	corestore "cosmossdk.io/core/store"
@@ -2140,6 +2141,83 @@ func TestMigrateValidatorScopedIteration_SimulatesGlobalStateImprovement(t *test
 	require.Equal(t, dstValAddr.String(), rewritten[40_001].ValidatorDstAddress)
 	require.Equal(t, srcValAddr.String(), rewritten[40_002].ValidatorSrcAddress)
 	require.Equal(t, newValAddr.String(), rewritten[40_002].ValidatorDstAddress)
+}
+
+// TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic locks in the
+// fix for a consensus-halt bug: redelegationsForValidator collects records into a
+// Go map, and iterating that map directly to replay them (RemoveRedelegation ->
+// SetRedelegation -> InsertRedelegationQueue) leaked Go's randomized map order into
+// state writes. InsertRedelegationQueue appends to shared queue timeslices, so a
+// nondeterministic replay order diverges the queue bytes (and the app hash) across
+// nodes. The fix emits records in redelegation-store-key order; this test asserts
+// the replay order matches that canonical order regardless of insertion order.
+//
+// With numReds records there are numReds! possible map orderings, so if the sort is
+// ever reverted to raw map iteration this test fails essentially every run rather
+// than flaking intermittently.
+func TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
+
+	const numReds = 12
+
+	type placedRed struct {
+		key         string
+		unbondingID uint64
+	}
+	placed := make([]placedRed, 0, numReds)
+	for i := 0; i < numReds; i++ {
+		del := testAccAddr()
+		dst := sdk.ValAddress(testAccAddr())
+		unbondingID := uint64(70_000 + i)
+		f.writeRedelegation(stakingtypes.Redelegation{
+			DelegatorAddress:    del.String(),
+			ValidatorSrcAddress: oldValAddr.String(),
+			ValidatorDstAddress: dst.String(),
+			Entries: []stakingtypes.RedelegationEntry{{
+				CreationHeight: int64(i),
+				CompletionTime: completionTime,
+				InitialBalance: math.NewInt(100),
+				SharesDst:      math.LegacyNewDec(100),
+				UnbondingId:    unbondingID,
+			}},
+		})
+		placed = append(placed, placedRed{
+			key:         string(stakingtypes.GetREDKey(del, oldValAddr, dst)),
+			unbondingID: unbondingID,
+		})
+	}
+
+	// Expected replay order == redelegations sorted by their store key, matching
+	// the canonical order redelegationsForValidator now emits.
+	sorted := make([]placedRed, len(placed))
+	copy(sorted, placed)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].key < sorted[j].key })
+	expectedOrder := make([]uint64, len(sorted))
+	for i, p := range sorted {
+		expectedOrder[i] = p.unbondingID
+	}
+
+	var replayOrder []uint64
+	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), gomock.Any()).Return(nil).Times(numReds)
+	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ sdk.Context, red stakingtypes.Redelegation) error {
+			replayOrder = append(replayOrder, red.Entries[0].UnbondingId)
+			return nil
+		},
+	).Times(numReds)
+	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(numReds)
+	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(numReds)
+
+	// Passing nil redelegations forces the internal scoped scan (the map path).
+	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, nil, nil, nil)
+	require.NoError(t, err)
+
+	require.Equal(t, expectedOrder, replayOrder, "redelegations must replay in deterministic store-key order")
 }
 
 // --- Validator-supernode metrics tests ---

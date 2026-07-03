@@ -289,6 +289,11 @@ func TestMigrateValidator_Success(t *testing.T) {
 		distrtypes.ValidatorCurrentRewards{Period: 3}, nil,
 	)
 	expectHistoricalRewardsSet(f.distributionKeeper, newValAddr, 2, 2)
+	// V4 fetches the re-keyed validator to convert shares → tokens; a rate-1.0
+	// validator (tokens == shares) keeps Stake == shares for the assertion below.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		stakingtypes.Validator{OperatorAddress: newValAddr.String(), Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)}, nil,
+	)
 	// Per-delegation re-keying (no per-delegation refcount bump — set once above).
 	f.distributionKeeper.EXPECT().DeleteDelegatorStartingInfo(gomock.Any(), oldValAddr, legacyAddr).Return(nil)
 	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
@@ -449,6 +454,10 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 		},
 	)
 	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, targetPeriod, gomock.Any()).Return(nil)
+	// V4 fetches the re-keyed validator to convert shares → tokens (rate 1.0).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		stakingtypes.Validator{OperatorAddress: newValAddr.String(), Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)}, nil,
+	)
 	f.distributionKeeper.EXPECT().DeleteDelegatorStartingInfo(gomock.Any(), oldValAddr, legacyAddr).Return(nil)
 	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), selfDel).Return(nil)
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
@@ -506,6 +515,10 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 		},
 	)
 	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), otherValAddr, otherTargetPeriod, gomock.Any()).Return(nil)
+	// migrateActiveDelegations fetches otherValAddr to convert shares → tokens (rate 1.0).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), otherValAddr).Return(
+		stakingtypes.Validator{OperatorAddress: otherValAddr.String(), Tokens: math.NewInt(50), DelegatorShares: math.LegacyNewDec(50)}, nil,
+	)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), otherValAddr, newAddr, gomock.Any()).Return(nil)
 	// No unbonding delegations or redelegations to other validators.
 	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
@@ -647,6 +660,11 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 		},
 	)
 	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, targetPeriod, gomock.Any()).Return(nil)
+	// V4 fetches the re-keyed validator once (outside the loop) to convert
+	// shares → tokens; rate 1.0 keeps each delegation's Stake == shares.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		stakingtypes.Validator{OperatorAddress: newValAddr.String(), Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)}, nil,
+	)
 	for range 2 {
 		f.distributionKeeper.EXPECT().DeleteDelegatorStartingInfo(gomock.Any(), oldValAddr, gomock.Any()).Return(nil)
 		f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), gomock.Any()).Return(nil)

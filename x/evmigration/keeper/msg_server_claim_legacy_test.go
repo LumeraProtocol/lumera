@@ -1249,6 +1249,10 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 		distrtypes.ValidatorCurrentRewards{Period: 5}, nil,
 	)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
+	// migrateActiveDelegations fetches the validator to convert shares → tokens (rate 1.0).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{OperatorAddress: valAddr.String(), Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)}, nil,
+	)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)
 
 	// migrateUnbondingDelegations

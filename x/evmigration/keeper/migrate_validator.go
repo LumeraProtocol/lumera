@@ -81,6 +81,7 @@ func (k Keeper) MigrateValidatorDelegations(
 	// single write here instead of resetting to 1 and incrementing once per
 	// delegation, which cost N+1 full-chain scans of ValidatorHistoricalRewards.
 	var targetPeriod uint64
+	var val stakingtypes.Validator
 	if len(delegations) > 0 {
 		currentRewards, err := k.distributionKeeper.GetValidatorCurrentRewards(ctx, newValAddr)
 		if err != nil {
@@ -88,6 +89,14 @@ func (k Keeper) MigrateValidatorDelegations(
 		}
 		targetPeriod = currentRewards.Period - 1
 		if err := k.setHistoricalRewardsReferenceCount(ctx, newValAddr, targetPeriod, uint32(1+len(delegations))); err != nil {
+			return err
+		}
+		// Fetch the re-keyed validator once to convert shares to tokens below.
+		// Distribution stores stake as tokens (TokensFromSharesTruncated), not
+		// raw shares; for an ever-slashed validator (exchange rate < 1) storing
+		// shares overstates stake and panics the next reward/undelegate tx.
+		val, err = k.stakingKeeper.GetValidator(ctx, newValAddr)
+		if err != nil {
 			return err
 		}
 	}
@@ -120,7 +129,7 @@ func (k Keeper) MigrateValidatorDelegations(
 		startingInfo := distrtypes.DelegatorStartingInfo{
 			PreviousPeriod: targetPeriod,
 			Height:         uint64(ctx.BlockHeight()),
-			Stake:          del.Shares,
+			Stake:          val.TokensFromSharesTruncated(del.Shares),
 		}
 		if err := k.distributionKeeper.SetDelegatorStartingInfo(ctx, newValAddr, delAddr, startingInfo); err != nil {
 			return err

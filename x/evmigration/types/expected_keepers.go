@@ -133,6 +133,8 @@ type SupernodeKeeper interface {
 // ActionKeeper defines the expected interface for the x/action module.
 type ActionKeeper interface {
 	IterateActions(ctx sdk.Context, handler func(*actiontypes.Action) bool) error
+	GetActionsByCreator(ctx sdk.Context, creator string) ([]*actiontypes.Action, error)
+	GetActionsBySuperNode(ctx sdk.Context, supernode string) ([]*actiontypes.Action, error)
 	SetAction(ctx sdk.Context, action *actiontypes.Action) error
 	GetActionByID(ctx sdk.Context, actionID string) (*actiontypes.Action, bool)
 }

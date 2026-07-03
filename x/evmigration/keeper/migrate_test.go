@@ -1159,32 +1159,70 @@ func TestMigrateSupernode_NotFound(t *testing.T) {
 
 // --- MigrateActions tests ---
 
-// TestMigrateActions_CreatorAndSuperNodes verifies that both the Creator field
-// and SuperNodes array entries are updated from legacy to new address.
+// TestMigrateActions_CreatorAndSuperNodes verifies that when the legacy address
+// is both the creator and a supernode of the same action, the action is updated
+// exactly once (deduped across the creator and supernode indexes) with both the
+// Creator field and the matching SuperNodes entry re-keyed to the new address.
 func TestMigrateActions_CreatorAndSuperNodes(t *testing.T) {
 	f := initMockFixture(t)
 	legacy := testAccAddr()
 	newAddr := testAccAddr()
 	otherAddr := testAccAddr()
 
-	action := &actiontypes.Action{
+	// Each index lookup resolves an independent copy of the same action, mirroring
+	// the real keeper which unmarshals a fresh Action on every GetActionByID.
+	byCreator := &actiontypes.Action{
+		ActionID:   "action-1",
+		Creator:    legacy.String(),
+		SuperNodes: []string{legacy.String(), otherAddr.String()},
+	}
+	bySuperNode := &actiontypes.Action{
 		ActionID:   "action-1",
 		Creator:    legacy.String(),
 		SuperNodes: []string{legacy.String(), otherAddr.String()},
 	}
 
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ any, cb func(*actiontypes.Action) bool) error {
-			cb(action)
-			return nil
-		})
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), legacy.String()).
+		Return([]*actiontypes.Action{byCreator}, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), legacy.String()).
+		Return([]*actiontypes.Action{bySuperNode}, nil)
 	f.actionKeeper.EXPECT().SetAction(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated *actiontypes.Action) error {
+			require.Equal(t, "action-1", updated.ActionID)
 			require.Equal(t, newAddr.String(), updated.Creator)
 			require.Equal(t, newAddr.String(), updated.SuperNodes[0])
 			require.Equal(t, otherAddr.String(), updated.SuperNodes[1])
 			return nil
-		})
+		}).Times(1)
+
+	err := f.keeper.MigrateActions(f.ctx, legacy, newAddr)
+	require.NoError(t, err)
+}
+
+// TestMigrateActions_SuperNodeOnly verifies that an action where the legacy
+// address appears only as a supernode (with a different creator) has just its
+// SuperNodes entry re-keyed, leaving the Creator field untouched.
+func TestMigrateActions_SuperNodeOnly(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+	newAddr := testAccAddr()
+	creator := testAccAddr()
+
+	action := &actiontypes.Action{
+		ActionID:   "action-2",
+		Creator:    creator.String(),
+		SuperNodes: []string{legacy.String()},
+	}
+
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), legacy.String()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), legacy.String()).
+		Return([]*actiontypes.Action{action}, nil)
+	f.actionKeeper.EXPECT().SetAction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ any, updated *actiontypes.Action) error {
+			require.Equal(t, creator.String(), updated.Creator)
+			require.Equal(t, newAddr.String(), updated.SuperNodes[0])
+			return nil
+		}).Times(1)
 
 	err := f.keeper.MigrateActions(f.ctx, legacy, newAddr)
 	require.NoError(t, err)
@@ -1196,16 +1234,9 @@ func TestMigrateActions_NoMatch(t *testing.T) {
 	legacy := testAccAddr()
 	newAddr := testAccAddr()
 
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ any, cb func(*actiontypes.Action) bool) error {
-			// No actions match legacy address.
-			cb(&actiontypes.Action{
-				ActionID:   "action-1",
-				Creator:    testAccAddr().String(),
-				SuperNodes: []string{testAccAddr().String()},
-			})
-			return nil
-		})
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), legacy.String()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), legacy.String()).Return(nil, nil)
+	// No SetAction expected: nothing references the legacy address.
 
 	err := f.keeper.MigrateActions(f.ctx, legacy, newAddr)
 	require.NoError(t, err)

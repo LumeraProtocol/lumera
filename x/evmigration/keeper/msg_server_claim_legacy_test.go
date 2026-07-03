@@ -486,7 +486,8 @@ func TestClaimLegacyAccount_Success(t *testing.T) {
 	)
 
 	// Step 7: MigrateActions — no matching actions.
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	// Step 8: MigrateClaim — no claim records targeting this address.
 	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
@@ -582,7 +583,8 @@ func TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress(t *testing.T) {
 	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
 		sntypes.SuperNode{}, false, nil,
 	)
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
 
 	msg := &types.MsgClaimLegacyAccount{
@@ -865,8 +867,8 @@ func TestClaimLegacyAccount_FailAtActions(t *testing.T) {
 	)
 
 	// Step 7: MigrateActions fails.
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(
-		fmt.Errorf("action store corrupted"),
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(
+		nil, fmt.Errorf("action store corrupted"),
 	)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -902,7 +904,8 @@ func TestClaimLegacyAccount_FailAtClaim(t *testing.T) {
 	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
 		sntypes.SuperNode{}, false, nil,
 	)
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	// Step 8: MigrateClaim fails.
 	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(
@@ -1157,8 +1160,8 @@ func TestMigrateValidator_FailAtValidatorActions(t *testing.T) {
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
 
 	// Step V6: action re-key fails.
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(
-		fmt.Errorf("action store corrupted"),
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(
+		nil, fmt.Errorf("action store corrupted"),
 	)
 
 	_, err := f.msgServer.MigrateValidator(f.ctx, msg)
@@ -1178,7 +1181,8 @@ func TestMigrateValidator_FailAtAuth(t *testing.T) {
 
 	// V5-V6: no supernode, no actions.
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	// Step V7: MigrateDistribution + MigrateStaking succeed before MigrateAuth fails.
 	// Snapshot withdraw addr.
@@ -1274,7 +1278,8 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
 		sntypes.SuperNode{}, false, nil,
 	)
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
 
 	msg := &types.MsgClaimLegacyAccount{

@@ -180,10 +180,17 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 			resp.ValUnbondingCount = uint64(len(ubds))
 		}
 		// Count redelegations where the validator is source OR destination
-		// (both are re-keyed during migration).
-		if reds, err := qs.k.redelegationsForValidator(ctx, valAddr); err == nil {
-			resp.ValRedelegationCount = uint64(len(reds))
+		// (both are re-keyed during migration). Unlike the delegation/unbonding
+		// keeper reads above, the scoped redelegation lookup can fail on a
+		// corrupt src/dst index (an index row pointing at a missing record). We
+		// must NOT swallow that: undercounting redelegations would shrink
+		// totalRecords and could flip WouldSucceed to true for a validator whose
+		// real footprint exceeds MaxValidatorDelegations. Fail the estimate loudly.
+		reds, err := qs.k.redelegationsForValidator(ctx, valAddr)
+		if err != nil {
+			return nil, fmt.Errorf("count redelegations for validator %s: %w", valAddr, err)
 		}
+		resp.ValRedelegationCount = uint64(len(reds))
 
 		// Surface the validator's BondStatus + Jailed flag so callers can
 		// display the actionable cause when WouldSucceed is false. Jailed

@@ -50,13 +50,13 @@ func (k Keeper) redelegationsForValidator(ctx sdk.Context, valAddr sdk.ValAddres
 	// diverge queue bytes (and the app hash) across nodes. Sorting by the
 	// redelegation store key also matches the IterateRedelegations fallback above.
 	keys := make([]string, 0, len(seen))
-	for k := range seen {
-		keys = append(keys, k)
+	for redKey := range seen {
+		keys = append(keys, redKey)
 	}
 	sort.Strings(keys)
 	reds := make([]stakingtypes.Redelegation, 0, len(seen))
-	for _, k := range keys {
-		reds = append(reds, seen[k])
+	for _, redKey := range keys {
+		reds = append(reds, seen[redKey])
 	}
 	return reds, nil
 }

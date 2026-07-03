@@ -31,9 +31,18 @@ JSON_OUTPUT=0
 ALLOW_PARTIAL=0
 GRPC_INSECURE="${LUMERA_GRPC_INSECURE:-0}"
 GRPC_MAX_TIME="${LUMERA_GRPC_MAX_TIME:-30}"
+
+# These track whether CHAIN_ID/NODE/GRPC were explicitly provided, so that
+# apply_network_defaults() only fills endpoints the caller left unset. A value
+# supplied via LUMERA_* env vars (seeded above) counts as explicit: env vars are
+# documented as "overrides", so passing --network alongside them must NOT clobber
+# them. An explicit --node/--grpc/--chain-id flag also sets these (see parsing).
 CHAIN_ID_FLAG_SET=0
 NODE_FLAG_SET=0
 GRPC_FLAG_SET=0
+if [[ -n "${LUMERA_CHAIN_ID:-}" ]]; then CHAIN_ID_FLAG_SET=1; fi
+if [[ -n "${LUMERA_NODE:-}" || -n "${LUMERA_RPC:-}" ]]; then NODE_FLAG_SET=1; fi
+if [[ -n "${LUMERA_GRPC:-}" ]]; then GRPC_FLAG_SET=1; fi
 
 usage() {
   cat <<'USAGE'

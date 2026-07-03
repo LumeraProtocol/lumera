@@ -374,6 +374,25 @@ teardown() {
   '
 }
 
+@test "LUMERA_* env values are treated as explicit and survive --network" {
+  # Env vars are documented as overrides, so --network must fill only the
+  # endpoints the env didn't provide (here: grpc), not clobber the env values.
+  run env -u LUMERA_NODE -u LUMERA_GRPC \
+    LUMERA_CHAIN_ID=env-chain LUMERA_RPC=tcp://env-rpc:26657 \
+    "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
+    --binary "$FAKE_LUMERAD" \
+    --grpcurl "$FAKE_GRPCURL" \
+    --network mainnet \
+    --json
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '
+    .chain_id == "env-chain"
+    and .rpc == "tcp://env-rpc:26657"
+    and .grpc == "grpc.lumera.io:443"
+  '
+}
+
 @test "max-validator-delegations rejects --network without a value" {
   run "$SCRIPTS_DIR/chain-helper.sh" max-validator-delegations \
     --binary "$FAKE_LUMERAD" \

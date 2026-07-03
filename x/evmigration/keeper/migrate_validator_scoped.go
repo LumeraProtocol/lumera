@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+	"sort"
 
 	corestore "cosmossdk.io/core/store"
 	storetypes "cosmossdk.io/store/types"
@@ -43,9 +44,19 @@ func (k Keeper) redelegationsForValidator(ctx sdk.Context, valAddr sdk.ValAddres
 		return nil, err
 	}
 
+	// Emit in sorted store-key order rather than raw map iteration order. The
+	// slice is replayed by MigrateValidatorDelegations, whose InsertRedelegationQueue
+	// calls append to shared queue timeslices; a nondeterministic order would
+	// diverge queue bytes (and the app hash) across nodes. Sorting by the
+	// redelegation store key also matches the IterateRedelegations fallback above.
+	keys := make([]string, 0, len(seen))
+	for k := range seen {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 	reds := make([]stakingtypes.Redelegation, 0, len(seen))
-	for _, red := range seen {
-		reds = append(reds, red)
+	for _, k := range keys {
+		reds = append(reds, seen[k])
 	}
 	return reds, nil
 }

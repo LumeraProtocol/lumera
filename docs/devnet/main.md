@@ -222,4 +222,4 @@ Go structs that deserialize `config.json` and `validators.json`. Used by the gen
 
 Based on `debian:trixie-slim`. Installs system tools (`jq`, `crudini`, `nginx-light`, `ripgrep`, `Node.js`) and copies all setup scripts. Entrypoint: `/root/scripts/start.sh`.
 
-Exposed ports: `26656 26657 1317 9090 4444 8002 50051 8080 8088`.
+Exposed ports: `26656 26657 1317 9090 4444 8002 15051 8080 8088`.

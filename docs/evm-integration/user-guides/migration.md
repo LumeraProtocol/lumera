@@ -52,6 +52,33 @@ After migration:
 - Both addresses must come from the**same mnemonic** (same seed phrase)
 - The migration transaction is unsigned at the Cosmos tx layer; authentication is embedded in the message as dual cryptographic proofs
 
+### Using both Keplr and MetaMask after migration
+
+After the upgrade **and** account migration, you can use **both Keplr and MetaMask for the same account**.
+
+Your migrated account has two address representations:
+
+- **Cosmos bech32** — `lumera1xxxxx...`
+- **Ethereum hex** — `0x...`
+
+These are **not two different accounts** — they are two ways of writing the **same** account, pointing to the same funds, the same staking, the same everything. Keplr shows the `lumera1...` spelling; MetaMask shows the `0x...` spelling. The Portal displays both side-by-side so you can see they're the same thing.
+
+The two wallets just reach that account through **different Lumera endpoints (URLs)**:
+
+- **Keplr** uses Cosmos endpoints (testnet: `https://lcd.testnet.lumera.io`)
+- **MetaMask** uses Ethereum JSON-RPC endpoints (testnet: `https://evm-rpc.testnet.lumera.io`)
+
+It's basically about which door each wallet knocks on — both doors lead to the same room. Using a Cosmos URL in MetaMask (or an EVM URL in Keplr) will not work.
+
+- Use **MetaMask** for EVM/DeFi activity, Ethereum dApps, and anything that works with your `0x...` address. See [metamask-configuration.md](metamask-configuration.md).
+- Use **Keplr** for Cosmos-native activity — staking, governance, IBC transfers.
+
+**Important:**
+
+- You must first **migrate** your legacy account (coin-type 118, `secp256k1`) to the new EVM account (coin-type 60, `eth_secp256k1`). Before migration, MetaMask cannot use a legacy account at all — there is no `0x...` address to connect to.
+- **Keplr users must switch to the Lumera EVM chain profile** (coin-type 60) after migrating, and re-import their account, before Keplr will show the migrated key. An existing legacy profile won't show it on its own — see [§ State A: Wallet Re-Import Still Required](#state-a-wallet-re-import-still-required-still-on-the-legacy-profile).
+- A migrated **multisig** account is Cosmos-only (it has no usable `0x...` form), so it cannot be used in MetaMask; single-key accounts have no such limitation.
+
 ---
 
 ## Validator migration
@@ -329,7 +356,6 @@ After the chain config is on `60` but before you re-import the mnemonic, the sam
 
 ![State panel — Portal and chain on coin-type 60, but Keplr account key still legacy 118](../assets/evmigration-18.png)
 
-> **Why a fresh profile rather than just using the existing one?** A Keplr wallet profile derives its keys from the mnemonic at *creation time* using the chain's then-current `bip44.coinType`. Existing profiles aren't re-derived when the chain config later changes. Importing the same mnemonic into a new profile, after the chain registry is on `coin-type 60`, makes Keplr derive the EVM-compatible (P_60) key.
 
 ###### e. Re-import the mnemonic into a fresh Keplr profile
 

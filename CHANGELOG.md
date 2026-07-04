@@ -2,6 +2,32 @@
 
 ---
 
+## 1.20.1
+
+Changes included since `v1.20.0` (range: `v1.20.0..v1.20.1`).
+
+A migration-only hotfix that hardens `x/evmigration` for large validators and live-network conditions. No store changes.
+
+### Account migration performance (`x/evmigration`)
+
+- Optimized validator migration so its cost scales with the migrating validator's own footprint instead of total chain state: scoped distribution/staking index reads replace full-chain `Iterate*` scans, a redundant second read of the validator's staking records is removed, and the historical-rewards reference count is now written once (`base + N`) instead of via N+1 full-chain scans. In the modeled large-validator case this touches ~215× fewer KV keys (1507 → 7).
+- Optimized action re-keying (both `ClaimLegacyAccount` and `MigrateValidator`) to resolve affected actions through the `Creator`/`SuperNodes` secondary indexes instead of scanning the entire action store. This fixes `ClaimLegacyAccount` txs observed burning ~1.5B gas each on testnet, which would be unminable under a mainnet block gas cap.
+
+### Account migration correctness & safety (`x/evmigration`)
+
+- Fixed a fund-locking bug: migration rebuilt `DelegatorStartingInfo.Stake` from raw delegation shares instead of tokens, so any delegation to an ever-slashed validator would panic the delegator's next reward withdrawal, undelegate, or redelegate (`calculated final stake … greater than current stake`). Stake is now stored as tokens-from-shares, matching the SDK invariant.
+- Fixed a validator-migration deadlock: `Unbonded` (non-jailed) validators — those that fell out of the active set purely on stake weight — can now migrate and recover their keys, funds, and rewards. Only `Unbonding` validators remain blocked, because their live unbonding-queue entry would otherwise be orphaned and halt the chain at maturity; the guidance is to wait for the unbonding period to complete.
+- Removed claim-record re-keying from migration. The claim DB is frozen (claiming ended 2025-01-01) and retained for reference only; re-keying was cosmetic and scanned the ~18K-record store on every migration. The legacy→new mapping in `MigrationRecords` can reconstruct claim linkage offline if ever needed.
+- Made scoped redelegation replay deterministic (sorted store-key order) so migrations produce identical app hashes across nodes.
+- Hardened `MigrationEstimate` to fail loud on lookup errors instead of returning partial data.
+
+### Upgrade & operations
+
+- Added and registered the `v1.20.1` upgrade handler as a migration-only hotfix (standard handler, no store changes).
+- Updated the Lumera uploader devnet default gRPC port to `15051` to avoid the reserved Windows/Docker Desktop `50051` range, and documented chain-helper network defaults for migration tooling.
+
+---
+
 ## 1.20.0
 
 Changes included since `v1.11.1` (range: `v1.11.1..v1.20.0`).

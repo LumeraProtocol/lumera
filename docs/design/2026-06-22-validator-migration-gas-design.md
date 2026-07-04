@@ -214,3 +214,49 @@ is execution time, not gas. A finite block `max_gas` that still admits a within-
 migration would need to be ≥ ~11.3B (≈ 450× the 25M code default), so setting one
 provides no meaningful DoS bound; the `max_validator_delegations` cap remains the real
 guard, and raising it only lengthens the worst-case stall.
+
+---
+
+## In-process scaling benchmark (2026-07-04)
+
+`BenchmarkMigrateValidatorScaling`
+(`tests/integration/evmigration/migration_scaling_test.go`) is an in-repo,
+independent confirmation that `MsgMigrateValidator` scales **linearly** with the
+migrating validator's own record count. The devnet (§2026-06-23) and testnet
+(§2026-07-03) measurements were essentially single-point — each validator sat at
+~5149–5752 records — so they pinned a per-record *rate* but could not by
+themselves distinguish linear from super-linear. This benchmark varies N
+(1000 → 6000) against a realistic record mix seeded through the real
+`StakingKeeper` and shows a flat per-record cost.
+
+Representative run (`-benchtime=1x`, linux/amd64, AMD Ryzen 9 5900X):
+
+| records | ns/op | ms/op | µs/record |
+| ------: | ----------: | ----: | --------: |
+| 1000 | 40,987,018 | 41.0 | 41.0 |
+| 2000 | 75,297,933 | 75.3 | 37.6 |
+| 4000 | 147,209,620 | 147.2 | 36.8 |
+| 6000 | 240,509,053 | 240.5 | 40.1 |
+
+- **Linear:** per-record cost is flat (~38 µs/record) across a 6× range; each
+  doubling of N roughly doubles wall time (slope ≈ 1.0). This validates the
+  `base + per_record × N` formula *shape* used throughout this doc.
+- **ns/op ≠ gas:** the harness runs `app.Setup` + `BaseApp.NewContext` with no gas
+  meter and no consensus, so it measures *algorithmic shape*, not on-chain gas or
+  block-stall seconds. Use the live devnet/testnet numbers (688k–1.02M gas/record;
+  ≈30M gas/s) for absolute gas and time; use this benchmark only for the scaling
+  exponent.
+- **Linearity relies on spread completion times.** The unbonding/redelegation
+  queues are keyed by completion time (one slice per instant). Records that accrue
+  across many blocks — the real-chain case — land in distinct buckets, so the
+  migration's per-entry `InsertUBDQueue` / `InsertRedelegationQueue` re-insert is
+  O(1) each → O(N) total; the benchmark seeds across advancing block times to
+  reproduce this. A pathological validator whose unbond/redelegation records all
+  share one completion time (e.g. a mass action in a single block) would instead
+  force O(N²) re-insertion into a single bucket — a worst case the live
+  measurements did not hit and that `max_validator_delegations` does not directly
+  bound. Not a concern for any observed validator, but worth keeping in mind if the
+  cap is raised substantially.
+- **CI gate:** `TestMigrateValidatorAtScale` runs the 6000-record row in the
+  pipeline (~1.8 s, seeding included) asserting full re-keying; the benchmark
+  itself is on-demand (`go test` runs no `Benchmark*` without `-bench`).

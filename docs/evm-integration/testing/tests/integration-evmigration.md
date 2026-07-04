@@ -49,6 +49,19 @@ go test -tags='integration test' ./tests/integration/evmigration/ \
     -run='^$' -bench='^BenchmarkMigrateValidatorScaling$' -benchtime=1x -timeout=30m -v
 ```
 
+### Representative results
+
+Single-iteration run (`-benchtime=1x`, linux/amd64, AMD Ryzen 9 5900X):
+
+| records | ns/op | ms/op | µs/record |
+| ------: | ----------: | ----: | --------: |
+| 1000 | 40,987,018 | 41.0 | 41.0 |
+| 2000 | 75,297,933 | 75.3 | 37.6 |
+| 4000 | 147,209,620 | 147.2 | 36.8 |
+| 6000 | 240,509,053 | 240.5 | 40.1 |
+
+**Analysis:** cost is **linear** in the validator's own record count — per-record cost is flat at ~38 µs/record across a 6× range and each doubling of N roughly doubles the wall time (slope ≈ 1.0). This is `ns/op` in a gas-meterless, consensus-free harness, so it reflects *algorithmic shape* rather than on-chain gas or block time; it corroborates the live devnet finding of linear ~688k gas/record (see [`docs/design/2026-06-22-validator-migration-gas-design.md`](../../../design/2026-06-22-validator-migration-gas-design.md)). The `TestMigrateValidatorAtScale` pipeline gate runs the 6000-record row (~1.8 s wall clock including seeding).
+
 Notes:
 - Sizes swept: 1000 / 2000 / 4000 / 6000 records. The reported `records/op` custom metric is the deterministic re-keyed total; wall-clock `ns/op` is indicative only (the in-process harness has no gas meter or consensus).
 - Seeding advances block time per unbonding/redelegation record so their completion times spread across distinct staking-queue buckets, mirroring a real chain. Without this, all records share one completion-time bucket and the migration's `InsertUBDQueue` / `InsertRedelegationQueue` re-serialize the whole bucket per entry (O(N²)) — a seeding artifact that masks the true linear per-record cost.

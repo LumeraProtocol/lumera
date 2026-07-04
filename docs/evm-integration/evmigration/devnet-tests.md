@@ -22,7 +22,6 @@ The migration touches many modules. The test tool verifies correct re-keying acr
 | **x/feegrant**     | Fee allowance re-creation (both granter and grantee)                                                  |
 | **x/supernode**    | `ValidatorAddress`, `SupernodeAccount`, `Evidence`, `PrevSupernodeAccounts`, `MetricsState` |
 | **x/action**       | `Creator` and `SuperNodes` fields in action records                                               |
-| **x/claim**        | `DestAddress` in claim records                                                                      |
 | **x/evmigration**  | Core migration logic, dual-signature verification, rate limiting, params                              |
 
 Two custom ante decorators support the migration:
@@ -161,7 +160,7 @@ This is the default mode used by `make devnet-evm-upgrade`.
 
 ### 6. `verify` — Verify No Leftover Legacy State (Post-Migration)
 
-Run **after** all migrations complete. Queries every chain module (except `x/evmigration` itself) via RPC to confirm that no legacy address references remain in on-chain state.
+Run **after** all migrations complete. Queries every migrated module via RPC to confirm that no legacy address references remain in on-chain state. `x/claim` is intentionally skipped because claim records are historical records and are not re-keyed by evmigration.
 
 For each migrated legacy address, the tool checks:
 
@@ -173,7 +172,6 @@ For each migrated legacy address, the tool checks:
 | **authz**        | No grants as granter or grantee                                                                                                                                                                          |
 | **feegrant**     | No allowances as granter or grantee                                                                                                                                                                      |
 | **action**       | No actions referencing legacy as creator or supernode                                                                                                                                                    |
-| **claim**        | No unclaimed records;`dest_address` not pointing to legacy                                                                                                                                             |
 | **supernode**    | No `supernode_account` or `evidence.reporter_address` fields referencing legacy (note: `prev_supernode_accounts` entries are excluded — legacy addresses there are legitimate historical records) |
 | **evmigration**  | Migration record must exist; estimate must return "already migrated"                                                                                                                                     |
 
@@ -251,7 +249,7 @@ The `make devnet-evm-upgrade` target runs the **complete end-to-end EVM upgrade 
 | 6. Check estimates        | `devnet-evmigrationp-estimate` (verify all accounts are `ready_to_migrate`)         |
 | 7. Migrate validators     | `devnet-evmigrationp-migrate-validator` (validator operators first)                   |
 | 8. Migrate accounts       | `devnet-evmigrationp-migrate` (regular accounts second)                               |
-| 9. Verify clean state     | `devnet-evmigrationp-verify` (confirms no legacy address leftovers in any module)     |
+| 9. Verify clean state     | `devnet-evmigrationp-verify` (confirms no legacy address leftovers in migrated modules; skips `x/claim`) |
 
 Each stage has error handling — if any stage fails, the pipeline aborts with a clear error message identifying which stage failed. Validators are migrated before regular accounts because `MsgMigrateValidator` atomically re-keys the validator record and all its delegations, which must happen before delegators attempt their own migration.
 
@@ -362,7 +360,7 @@ Migrates the validator operator account on each node with full post-migration va
 make devnet-evmigration-verify
 ```
 
-Queries all modules via RPC to confirm no legacy address references remain (except legitimate `prev_supernode_accounts` entries). Exits non-zero if any leftover state is found.
+Queries migrated modules via RPC to confirm no legacy address references remain (except legitimate `prev_supernode_accounts` entries and historical `x/claim` records). Exits non-zero if any leftover state is found.
 
 ### Step 8: Clean up
 

@@ -65,7 +65,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Integration** | Precisebank                          | 6     | High — [details](tests/integration-precisebank.md) |
 | **Integration** | Precompiles (standard + custom + wasm) | 42   | High — [details](tests/integration-precompiles.md) |
 | **Integration** | VM queries / state                   | 12    | High — [details](tests/integration-vm.md) |
-| **Integration** | EVMigration                          | 14 core + 4 mempool broadcast regressions | High — [details](tests/integration-evmigration.md) |
+| **Integration** | EVMigration                          | 15 core + 4 mempool broadcast regressions + 1 on-demand benchmark | High — [details](tests/integration-evmigration.md) |
 |                 |                                      |       |                  |
 | **Devnet**      | EVM / fee market / cross-peer / IBC  | 12+   | High — [details](tests/devnet.md) |
 | **Devnet**      | EVMigration tool                     | 7 modes | High — [details](tests/devnet.md#evm-migration-devnet-tests) |
@@ -132,7 +132,7 @@ Each area has its own detailed file with per-test descriptions:
 | Precisebank | [integration-precisebank.md](tests/integration-precisebank.md) | 6 |
 | Precompiles (standard + custom + wasm + crossruntime) | [integration-precompiles.md](tests/integration-precompiles.md) | 42 |
 | VM queries / state | [integration-vm.md](tests/integration-vm.md) | 12 |
-| EVMigration | [integration-evmigration.md](tests/integration-evmigration.md) | 14 core + 4 mempool broadcast regressions |
+| EVMigration | [integration-evmigration.md](tests/integration-evmigration.md) | 15 core (incl. `TestMigrateValidatorAtScale`, ~6000-record scale gate) + 4 mempool broadcast regressions + 1 on-demand scaling benchmark (`BenchmarkMigrateValidatorScaling`, excluded from pipeline) |
 
 ### Devnet Tests
 

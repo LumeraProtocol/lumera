@@ -83,7 +83,7 @@ func signMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr
 	return sig
 }
 
-func signValidatorMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+func signValidatorMigration(t testing.TB, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
 	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:validator:%s:%s", integrationTestChainID, lcfg.EVMChainID, legacyAddr.String(), newAddr.String())
 	hash := sha256.Sum256([]byte(msg))
@@ -92,7 +92,7 @@ func signValidatorMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr
 	return sig
 }
 
-func signNewMigration(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+func signNewMigration(t testing.TB, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
 	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", integrationTestChainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
 	sig, err := privKey.Sign([]byte(msg))
@@ -100,7 +100,7 @@ func signNewMigration(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey
 	return sig
 }
 
-func createNewEVMAddress(t *testing.T) (*evmcryptotypes.PrivKey, sdk.AccAddress) {
+func createNewEVMAddress(t testing.TB) (*evmcryptotypes.PrivKey, sdk.AccAddress) {
 	t.Helper()
 	privKey, err := evmcryptotypes.GenerateKey()
 	require.NoError(t, err)
@@ -125,7 +125,7 @@ func newClaimMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.
 	}
 }
 
-func newValidatorMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.AccAddress, newPrivKey *evmcryptotypes.PrivKey, newAddr sdk.AccAddress) *types.MsgMigrateValidator {
+func newValidatorMsg(t testing.TB, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.AccAddress, newPrivKey *evmcryptotypes.PrivKey, newAddr sdk.AccAddress) *types.MsgMigrateValidator {
 	t.Helper()
 	return &types.MsgMigrateValidator{
 		LegacyAddress: legacyAddr.String(),

@@ -23,9 +23,33 @@ Additional real-node broadcast coverage for zero-signer `submit-proof` txs lives
 | `TestMigrateValidator_NotValidator` | Rejection when legacy address is not a validator operator with real staking state. |
 | `TestMigrateValidator_JailedValidator` | Rejection when validator is jailed with real staking/auth state; asserts no migration record or destination validator is created. |
 | `TestMigrateValidator_UnbondedNotJailedSucceeds` | Recovery path: an Unbonded, non-jailed validator (fell out of the active set on stake weight) migrates successfully with full re-keying of the validator record, delegations, distribution, and counters. |
+| `TestMigrateValidatorAtScale` | Scale correctness gate (`migration_scaling_test.go`): migrates a validator with ~6000 records in the realistic testnet val1 mix (~0.42 deleg / 0.19 unbond / 0.39 redel) and asserts every delegation, unbonding delegation, and source-role redelegation is re-keyed. Guards the PR #184 hot-path optimizations against scale-only regressions; deterministic, no wall-clock assertion. See the scaling benchmark below for on-demand measurement. |
 | `TestQueryMigrationRecord_Integration` | Query server returns record after real migration, nil before. |
 | `TestQueryMigrationEstimate_Integration` | Estimate query with real staking state reports correct values. |
 | `TestEVMigrationZeroSignerTxBroadcastSyncWithMempoolEnabled` | Mempool-suite regression: valid zero-signer migration tx passes real-node CheckTx with app-side mempool enabled. |
 | `TestEVMigrationProofValidNonexistentLegacyAccountRejectedByAnte` | Mempool-suite negative test: proof-valid zero-signer migration tx is rejected by ante state admission when the legacy account does not exist. |
 | `TestEVMigrationMalformedLegacyAddressRejectedByValidateBasic` | Mempool-suite negative test: malformed `legacy_address` is rejected by `ValidateBasic` in the ante chain on the real-node broadcast path (before mempool admission). |
 | `TestZeroSignerNonMigrationBroadcastSyncStillRejected` | Mempool-suite negative control: zero-signer non-migration tx remains rejected. |
+
+## Scaling test + benchmark
+
+File: `tests/integration/evmigration/migration_scaling_test.go`
+
+This file carries two things that share one seeding harness:
+
+- **`TestMigrateValidatorAtScale`** (runs in the pipeline) — a plain `Test` that migrates a ~6000-record validator and asserts full re-keying. This is the CI regression gate for scale correctness (listed in the table above). It makes no wall-clock/timing assertion, so it is deterministic and does not flake.
+- **`BenchmarkMigrateValidatorScaling`** (on demand) — measures how the cost *scales* across sizes.
+
+`BenchmarkMigrateValidatorScaling` measures how `MsgMigrateValidator` scales with the migrating validator's own footprint — the number of delegation / unbonding-delegation / redelegation records the hot path re-keys. It reproduces the live testnet scenario (a validator with thousands of records) that motivated the scoped-iteration / double-fetch / O(1)-refcount optimizations in PR #184, seeding a realistic mix (~0.42 deleg / 0.19 unbond / 0.39 redel, the observed testnet val1 ratio) via the real `StakingKeeper` and timing only the migration call.
+
+The **benchmark** is **excluded from the normal pipeline by construction**: `go test` runs no `Benchmark*` without an explicit `-bench`, and `make integration-tests` passes none. Run it on demand (pin one measured iteration per size, since seeding thousands of records is slow):
+
+```bash
+go test -tags='integration test' ./tests/integration/evmigration/ \
+    -run='^$' -bench='^BenchmarkMigrateValidatorScaling$' -benchtime=1x -timeout=30m -v
+```
+
+Notes:
+- Sizes swept: 1000 / 2000 / 4000 / 6000 records. The reported `records/op` custom metric is the deterministic re-keyed total; wall-clock `ns/op` is indicative only (the in-process harness has no gas meter or consensus).
+- Seeding advances block time per unbonding/redelegation record so their completion times spread across distinct staking-queue buckets, mirroring a real chain. Without this, all records share one completion-time bucket and the migration's `InsertUBDQueue` / `InsertRedelegationQueue` re-serialize the whole bucket per entry (O(N²)) — a seeding artifact that masks the true linear per-record cost.
+- Each iteration asserts full re-keying (`assertMigrated`): every delegation, unbonding delegation, and source-role redelegation moves off the old valoper onto the new one, and the migration record is stored.

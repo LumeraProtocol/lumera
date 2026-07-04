@@ -53,8 +53,19 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		return nil, types.ErrValidatorUnbonding.Wrapf("validator is jailed (status: %s); unjail before migration", val.Status.String())
 	}
 
-	// Reject if validator is unbonding or unbonded.
-	if val.Status == stakingtypes.Unbonding || val.Status == stakingtypes.Unbonded {
+	// Reject only Unbonding — NOT Unbonded. An Unbonding validator still holds a
+	// live entry in the SDK unbonding-validator queue (keyed by completion time →
+	// operator address). Step V8 deletes the old validator record, but the
+	// evmigration StakingKeeper interface has no validator-queue methods, so the
+	// old operator address would be orphaned in the queue and halt the chain when
+	// UnbondAllMatureValidators fails to find it at maturity.
+	//
+	// Unbonded is safe and IS the recovery path: the queue entry was already
+	// dequeued (that transition is what made the validator Unbonded), so there is
+	// nothing to orphan. All re-keying below applies unchanged, letting an operator
+	// who fell out of the active set on stake weight recover keys, funds, and
+	// rewards without having to re-enter the set.
+	if val.Status == stakingtypes.Unbonding {
 		return nil, types.ErrValidatorUnbonding
 	}
 
@@ -195,8 +206,8 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 
 	// --- Step V7: Account-level migration (shared with MsgClaimLegacyAccount) ---
 	// Migrates distribution rewards, staking positions (to OTHER validators),
-	// auth account (vesting-aware), bank balances, authz grants, feegrant
-	// allowances, and claim records.
+	// auth account (vesting-aware), bank balances, authz grants, and feegrant
+	// allowances.
 
 	// Snapshot the original withdraw address before MigrateDistribution may
 	// temporarily redirect it to self.
@@ -241,11 +252,6 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	// Re-key feegrant allowances (both granter and grantee roles).
 	if err := ms.MigrateFeegrant(ctx, legacyAddr, newAddr); err != nil {
 		return nil, fmt.Errorf("migrate feegrant: %w", err)
-	}
-
-	// Update claim record destAddress from legacy to new address.
-	if err := ms.MigrateClaim(ctx, legacyAddr, newAddr); err != nil {
-		return nil, fmt.Errorf("migrate claim: %w", err)
 	}
 
 	// --- Step V8: Delete orphaned main validator KV row ---

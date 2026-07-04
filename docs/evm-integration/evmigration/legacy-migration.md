@@ -64,8 +64,7 @@ x/evmigration/
 8. Re-key feegrant allowances
 9. Update supernode account field
 10. Update action creator/supernode references
-11. Update claim destAddress
-12. Store MigrationRecord, increment counters, emit event
+11. Store MigrationRecord, increment counters, emit event
 
 ### Queries
 

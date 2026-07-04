@@ -73,7 +73,6 @@ Lumera chose **Approach 2A (claim-and-move)** -- the chain performs a one-time a
 | `x/feegrant` | Fee allowance re-keying (both granter and grantee) |
 | `x/supernode` | SupernodeAccount, Evidence, PrevSupernodeAccounts, MetricsState |
 | `x/action` | Creator and SuperNodes fields in action records |
-| `x/claim` | DestAddress in claim records |
 
 ### Key design properties
 

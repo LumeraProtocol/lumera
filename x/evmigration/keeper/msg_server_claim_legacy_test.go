@@ -106,7 +106,6 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 	feegrantKeeper := evmigrationmocks.NewMockFeegrantKeeper(ctrl)
 	supernodeKeeper := evmigrationmocks.NewMockSupernodeKeeper(ctrl)
 	actionKeeper := evmigrationmocks.NewMockActionKeeper(ctrl)
-	claimKeeper := evmigrationmocks.NewMockClaimKeeper(ctrl)
 
 	encCfg := moduletestutil.MakeTestEncodingConfig(module.AppModule{})
 	addrCodec := addresscodec.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix())
@@ -138,7 +137,6 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 		feegrantKeeper,
 		supernodeKeeper,
 		actionKeeper,
-		claimKeeper,
 	)
 
 	// Wire an isolated staking store service so scoped redelegation iteration
@@ -165,7 +163,6 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 		feegrantKeeper:     feegrantKeeper,
 		supernodeKeeper:    supernodeKeeper,
 		actionKeeper:       actionKeeper,
-		claimKeeper:        claimKeeper,
 	}
 
 	return &msgServerFixture{
@@ -489,9 +486,6 @@ func TestClaimLegacyAccount_Success(t *testing.T) {
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
 	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 
-	// Step 8: MigrateClaim — no claim records targeting this address.
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
-
 	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	resp, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -577,7 +571,7 @@ func TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress(t *testing.T) {
 	// Step 3b: MigrateBank — no balance.
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(sdk.Coins{})
 
-	// Steps 4-8: no authz/feegrant/supernode/action/claim to migrate.
+	// Steps 4-7: no authz/feegrant/supernode/action to migrate.
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
@@ -585,7 +579,6 @@ func TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress(t *testing.T) {
 	)
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
 	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
 
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),
@@ -874,47 +867,6 @@ func TestClaimLegacyAccount_FailAtActions(t *testing.T) {
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "migrate actions")
-	assertNoFinalization(t, f, legacyAddr)
-}
-
-// TestClaimLegacyAccount_FailAtClaim verifies that a failure in MigrateClaim
-// (step 8, the last step before finalization) propagates and no record is stored.
-func TestClaimLegacyAccount_FailAtClaim(t *testing.T) {
-	f := initMsgServerFixture(t)
-	_, legacyAddr, newAddr, msg := setupPassingPreChecks(t, f)
-
-	// Steps 1-7 succeed.
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(2)
-	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil).Times(2)
-	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
-
-	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
-	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), baseAcc)
-	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
-	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
-	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), newAcc)
-
-	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(sdk.Coins{})
-	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
-	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
-		sntypes.SuperNode{}, false, nil,
-	)
-	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
-	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
-
-	// Step 8: MigrateClaim fails.
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(
-		fmt.Errorf("claim store corrupted"),
-	)
-
-	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "migrate claim")
 	assertNoFinalization(t, f, legacyAddr)
 }
 
@@ -1276,7 +1228,7 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 	// Step 3b: MigrateBank
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(sdk.Coins{})
 
-	// Steps 4-8: no authz/feegrant/supernode/action/claim to migrate.
+	// Steps 4-7: no authz/feegrant/supernode/action to migrate.
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
@@ -1284,7 +1236,6 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 	)
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
 	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
 
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),

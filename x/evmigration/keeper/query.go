@@ -214,12 +214,15 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 				"validator is jailed (status: %s); restart the node, wait for catch-up, then `lumerad tx slashing unjail`",
 				strings.ToLower(strings.TrimPrefix(val.Status.String(), "BOND_STATUS_")),
 			)
-		case val.Status == stakingtypes.Unbonding || val.Status == stakingtypes.Unbonded:
+		case val.Status == stakingtypes.Unbonding:
+			// Reject only Unbonding — an Unbonding validator still holds a live
+			// unbonding-validator-queue entry keyed by the old operator address;
+			// migrating would orphan it and halt the chain at maturity. Once the
+			// unbonding period elapses the validator becomes Unbonded (queue entry
+			// dequeued) and IS migratable, so the guidance is to wait, not re-bond.
+			// Unbonded (not jailed) falls through to the default → would_succeed=true.
 			resp.WouldSucceed = false
-			resp.RejectionReason = fmt.Sprintf(
-				"validator status is %s (not bonded); migration requires the validator to be in the active set",
-				strings.ToLower(strings.TrimPrefix(val.Status.String(), "BOND_STATUS_")),
-			)
+			resp.RejectionReason = "validator is unbonding; wait for the unbonding period to complete, then migrate"
 		default:
 			resp.WouldSucceed = true
 		}

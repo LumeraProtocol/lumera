@@ -17,10 +17,12 @@ Additional real-node broadcast coverage for zero-signer `submit-proof` txs lives
 | `TestClaimLegacyAccount_ValidatorMustUseMigrateValidator` | Validator operators rejected from ClaimLegacyAccount with real staking state. |
 | `TestClaimLegacyAccount_MultiDenom` | Multi-denomination balance transfer verified with real bank module. |
 | `TestClaimLegacyAccount_LegacyAccountRemoved` | Legacy auth account removed and new account exists after migration. |
+| `TestClaimLegacyAccount_LeavesClaimRecordUntouched` | Migration does not re-key claim records: a seeded claim record whose DestAddress points at the legacy address is left unchanged (claim DB is reference-only). |
 | `TestClaimLegacyAccount_AfterValidatorMigration` | Fresh-state validator-first flow: migrate validator first, then migrate a legacy delegator account. |
 | `TestMigrateValidator_Success` | End-to-end validator migration: bonded validator with self-delegation + external delegator. |
 | `TestMigrateValidator_NotValidator` | Rejection when legacy address is not a validator operator with real staking state. |
 | `TestMigrateValidator_JailedValidator` | Rejection when validator is jailed with real staking/auth state; asserts no migration record or destination validator is created. |
+| `TestMigrateValidator_UnbondedNotJailedSucceeds` | Recovery path: an Unbonded, non-jailed validator (fell out of the active set on stake weight) migrates successfully with full re-keying of the validator record, delegations, distribution, and counters. |
 | `TestQueryMigrationRecord_Integration` | Query server returns record after real migration, nil before. |
 | `TestQueryMigrationEstimate_Integration` | Estimate query with real staking state reports correct values. |
 | `TestEVMigrationZeroSignerTxBroadcastSyncWithMempoolEnabled` | Mempool-suite regression: valid zero-signer migration tx passes real-node CheckTx with app-side mempool enabled. |

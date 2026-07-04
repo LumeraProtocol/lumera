@@ -1,7 +1,11 @@
 # Validator Migration Gas: Auto-Sizing + Formula
 
 **Date:** 2026-06-22
-**Status:** Design (pending implementation)
+**Status:** Implemented. The design body below (2026-06-22) is pre-implementation
+analysis; its gas constants (200k base / 7k per record) and its block-gas premise
+(mainnet 25M; the "~17.5M / ~11M fits in a block" reasoning) are **superseded** by
+the live-measured corrections at the end — 2026-06-23 (devnet) and 2026-07-03
+(testnet). Read those before relying on any number above them.
 
 ## Problem
 
@@ -174,3 +178,39 @@ Extrapolating linearly to mainnet's largest validator (~1597 delegations):
 **Operator guidance:** raise `timeout_broadcast_tx_commit` (e.g. to `600s`) on
 the node you broadcast through so `--gas auto` can complete, **or** broadcast with
 a high fixed `--gas` (skips the simulate, no timeout risk).
+
+---
+
+## Testnet calibration (2026-07-03, live `lumera-testnet-2`)
+
+Live testnet data (height ~5.56M) confirms the recalibrated formula and closes the
+"calibrate on a realistic-size migration" open item above.
+
+**Param:** `max_validator_delegations = 7500` on testnet (default is 2500; devnet 20000).
+The cap bounds the **sum** of delegations + unbondings + redelegations.
+
+**Largest validator by records:** Nansen — `total_touched = 5752`
+(`val_delegation_count = 5751` + 1 operator self-delegation), `would_succeed = true`.
+Top ~10 validators cluster at 5599–5751 records. Unlike the devnet gen-activity load
+(val1 was only ~43% delegations; the rest unbondings/redelegations), testnet validators
+are **delegation-dominated** — `total_touched ≈ delegation count` — so delegation count
+is a reliable proxy for total records here (it would not be on a chain with heavy
+unbond/redelegate churn).
+
+**Per-record range (devnet campaign, all 5 validators):** 331k–688k/record single-sig,
+**1.02M/record for the 2-of-3 multisig** (val2 — the measured ceiling). The conservative
+`MIGRATION_GAS_PER_RECORD = 1,500,000` sits above that ceiling with margin.
+
+**Testnet gas** (`gas = 6,000,000 + per_record × records`):
+
+| scenario | records | @688k (single-sig) | @1.02M (multisig) | @1.5M (conservative) |
+| --- | --- | --- | --- | --- |
+| current largest (Nansen) | 5752 | ~3.96B | ~5.87B | ~8.63B |
+| protocol cap (worst permitted) | 7500 | ~5.17B | ~7.66B | ~11.26B |
+
+**Block-stall implication** (measured execution rate ≈ 30M gas/s): current largest
+≈ 132–288s; cap-max ≈ 172–375s. This reinforces correction §3 — the binding constraint
+is execution time, not gas. A finite block `max_gas` that still admits a within-cap
+migration would need to be ≥ ~11.3B (≈ 450× the 25M code default), so setting one
+provides no meaningful DoS bound; the `max_validator_delegations` cap remains the real
+guard, and raising it only lengthens the worst-case stall.

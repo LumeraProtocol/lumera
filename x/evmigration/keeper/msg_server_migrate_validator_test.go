@@ -44,7 +44,10 @@ func TestMigrateValidator_NotValidator(t *testing.T) {
 }
 
 // TestMigrateValidator_UnbondingValidator verifies rejection when the validator
-// is in unbonding or unbonded status.
+// is still Unbonding — migration would orphan its live unbonding-validator-queue
+// entry and halt the chain at maturity. Unbonded is deliberately NOT rejected;
+// see integration TestMigrateValidator_UnbondedNotJailedSucceeds for that
+// recovery path.
 func TestMigrateValidator_UnbondingValidator(t *testing.T) {
 	f := initMsgServerFixture(t)
 
@@ -343,9 +346,6 @@ func TestMigrateValidator_Success(t *testing.T) {
 	// MigrateFeegrant — no allowances.
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 
-	// MigrateClaim — no claim records targeting this address.
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
-
 	// Step V8: DeleteValidatorRecordNoHooks precondition — new validator exists.
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(val, nil)
 
@@ -539,10 +539,9 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(balances)
 	f.bankKeeper.EXPECT().SendCoins(gomock.Any(), legacyAddr, newAddr, balances).Return(nil)
 
-	// MigrateAuthz, MigrateFeegrant, MigrateClaim — empty.
+	// MigrateAuthz, MigrateFeegrant — empty.
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
 
 	// Step V8: DeleteValidatorRecordNoHooks precondition — new validator exists.
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(val, nil)
@@ -706,7 +705,6 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 	f.bankKeeper.EXPECT().SendCoins(gomock.Any(), legacyAddr, newAddr, balances).Return(nil)
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
 
 	// Step V8: DeleteValidatorRecordNoHooks precondition — new validator exists.
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(val, nil)

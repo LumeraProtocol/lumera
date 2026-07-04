@@ -43,8 +43,6 @@ Files: `x/evmigration/types/sigverify/sigverify_test.go`, `x/evmigration/keeper/
 | `TestMigrateSupernode_NotFound` | Verifies no-op when legacy is not a supernode. |
 | `TestMigrateActions_CreatorAndSuperNodes` | Verifies Creator and SuperNodes fields are updated. |
 | `TestMigrateActions_NoMatch` | Verifies no-op when no actions reference legacy address. |
-| `TestMigrateClaim_Found` | Verifies claim record DestAddress is updated. |
-| `TestMigrateClaim_NotFound` | Verifies no-op when there is no claim record. |
 | `TestMigrateStaking_ActiveDelegations` | Verifies full staking migration: delegation re-keying, starting info, withdraw addr. |
 | `TestMigrateStaking_NoDelegations` | Verifies no-op when delegator has no delegations. |
 | `TestMigrateStaking_ThirdPartyWithdrawAddress` | Verifies third-party withdraw address is preserved via origWithdrawAddr parameter (bug #16). |
@@ -67,12 +65,11 @@ Files: `x/evmigration/types/sigverify/sigverify_test.go`, `x/evmigration/keeper/
 | `TestClaimLegacyAccount_FailAtAuthz` | Failure at step 4 (authz grant re-keying) propagates error. |
 | `TestClaimLegacyAccount_FailAtFeegrant` | Failure at step 5 (feegrant migration) propagates error. |
 | `TestClaimLegacyAccount_FailAtSupernode` | Failure at step 6 (supernode migration) propagates error. |
-| `TestClaimLegacyAccount_FailAtActions` | Failure at step 7 (action migration) propagates error. |
-| `TestClaimLegacyAccount_FailAtClaim` | Failure at step 8 (claim migration, last before finalize) propagates error. |
+| `TestClaimLegacyAccount_FailAtActions` | Failure at step 7 (action migration, last before finalize) propagates error. |
 | `TestClaimLegacyAccount_WithDelegations` | Verifies rewards withdrawal and delegation re-keying during claim. |
 | `TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress` | End-to-end message-server test: third-party withdraw addr resolved to migrated destination (bug #16). |
 | `TestMigrateValidator_NotValidator` | Verifies rejection when legacy address is not a validator operator. |
-| `TestMigrateValidator_UnbondingValidator` | Verifies rejection when validator is unbonding or unbonded. |
+| `TestMigrateValidator_UnbondingValidator` | Verifies rejection when validator is still unbonding (Unbonded is now migratable). |
 | `TestMigrateValidator_JailedValidator` | Verifies jailed validators are rejected before any validator migration mutation path. |
 | `TestMigrateValidator_TooManyDelegators` | Verifies rejection when delegation records exceed MaxValidatorDelegations. |
 | `TestMigrateValidator_Success` | Verifies full validator migration: commission, record, delegations, distribution, supernode, account. |
@@ -83,6 +80,8 @@ Files: `x/evmigration/types/sigverify/sigverify_test.go`, `x/evmigration/keeper/
 | `TestQueryMigrationStats` | Verifies counters and computed stats are returned. |
 | `TestQueryMigrationEstimate_NonValidator` | Verifies estimate for non-validator address with delegations. |
 | `TestQueryMigrationEstimate_AlreadyMigrated` | Verifies already-migrated addresses report would_succeed=false. |
+| `TestMigrationEstimate_ValidatorUnbondedNotJailed_WouldSucceed` | Verifies an Unbonded, non-jailed validator reports would_succeed=true (recovery path). |
+| `TestMigrationEstimate_ValidatorUnbonding_WouldFail` | Verifies an Unbonding validator reports would_succeed=false with a wait-for-unbonding-period reason. |
 | `TestQueryLegacyAccounts_WithSecp256k1` | Verifies accounts with secp256k1 pubkeys are listed as legacy. |
 | `TestQueryLegacyAccounts_Pagination` | Multi-page offset pagination: page 1 has NextKey, page 2 returns remainder without NextKey. |
 | `TestQueryLegacyAccounts_Empty` | Empty response when no legacy accounts exist; Total=0, no NextKey. |
@@ -126,6 +125,8 @@ Files: `x/evmigration/types/sigverify/sigverify_test.go`, `x/evmigration/keeper/
 | `TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic` | Redelegations from the scoped scan replay in deterministic store-key order, guarding against Go map-iteration nondeterminism that would diverge app hashes across nodes. |
 | `TestMigrateValidator_TooManyDelegatorsIncludesScopedRedelegations` | The MaxValidatorDelegations pre-check counts scoped redelegations (source and destination); exceeding the limit rejects with `ErrTooManyDelegators` even with no plain delegations/unbondings. |
 | `TestQueryMigrationEstimate_ValidatorUsesScopedRedelegationIndexesForLimit` | The `MigrationEstimate` query counts a validator's redelegations via scoped indexes (source and destination, excluding unrelated) when reporting the delegation count. |
+| `TestMigrateValidatorDelegations_SlashedValidatorStoresTokensNotShares` | V4 stores `DelegatorStartingInfo.Stake` as tokens-from-shares (truncated) via the re-keyed validator's exchange rate, not raw shares, so an ever-slashed validator (tokens < shares) cannot trip the SDK's final-stake panic on later withdrawals. |
+| `TestMigrateStaking_SlashedValidatorStoresTokensNotShares` | Account-path delegation re-keying (`migrateActiveDelegations`) applies the same shares→token stake conversion for a delegation to an ever-slashed validator. |
 
 **Additional regression coverage**: `TestKeeper_GetSuperNodeByAccount` (in `x/supernode/v1/keeper/`) confirms `GetSuperNodeByAccount` returns the correct supernode for a given account address, exercising the index used by `MigrateSupernode`.
 

@@ -69,7 +69,6 @@ type Keeper struct {
 	feegrantKeeper     types.FeegrantKeeper
 	supernodeKeeper    types.SupernodeKeeper
 	actionKeeper       types.ActionKeeper
-	claimKeeper        types.ClaimKeeper
 }
 
 func NewKeeper(
@@ -85,7 +84,6 @@ func NewKeeper(
 	feegrantKeeper types.FeegrantKeeper,
 	supernodeKeeper types.SupernodeKeeper,
 	actionKeeper types.ActionKeeper,
-	claimKeeper types.ClaimKeeper,
 ) Keeper {
 	if _, err := addressCodec.BytesToString(authority); err != nil {
 		panic(fmt.Sprintf("invalid authority address %s: %s", authority, err))
@@ -114,7 +112,6 @@ func NewKeeper(
 		feegrantKeeper:     feegrantKeeper,
 		supernodeKeeper:    supernodeKeeper,
 		actionKeeper:       actionKeeper,
-		claimKeeper:        claimKeeper,
 
 		// Allocate once so value-copies of Keeper (e.g. app.EvmigrationKeeper
 		// and AppModule.keeper) share the same mutable handle. app.go writes

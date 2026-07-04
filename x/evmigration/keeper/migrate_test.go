@@ -29,7 +29,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	"github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	evmigrationmocks "github.com/LumeraProtocol/lumera/x/evmigration/mocks"
 	module "github.com/LumeraProtocol/lumera/x/evmigration/module"
@@ -52,7 +51,6 @@ type mockFixture struct {
 	feegrantKeeper     *evmigrationmocks.MockFeegrantKeeper
 	supernodeKeeper    *evmigrationmocks.MockSupernodeKeeper
 	actionKeeper       *evmigrationmocks.MockActionKeeper
-	claimKeeper        *evmigrationmocks.MockClaimKeeper
 }
 
 func initMockFixture(t *testing.T) *mockFixture {
@@ -68,7 +66,6 @@ func initMockFixture(t *testing.T) *mockFixture {
 	feegrantKeeper := evmigrationmocks.NewMockFeegrantKeeper(ctrl)
 	supernodeKeeper := evmigrationmocks.NewMockSupernodeKeeper(ctrl)
 	actionKeeper := evmigrationmocks.NewMockActionKeeper(ctrl)
-	claimKeeper := evmigrationmocks.NewMockClaimKeeper(ctrl)
 
 	encCfg := moduletestutil.MakeTestEncodingConfig(module.AppModule{})
 	addrCodec := addresscodec.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix())
@@ -103,7 +100,6 @@ func initMockFixture(t *testing.T) *mockFixture {
 		feegrantKeeper,
 		supernodeKeeper,
 		actionKeeper,
-		claimKeeper,
 	)
 
 	// Initialize params with migration enabled.
@@ -126,7 +122,6 @@ func initMockFixture(t *testing.T) *mockFixture {
 		feegrantKeeper:     feegrantKeeper,
 		supernodeKeeper:    supernodeKeeper,
 		actionKeeper:       actionKeeper,
-		claimKeeper:        claimKeeper,
 	}
 }
 
@@ -1239,54 +1234,6 @@ func TestMigrateActions_NoMatch(t *testing.T) {
 	// No SetAction expected: nothing references the legacy address.
 
 	err := f.keeper.MigrateActions(f.ctx, legacy, newAddr)
-	require.NoError(t, err)
-}
-
-// --- MigrateClaim tests ---
-
-// TestMigrateClaim_Found verifies that the claim record's DestAddress is updated.
-func TestMigrateClaim_Found(t *testing.T) {
-	f := initMockFixture(t)
-	legacy := testAccAddr()
-	newAddr := testAccAddr()
-
-	record := claimtypes.ClaimRecord{
-		OldAddress:  "pastel1legacyoldaddress",
-		DestAddress: legacy.String(),
-	}
-
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ any, cb func(claimtypes.ClaimRecord) (bool, error)) error {
-			_, err := cb(record)
-			return err
-		})
-	f.claimKeeper.EXPECT().GetClaimRecord(gomock.Any(), record.OldAddress).Return(record, true, nil)
-	f.claimKeeper.EXPECT().SetClaimRecord(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ any, updated claimtypes.ClaimRecord) error {
-			require.Equal(t, newAddr.String(), updated.DestAddress)
-			return nil
-		})
-
-	err := f.keeper.MigrateClaim(f.ctx, legacy, newAddr)
-	require.NoError(t, err)
-}
-
-// TestMigrateClaim_NotFound verifies no-op when there is no claim record.
-func TestMigrateClaim_NotFound(t *testing.T) {
-	f := initMockFixture(t)
-	legacy := testAccAddr()
-	newAddr := testAccAddr()
-
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ any, cb func(claimtypes.ClaimRecord) (bool, error)) error {
-			_, err := cb(claimtypes.ClaimRecord{
-				OldAddress:  "pastel1otheroldaddress",
-				DestAddress: testAccAddr().String(),
-			})
-			return err
-		})
-
-	err := f.keeper.MigrateClaim(f.ctx, legacy, newAddr)
 	require.NoError(t, err)
 }
 

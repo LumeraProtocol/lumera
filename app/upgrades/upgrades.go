@@ -40,8 +40,8 @@ import (
 // | v1.11.0 | custom   | add audit store                   | Initializes audit params with dynamic epoch_zero_height
 // | v1.11.1 | custom   | conditional add audit store       | Supports direct v1.10.1->v1.11.1 and enforces audit min_disk_free_percent floor (>=15)
 // | v1.12.0 | custom   | none (Everlight in supernode)     | Runs migrations; Everlight logic embedded in x/supernode
-// | v1.20.0 | custom   | add feemarket, precisebank, vm, erc20 | Adds EVM stores and applies Lumera EVM param finalization
-// | v1.20.1 | standard | none                              | Hotfix release; migrations only
+// | v1.20.0 | custom   | non-mainnet: add feemarket, precisebank, vm, erc20 | EVM bring-up; gated to non-mainnet (mainnet runs it via v1.20.1)
+// | v1.20.1 | mixed    | mainnet: add feemarket, precisebank, vm, erc20 | Mainnet reuses v1.20.0 store+handler (full EVM bring-up); non-mainnet is migrations only
 // =================================================================================================================================
 
 type UpgradeConfig struct {
@@ -155,11 +155,27 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 			Handler:      upgrade_v1_12_0.CreateUpgradeHandler(params),
 		}, true
 	case upgrade_v1_20_0.UpgradeName:
+		// Mainnet skips v1.20.0 entirely and runs the EVM bring-up via v1.20.1
+		// instead (see the v1.20.1 case). Testnet and devnet already ran v1.20.0,
+		// so they keep it. Mirrors the v1.8.0/v1.8.4 mainnet-skip precedent.
+		if IsMainnet(params.ChainID) {
+			return NoUpgradeConfig, true
+		}
 		return UpgradeConfig{
 			StoreUpgrade: &upgrade_v1_20_0.StoreUpgrades,
 			Handler:      upgrade_v1_20_0.CreateUpgradeHandler(params),
 		}, true
 	case upgradeNameV1201:
+		// On mainnet v1.20.1 carries the full EVM bring-up that other networks got
+		// from v1.20.0: it reuses v1.20.0's store additions and handler verbatim,
+		// so everything v1.20.0 does is guaranteed to run here. On testnet/devnet
+		// (which already ran v1.20.0) v1.20.1 is a migration-only hotfix.
+		if IsMainnet(params.ChainID) {
+			return UpgradeConfig{
+				StoreUpgrade: &upgrade_v1_20_0.StoreUpgrades,
+				Handler:      upgrade_v1_20_0.CreateUpgradeHandler(params),
+			}, true
+		}
 		return UpgradeConfig{
 			Handler: standardUpgradeHandler(upgradeNameV1201, params),
 		}, true

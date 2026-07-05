@@ -6,7 +6,7 @@
 
 Changes included since `v1.20.0` (range: `v1.20.0..v1.20.1`).
 
-A migration-only hotfix that hardens `x/evmigration` for large validators and live-network conditions. No store changes.
+A hotfix that hardens `x/evmigration` for large validators and live-network conditions. On networks that already ran `v1.20.0` (testnet/devnet) it is migration-only with no store changes; on mainnet — which skips `v1.20.0` entirely — `v1.20.1` also performs the full EVM bring-up (adds the EVM stores and finalizes Lumera EVM params) by reusing the `v1.20.0` store additions and handler.
 
 ### Account migration performance (`x/evmigration`)
 
@@ -23,7 +23,7 @@ A migration-only hotfix that hardens `x/evmigration` for large validators and li
 
 ### Upgrade & operations
 
-- Added and registered the `v1.20.1` upgrade handler as a migration-only hotfix (standard handler, no store changes).
+- Excluded the `v1.20.0` upgrade handler on mainnet and routed the full EVM bring-up through `v1.20.1` instead (mirrors the existing `v1.8.0`/`v1.8.4` mainnet-skip precedent). On mainnet, `v1.20.1` reuses the `v1.20.0` store additions and handler verbatim, so everything `v1.20.0` does is guaranteed to run; on testnet/devnet (which already ran `v1.20.0`) `v1.20.1` remains a migration-only hotfix (standard handler, no store changes).
 - Updated the Lumera uploader devnet default gRPC port to `15051` to avoid the reserved Windows/Docker Desktop `50051` range, and documented chain-helper network defaults for migration tooling.
 
 ---

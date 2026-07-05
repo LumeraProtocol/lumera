@@ -90,19 +90,28 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 					require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey, "v1.20.0 should add evm store key")
 					require.Contains(t, config.StoreUpgrade.Added, erc20types.StoreKey, "v1.20.0 should add erc20 store key")
 				}
+				if upgradeName == upgradeNameV1201 && config.StoreUpgrade != nil {
+					require.Contains(t, config.StoreUpgrade.Added, feemarkettypes.StoreKey, "v1.20.1 on mainnet should add feemarket store key")
+					require.Contains(t, config.StoreUpgrade.Added, precisebanktypes.StoreKey, "v1.20.1 on mainnet should add precisebank store key")
+					require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey, "v1.20.1 on mainnet should add evm store key")
+					require.Contains(t, config.StoreUpgrade.Added, erc20types.StoreKey, "v1.20.1 on mainnet should add erc20 store key")
+				}
 
 				if config.Handler == nil {
 					continue
 				}
 
 				// Custom upgrades that need keepers are skipped in this lightweight harness.
+				// On mainnet v1.20.1 reuses the v1.20.0 EVM bring-up handler, which also
+				// needs keepers; on other networks it is migration-only and safe to run.
 				if upgradeName == upgrade_v1_9_0.UpgradeName ||
 					upgradeName == upgrade_v1_10_0.UpgradeName ||
 					upgradeName == upgrade_v1_10_1.UpgradeName ||
 					upgradeName == upgrade_v1_11_0.UpgradeName ||
 					upgradeName == upgrade_v1_11_1.UpgradeName ||
 					upgradeName == upgrade_v1_12_0.UpgradeName ||
-					upgradeName == upgrade_v1_20_0.UpgradeName {
+					upgradeName == upgrade_v1_20_0.UpgradeName ||
+					(upgradeName == upgradeNameV1201 && IsMainnet(tt.chainID)) {
 					continue
 				}
 
@@ -150,6 +159,53 @@ func TestV1201IsRegisteredAsMigrationOnlyUpgrade(t *testing.T) {
 	require.NotNil(t, vm)
 }
 
+// Mainnet skips v1.20.0 outright: no handler runs and no stores are mounted, so
+// a mainnet node never applies the (partial, later-superseded) v1.20.0 bring-up.
+func TestV1200ExcludedOnMainnet(t *testing.T) {
+	params := newTestUpgradeParams("lumera-mainnet-1")
+	config, found := SetupUpgrades(upgrade_v1_20_0.UpgradeName, params)
+	require.True(t, found, "v1.20.0 must remain a known upgrade name")
+	require.Nil(t, config.Handler, "v1.20.0 must not run a handler on mainnet")
+	require.Nil(t, config.StoreUpgrade, "v1.20.0 must not mount stores on mainnet")
+}
+
+// Testnet and devnet already ran v1.20.0, so it keeps its handler and EVM stores there.
+func TestV1200ActiveOnNonMainnet(t *testing.T) {
+	for _, chainID := range []string{"lumera-testnet-2", "lumera-devnet-1"} {
+		params := newTestUpgradeParams(chainID)
+		config, found := SetupUpgrades(upgrade_v1_20_0.UpgradeName, params)
+		require.True(t, found)
+		require.NotNil(t, config.Handler, "v1.20.0 should run on %s", chainID)
+		require.NotNil(t, config.StoreUpgrade, "v1.20.0 should mount EVM stores on %s", chainID)
+		require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey, "v1.20.0 should add evm store key on %s", chainID)
+	}
+}
+
+// On mainnet v1.20.1 must carry everything v1.20.0 would have: the EVM store
+// additions and the full EVM bring-up handler.
+func TestV1201CarriesEVMBringupOnMainnet(t *testing.T) {
+	params := newTestUpgradeParams("lumera-mainnet-1")
+	config, found := SetupUpgrades(upgradeNameV1201, params)
+	require.True(t, found)
+	require.NotNil(t, config.Handler, "v1.20.1 must carry a handler on mainnet")
+	require.NotNil(t, config.StoreUpgrade, "v1.20.1 must mount the EVM stores on mainnet")
+	require.Contains(t, config.StoreUpgrade.Added, feemarkettypes.StoreKey, "v1.20.1 mainnet should add feemarket store key")
+	require.Contains(t, config.StoreUpgrade.Added, precisebanktypes.StoreKey, "v1.20.1 mainnet should add precisebank store key")
+	require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey, "v1.20.1 mainnet should add evm store key")
+	require.Contains(t, config.StoreUpgrade.Added, erc20types.StoreKey, "v1.20.1 mainnet should add erc20 store key")
+}
+
+// On networks that already ran v1.20.0, v1.20.1 is a plain migration-only hotfix.
+func TestV1201MigrationOnlyOnNonMainnet(t *testing.T) {
+	for _, chainID := range []string{"lumera-testnet-2", "lumera-devnet-1"} {
+		params := newTestUpgradeParams(chainID)
+		config, found := SetupUpgrades(upgradeNameV1201, params)
+		require.True(t, found)
+		require.NotNil(t, config.Handler, "v1.20.1 should still run migrations on %s", chainID)
+		require.Nil(t, config.StoreUpgrade, "v1.20.1 should not mount stores on %s", chainID)
+	}
+}
+
 func newTestUpgradeParams(chainID string) appParams.AppUpgradeParams {
 	return appParams.AppUpgradeParams{
 		ChainID:       chainID,
@@ -163,6 +219,9 @@ func expectHandler(upgradeName, chainID string) bool {
 	switch upgradeName {
 	case upgrade_v1_8_0.UpgradeName:
 		return IsTestnet(chainID) || IsDevnet(chainID)
+	case upgrade_v1_20_0.UpgradeName:
+		// Mainnet skips v1.20.0 entirely; the EVM bring-up runs in v1.20.1.
+		return !IsMainnet(chainID)
 	default:
 		return true
 	}
@@ -183,7 +242,11 @@ func expectStoreUpgrade(upgradeName, chainID string) bool {
 	case upgrade_v1_12_0.UpgradeName:
 		return true
 	case upgrade_v1_20_0.UpgradeName:
-		return true
+		// EVM stores are added by v1.20.0 only on the networks that run it.
+		return !IsMainnet(chainID)
+	case upgradeNameV1201:
+		// Mainnet carries the EVM store additions on v1.20.1 instead of v1.20.0.
+		return IsMainnet(chainID)
 	default:
 		return false
 	}

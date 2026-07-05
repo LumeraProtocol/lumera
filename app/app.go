@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -28,6 +29,7 @@ import (
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -442,7 +444,7 @@ func New(
 
 	// **** SETUP UPGRADES (upgrade handlers and store loaders) ****
 	// This needs to be done after keepers are initialized but before loading state.
-	app.setupUpgrades()
+	app.setupUpgrades(appOpts)
 
 	/****  Module Options ****/
 
@@ -490,9 +492,10 @@ func (app *App) GetSubspace(moduleName string) paramstypes.Subspace {
 
 // setupUpgrades configures the store loader for upcoming upgrades and registers upgrade handlers.
 // This needs to be called BEFORE app.Load()
-func (app *App) setupUpgrades() {
+func (app *App) setupUpgrades(appOpts servertypes.AppOptions) {
+	chainID := app.upgradeRoutingChainID(appOpts)
 	params := appParams.AppUpgradeParams{
-		ChainID:               app.ChainID(),
+		ChainID:               chainID,
 		Logger:                app.Logger(),
 		ModuleManager:         app.ModuleManager,
 		Configurator:          app.Configurator(),
@@ -574,6 +577,60 @@ func (app *App) setupUpgrades() {
 	)
 	app.SetStoreLoader(selection.Loader)
 	app.Logger().Info(selection.LogMessage(), "name", upgradeInfo.Name, "height", upgradeInfo.Height)
+}
+
+func (app *App) upgradeRoutingChainID(appOpts servertypes.AppOptions) string {
+	return upgradeRoutingChainID(app.ChainID(), appOpts, app.Logger())
+}
+
+func upgradeRoutingChainID(setupChainID string, appOpts servertypes.AppOptions, logger log.Logger) string {
+	chainID := strings.TrimSpace(setupChainID)
+	if chainID != "" && chainID != Name {
+		return chainID
+	}
+
+	genesisChainID, err := chainIDFromGenesisAppOptions(appOpts)
+	if err != nil {
+		if logger != nil {
+			logger.Error("Failed to resolve genesis chain ID for upgrade routing; using setup chain ID", "setup_chain_id", chainID, "error", err)
+		}
+		return chainID
+	}
+	if genesisChainID == "" {
+		return chainID
+	}
+
+	if logger != nil {
+		logger.Info("Resolved upgrade routing chain ID from genesis", "setup_chain_id", chainID, "genesis_chain_id", genesisChainID)
+	}
+	return genesisChainID
+}
+
+func chainIDFromGenesisAppOptions(appOpts servertypes.AppOptions) (string, error) {
+	if appOpts == nil {
+		return "", fmt.Errorf("app options are nil")
+	}
+
+	homeDir := strings.TrimSpace(cast.ToString(appOpts.Get(flags.FlagHome)))
+	genesisPath := strings.TrimSpace(cast.ToString(appOpts.Get("genesis_file")))
+	if genesisPath == "" {
+		genesisPath = filepath.Join("config", "genesis.json")
+	}
+	if !filepath.IsAbs(genesisPath) {
+		genesisPath = filepath.Join(homeDir, genesisPath)
+	}
+
+	reader, err := os.Open(genesisPath)
+	if err != nil {
+		return "", fmt.Errorf("open genesis file %q: %w", genesisPath, err)
+	}
+	defer func() { _ = reader.Close() }()
+
+	chainID, err := genutiltypes.ParseChainIDFromGenesis(reader)
+	if err != nil {
+		return "", fmt.Errorf("parse chain-id from genesis file %q: %w", genesisPath, err)
+	}
+	return strings.TrimSpace(chainID), nil
 }
 
 // LegacyAmino returns App's amino codec.

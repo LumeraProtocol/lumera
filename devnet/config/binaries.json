@@ -111,7 +111,7 @@
         "v1.20.1": {
             "bin_dir": "bin-v1.20.1",
             "lumera": {
-                "tag": "v1.20.1-rc1",
+                "tag": "v1.20.1",
                 "asset": "lumera_linux_amd64.tar.gz"
             },
             "supernode": {

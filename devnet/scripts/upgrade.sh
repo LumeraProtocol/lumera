@@ -127,7 +127,7 @@ PROPOSAL_ID="$(docker compose -f "${COMPOSE_FILE}" exec -T supernova_validator_1
 	lumerad query gov proposals --output json | jq -r --arg name "${RELEASE_NAME}" '
     .proposals
     | map(select(
-        (.messages[]?.value.plan.name == $name)
+        any(.messages[]?; (.value.plan.name // .plan.name // empty) == $name)
         and ((.status == "PROPOSAL_STATUS_VOTING_PERIOD")
              or (.status == "PROPOSAL_STATUS_DEPOSIT_PERIOD")
              or (.status == "PROPOSAL_STATUS_PASSED"))
@@ -151,7 +151,7 @@ PROPOSAL_STATUS=""
 PROPOSAL_HEIGHT=""
 if [[ -n "${PROPOSAL_JSON}" ]]; then
 	PROPOSAL_STATUS="$(echo "${PROPOSAL_JSON}" | jq -r '.proposal.status // .status // empty' 2>/dev/null || true)"
-	PROPOSAL_HEIGHT="$(echo "${PROPOSAL_JSON}" | jq -r '.proposal.messages[]?.value.plan.height // empty' 2>/dev/null | head -n 1 || true)"
+	PROPOSAL_HEIGHT="$(echo "${PROPOSAL_JSON}" | jq -r '.proposal.messages[]? | (.value.plan.height // .plan.height // empty)' 2>/dev/null | head -n 1 || true)"
 fi
 
 if [[ -n "${PROPOSAL_HEIGHT}" && "${PROPOSAL_HEIGHT}" =~ ^[0-9]+$ ]]; then

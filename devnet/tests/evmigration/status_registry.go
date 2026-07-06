@@ -121,3 +121,7 @@ func updateStatusRegistryAddress(name, newAddr string) {
 	}
 	log.Printf("  updated account registry address for %s in %s", name, registryFile)
 }
+
+func updateStatusRegistryMigratedAccount(name, newAddr string) {
+	updateStatusRegistryAddress(name, newAddr)
+}

@@ -418,6 +418,8 @@ func migrateOne(rec *AccountRecord) migrateResult {
 		return migrateFailed
 	}
 
+	updateStatusRegistryMigratedAccount(rec.Name, newAddress)
+
 	log.Printf("  OK: %s (%s) -> %s (%s)", rec.Name, rec.Address, newName, newAddress)
 	return migrateNew
 }

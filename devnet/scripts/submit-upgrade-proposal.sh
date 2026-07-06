@@ -22,6 +22,8 @@ DEFAULT_DEPOSIT="10000000$DENOM"
 HOST_PROPOSAL_FILE="${LUMERA_SHARED}/upgrade_${VERSION}.json"
 CONTAINER_PROPOSAL_FILE="/shared/upgrade_${VERSION}.json"
 COMPOSE_FILE="../docker-compose.yml"
+STATUS_DIR="${LUMERA_SHARED}/status"
+ACCOUNT_REGISTRY_FILE="${STATUS_DIR}/${SERVICE}/accounts.json"
 
 get_current_height() {
 	docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
@@ -34,7 +36,7 @@ get_current_height() {
 get_proposal_id_by_version_with_retry() {
 	local version="$1"
 	local attempts="${2:-1}" # Default to 1 attempt if not provided
-	local height_filter="$3"
+	local height_filter="${3:-}"
 	local sleep_interval=2
 	local proposal_id=""
 	local proposals_json
@@ -56,10 +58,10 @@ get_proposal_id_by_version_with_retry() {
               .messages[]?
               | select(
                   ((.type // .["@type"]) == "/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade")
-                  and (.value.plan.name == $version)
+                  and ((.value.plan.name // .plan.name) == $version)
                   and (
                     ($height == "")
-                    or ((.value.plan.height // "0") | tonumber) >= ($height | tonumber)
+                    or (((.value.plan.height // .plan.height // "0") | tonumber) >= ($height | tonumber))
                   )
                 )
             ] | length > 0
@@ -106,7 +108,7 @@ get_proposal_height_by_id() {
 	local proposal_id="$1"
 	docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
 		lumerad query gov proposal "$proposal_id" --output json 2>/dev/null |
-		jq -r '.proposal.messages[]?.value.plan.height // empty'
+		jq -r '.proposal.messages[]? | (.value.plan.height // .plan.height // empty)'
 }
 
 validate_height_param() {
@@ -132,6 +134,201 @@ get_min_deposit_from_gov_params() {
 		lumerad query gov params --output json 2>/dev/null |
 		jq -r '.params.min_deposit[0].amount + .params.min_deposit[0].denom')
 	echo "$output"
+}
+
+account_exists() {
+	local address="$1"
+	[[ -n "$address" ]] || return 1
+	docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
+		lumerad query auth account "$address" --output json >/dev/null 2>&1
+}
+
+key_address() {
+	local key_name="$1"
+	docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
+		lumerad keys show "$key_name" -a --keyring-backend "$KEYRING" 2>/dev/null |
+		tr -d '\r\n'
+}
+
+key_name_for_address() {
+	local address="$1"
+	[[ -n "$address" ]] || return 1
+	docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
+		lumerad keys list --keyring-backend "$KEYRING" --output json 2>/dev/null |
+		jq -r --arg address "$address" '
+			(if type == "array" then . else (.keys // []) end)
+			| map(select(.address == $address))
+			| first
+			| .name // empty
+		' 2>/dev/null | head -n 1
+}
+
+registry_mnemonic() {
+	local key_name="$1"
+	if [[ -f "$ACCOUNT_REGISTRY_FILE" ]]; then
+		jq -r --arg name "$key_name" '
+			(map(select(.name == $name)) | first | .mnemonic) // empty
+		' "$ACCOUNT_REGISTRY_FILE" 2>/dev/null
+	fi
+}
+
+governance_mnemonic_file() {
+	printf '%s\n' "${STATUS_DIR}/${SERVICE}/governance-address-mnemonic"
+}
+
+migration_new_address() {
+	local legacy_address="$1"
+	[[ -n "$legacy_address" ]] || return 1
+	docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
+		lumerad query evmigration migration-record "$legacy_address" --output json 2>/dev/null |
+		jq -r '.record.new_address // .migration_record.new_address // .new_address // empty' 2>/dev/null
+}
+
+update_status_registry_address() {
+	local key_name="$1"
+	local new_address="$2"
+	local registry tmp
+
+	[[ -n "$key_name" && -n "$new_address" && -d "$STATUS_DIR" ]] || return 0
+	while IFS= read -r registry; do
+		if [[ ! -w "$registry" || ! -w "$(dirname "$registry")" ]]; then
+			echo "⚠️  Cannot update ${registry}; file is not writable by this user." >&2
+			continue
+		fi
+		if ! jq -e --arg name "$key_name" 'any(.[]?; .name == $name)' "$registry" >/dev/null 2>&1; then
+			continue
+		fi
+		tmp="$(mktemp "${registry}.tmp.XXXXXX")" || return 0
+		if jq --arg name "$key_name" --arg address "$new_address" '
+			map(if .name == $name then .address = $address else . end)
+		' "$registry" >"$tmp"; then
+			chmod 644 "$tmp"
+			mv "$tmp" "$registry"
+		else
+			rm -f "$tmp"
+		fi
+	done < <(find "$STATUS_DIR" -mindepth 2 -maxdepth 2 -name accounts.json -type f 2>/dev/null)
+}
+
+recover_evm_key_from_mnemonic() {
+	local key_name="$1"
+	local mnemonic="$2"
+	local expected_address="$3"
+	local recovered_address key_json
+
+	recovered_address="$(key_address "$key_name")"
+	if [[ -n "$recovered_address" ]]; then
+		if [[ "$recovered_address" != "$expected_address" ]]; then
+			echo "❌ Key ${key_name} exists but resolves to ${recovered_address}; expected migrated address ${expected_address}" >&2
+			return 1
+		fi
+		return 0
+	fi
+
+	key_json="$(docker compose -f "$COMPOSE_FILE" exec -T -e MNEMONIC="$mnemonic" "$SERVICE" \
+		sh -c 'printf "%s\n" "$MNEMONIC" | lumerad keys add "$1" --recover --coin-type 60 --algo eth_secp256k1 --keyring-backend "$2" --output json' \
+		_ "$key_name" "$KEYRING" 2>&1)"
+	recovered_address="$(printf '%s' "$key_json" | jq -r '.address // empty' 2>/dev/null || true)"
+	if [[ -z "$recovered_address" ]]; then
+		echo "❌ Failed to recover migrated key ${key_name} from mnemonic:" >&2
+		echo "$key_json" >&2
+		return 1
+	fi
+	if [[ "$recovered_address" != "$expected_address" ]]; then
+		echo "❌ Recovered key ${key_name} resolved to ${recovered_address}; expected migrated address ${expected_address}" >&2
+		return 1
+	fi
+}
+
+try_migrated_proposer() {
+	local legacy_key_name="$1"
+	local legacy_address="$2"
+	local migrated_address migrated_key_name mnemonic mnemonic_file
+
+	migrated_address="$(migration_new_address "$legacy_address")"
+	if [[ -z "$migrated_address" || "$migrated_address" == "null" ]]; then
+		return 1
+	fi
+
+	migrated_key_name="$(key_name_for_address "$migrated_address")"
+	if [[ -z "$migrated_key_name" ]]; then
+		mnemonic="$(registry_mnemonic "$legacy_key_name")"
+		mnemonic_file="$(governance_mnemonic_file)"
+		if [[ -z "$mnemonic" && "$legacy_key_name" == "governance_key" && -s "$mnemonic_file" ]]; then
+			mnemonic="$(cat "$mnemonic_file")"
+		fi
+		if [[ -z "$mnemonic" ]]; then
+			echo "⚠️  ${legacy_key_name} migrated to ${migrated_address}, but no mnemonic was found in validator 1 registry." >&2
+			return 1
+		fi
+		migrated_key_name="${legacy_key_name}_evm"
+		recover_evm_key_from_mnemonic "$migrated_key_name" "$mnemonic" "$migrated_address" || return 1
+	fi
+
+	if ! account_exists "$migrated_address"; then
+		echo "❌ Migrated proposer ${migrated_key_name} (${migrated_address}) is not present on-chain" >&2
+		return 1
+	fi
+
+	update_status_registry_address "$legacy_key_name" "$migrated_address"
+	if [[ "$legacy_key_name" == "governance_key" ]]; then
+		if [[ -w "$GOV_ADDRESS_FILE" || ( ! -e "$GOV_ADDRESS_FILE" && -w "$(dirname "$GOV_ADDRESS_FILE")" ) ]]; then
+			printf '%s\n' "$migrated_address" >"$GOV_ADDRESS_FILE"
+		else
+			echo "⚠️  Cannot update ${GOV_ADDRESS_FILE}; file is not writable by this user." >&2
+		fi
+	fi
+	PROPOSER_KEY_NAME="$migrated_key_name"
+	PROPOSER_ADDRESS="$migrated_address"
+	echo "Governance proposer migrated: ${legacy_key_name} (${legacy_address}) -> ${PROPOSER_KEY_NAME} (${PROPOSER_ADDRESS})"
+	return 0
+}
+
+primary_validator_key_name() {
+	local key_name
+	key_name="$(jq -r --arg svc "$SERVICE" '.[] | select(.moniker == $svc or .name == $svc) | .key_name // empty' \
+		"${LUMERA_SHARED}/config/validators.json" 2>/dev/null | head -n 1)"
+	if [[ -z "$key_name" || "$key_name" == "null" ]]; then
+		key_name="${SERVICE}_key"
+	fi
+	echo "$key_name"
+}
+
+resolve_proposer() {
+	PROPOSER_KEY_NAME="governance_key"
+	PROPOSER_ADDRESS="$(key_address "$PROPOSER_KEY_NAME")"
+
+	if [[ -z "$PROPOSER_ADDRESS" && -f "$GOV_ADDRESS_FILE" ]]; then
+		PROPOSER_ADDRESS="$(tr -d '\r\n' <"$GOV_ADDRESS_FILE")"
+	fi
+
+	if account_exists "$PROPOSER_ADDRESS"; then
+		echo "Governance proposer: ${PROPOSER_KEY_NAME} (${PROPOSER_ADDRESS})"
+		return
+	fi
+	if try_migrated_proposer "$PROPOSER_KEY_NAME" "$PROPOSER_ADDRESS"; then
+		return
+	fi
+
+	if [[ -n "$PROPOSER_ADDRESS" ]]; then
+		echo "⚠️  Governance helper account ${PROPOSER_ADDRESS} is not present on-chain; using primary validator proposer." >&2
+	fi
+
+	PROPOSER_KEY_NAME="$(primary_validator_key_name)"
+	PROPOSER_ADDRESS="$(key_address "$PROPOSER_KEY_NAME")"
+	if [[ -z "$PROPOSER_ADDRESS" ]]; then
+		echo "❌ Unable to resolve fallback proposer key ${PROPOSER_KEY_NAME}" >&2
+		exit 1
+	fi
+	if ! account_exists "$PROPOSER_ADDRESS"; then
+		if try_migrated_proposer "$PROPOSER_KEY_NAME" "$PROPOSER_ADDRESS"; then
+			return
+		fi
+		echo "❌ Fallback proposer ${PROPOSER_KEY_NAME} (${PROPOSER_ADDRESS}) is not present on-chain" >&2
+		exit 1
+	fi
+
+	echo "Governance proposer: ${PROPOSER_KEY_NAME} (${PROPOSER_ADDRESS})"
 }
 
 submit_proposal() {
@@ -171,20 +368,22 @@ EOF
 	# Run inside supernova_validator_1 container
 	PROPOSAL_OUTPUT=$(docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
 		lumerad tx gov submit-proposal "$CONTAINER_PROPOSAL_FILE" \
-		--from "$GOV_ADDRESS" \
+		--from "$PROPOSER_KEY_NAME" \
 		--chain-id "$CHAIN_ID" \
 		--keyring-backend "$KEYRING" \
 		--gas 400000 \
 		--fees 5000ulume \
 		--broadcast-mode sync \
 		--output json \
-		--yes 2>/dev/null)
+		--yes 2>&1)
 
 	echo "🔍 Proposal submission output:" >&2
-	echo "$PROPOSAL_OUTPUT" | jq . >&2
+	if ! echo "$PROPOSAL_OUTPUT" | jq . >&2; then
+		echo "$PROPOSAL_OUTPUT" >&2
+	fi
 
-	TXHASH=$(echo "$PROPOSAL_OUTPUT" | jq -r '.txhash // empty')
-	LATEST_PROPOSAL_ID=$(get_proposal_id_by_version_with_retry "$VERSION" 5 "$UPGRADE_HEIGHT")
+	TXHASH=$(echo "$PROPOSAL_OUTPUT" | jq -r '.txhash // empty' 2>/dev/null || true)
+	LATEST_PROPOSAL_ID=$(get_proposal_id_by_version_with_retry "$VERSION" 15 "$UPGRADE_HEIGHT")
 
 	if [[ -n "$LATEST_PROPOSAL_ID" ]]; then
 		echo "✅ Proposal submitted successfully with ID: $LATEST_PROPOSAL_ID" >&2
@@ -224,7 +423,7 @@ submit_proposal_deposit() {
 
 	DEPOSIT_OUTPUT=$(docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
 		lumerad tx gov deposit "$EXISTING_PROPOSAL_ID" "$DEPOSIT_AMOUNT" \
-		--from "$GOV_ADDRESS" \
+		--from "$PROPOSER_KEY_NAME" \
 		--chain-id "$CHAIN_ID" \
 		--keyring-backend "$KEYRING" \
 		--gas 300000 \
@@ -309,16 +508,13 @@ if [ $# -ne 2 ]; then
 	exit 1
 fi
 
-# Read the governance address
+# Read the governance helper address, then resolve a live proposer key.
 GOV_ADDRESS_FILE="${LUMERA_SHARED}/governance_address"
 if [ ! -f "$GOV_ADDRESS_FILE" ]; then
-	echo "❌ Governance address file not found at $GOV_ADDRESS_FILE"
-	exit 1
+	echo "⚠️  Governance address file not found at $GOV_ADDRESS_FILE; using primary validator proposer if available." >&2
 fi
-GOV_ADDRESS=$(cat "$GOV_ADDRESS_FILE")
-GOV_KEY_NAME="governance_key"
 
-echo "Governance address: ${GOV_ADDRESS}"
+resolve_proposer
 
 validate_height_param
 

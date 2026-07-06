@@ -42,8 +42,8 @@
 #
 # -- In-place upgrade (while devnet is running) ----------------
 #   make devnet-upgrade-version VERSION=v1.12.0     # upgrade to a pre-downloaded release
-#   make devnet-upgrade-1200                        # upgrade to locally-built v1.20.0 (EVM)
-#   make devnet-evm-upgrade                         # scripted v1.12.0 -> v1.20.0 evmigration flow
+#   make devnet-upgrade-1201                        # upgrade to locally-built v1.20.1 (EVM)
+#   make devnet-evm-upgrade                         # scripted v1.12.0 -> v1.20.1 evmigration flow
 #
 # -- External genesis / claims (override inputs to devnet-build) --
 #   make devnet-build \
@@ -660,8 +660,8 @@ devnet-update-scripts:
 		echo "No containers were updated. Ensure the devnet is running."; \
 	fi
 
-.PHONY: devnet-new-1111 devnet-new-1120
-.PHONY: devnet-upgrade-1110 devnet-upgrade-1111 devnet-upgrade-1120 devnet-upgrade-1200
+.PHONY: devnet-new-1120
+.PHONY: devnet-upgrade-1110 devnet-upgrade-1111 devnet-upgrade-1120 devnet-upgrade-1201
 .PHONY: devnet-evm-upgrade
 
 # Upgrade a running devnet to a pre-downloaded lumera version.
@@ -697,12 +697,9 @@ devnet-upgrade-1120:
 # Special case: upgrade to the locally-built version (devnet/bin, not
 # devnet/bin-<VERSION>). Stays separate from devnet-upgrade-version because
 # the binary source differs (local repo build vs pre-downloaded release).
-devnet-upgrade-1200:
+devnet-upgrade-1201:
 	@$(MAKE) devnet-refresh-bin
-	@cd devnet/scripts && ./upgrade.sh v1.20.0 auto-height ../bin
-
-devnet-new-1111:
-	@$(MAKE) devnet-new-version VERSION=v1.11.1
+	@cd devnet/scripts && ./upgrade.sh v1.20.1 auto-height ../bin
 
 devnet-new-1120:
 	@$(MAKE) devnet-new-version VERSION=v1.12.0
@@ -756,7 +753,7 @@ devnet-evm-upgrade:
 		exit 1; \
 	fi; \
 	echo "==> Stage: upgrade to $$EVM_VERSION"; \
-	if ! $(MAKE) devnet-upgrade-1200; then \
+	if ! $(MAKE) devnet-upgrade-1201; then \
 		echo "ERROR: stage upgrade to $$EVM_VERSION failed" >&2; \
 		exit 1; \
 	fi; \

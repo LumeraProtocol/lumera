@@ -149,8 +149,8 @@ func TestV1200SkipsEVMInitGenesis(t *testing.T) {
 		"upstream DefaultParams().EvmDenom should be the extended EVM denom — if this changes, review the fromVM skip in v1.20.0")
 }
 
-// When the EVM stack is already present (fromVM carries the EVM module — i.e. the
-// chain already ran v1.20.0), v1.20.1 is a migration-only hotfix: it runs
+// When the EVM stack is already present (fromVM carries ALL four EVM modules —
+// i.e. the chain already ran v1.20.0), v1.20.1 is a migration-only hotfix: it runs
 // RunMigrations without touching EVM params, so it needs no EVM keepers.
 func TestV1201HandlerMigrationOnlyWhenEVMPresent(t *testing.T) {
 	params := newTestUpgradeParams("lumera-testnet-2")
@@ -160,10 +160,30 @@ func TestV1201HandlerMigrationOnlyWhenEVMPresent(t *testing.T) {
 	require.NotNil(t, config.StoreUpgrade, "v1.20.1 declares the EVM store set on every network")
 
 	ctx := sdk.NewContext(nil, tmproto.Header{ChainID: "lumera-testnet-2"}, false, params.Logger)
-	fromVM := module.VersionMap{evmtypes.ModuleName: 1}
+	fromVM := module.VersionMap{
+		evmtypes.ModuleName:         1,
+		feemarkettypes.ModuleName:   1,
+		precisebanktypes.ModuleName: 1,
+		erc20types.ModuleName:       1,
+	}
 	vm, err := config.Handler(ctx, upgradetypes.Plan{}, fromVM)
 	require.NoError(t, err)
 	require.NotNil(t, vm)
+}
+
+// Partial EVM module state (some present, some absent) cannot arise from any
+// correct upgrade path, so v1.20.1 must fail closed rather than silently take the
+// migration-only path and skip EVM param finalization.
+func TestV1201HandlerFailsClosedOnPartialEVMState(t *testing.T) {
+	params := newTestUpgradeParams("lumera-testnet-2")
+	config, found := SetupUpgrades(upgrade_v1_20_1.UpgradeName, params)
+	require.True(t, found)
+
+	ctx := sdk.NewContext(nil, tmproto.Header{ChainID: "lumera-testnet-2"}, false, params.Logger)
+	fromVM := module.VersionMap{evmtypes.ModuleName: 1} // only 1 of 4 EVM modules
+	_, err := config.Handler(ctx, upgradetypes.Plan{}, fromVM)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "inconsistent EVM module state")
 }
 
 // Mainnet skips v1.20.0 outright: no handler runs and no stores are mounted, so

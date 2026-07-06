@@ -90,8 +90,6 @@ func AddOnlyStoreLoader(
 	baseUpgrades *storetypes.StoreUpgrades,
 	logger log.Logger,
 ) baseapp.StoreLoader {
-	fallbackLoader := upgradetypes.UpgradeStoreLoader(upgradeHeight, baseUpgrades)
-
 	return func(ms storetypes.CommitMultiStore) error {
 		if upgradeHeight != ms.LastCommitID().Version+1 {
 			return baseapp.DefaultStoreLoader(ms)
@@ -99,8 +97,13 @@ func AddOnlyStoreLoader(
 
 		existingStoreNames, err := loadExistingStoreNames(ms)
 		if err != nil {
-			logger.Error("Failed to load existing stores; falling back to standard upgrade loader", "error", err)
-			return fallbackLoader(ms)
+			// Fail closed. The whole point of the add-only diff is to never re-add
+			// an already-present store; falling back to a blind UpgradeStoreLoader
+			// here would try to add every declared EVM store, which on a chain that
+			// already ran v1.20.0 could halt during load. Better a loud, deterministic
+			// failure than a silent duplicate-add.
+			logger.Error("Failed to load existing stores for add-only upgrade; failing closed", "error", err)
+			return fmt.Errorf("add-only store loader: cannot determine existing stores at height %d: %w", upgradeHeight, err)
 		}
 
 		effective := computeAddOnlyStoreUpgrades(baseUpgrades, existingStoreNames)

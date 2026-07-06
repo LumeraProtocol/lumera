@@ -15,12 +15,13 @@ Make v1.20.1 carry the EVM bring-up **whenever EVM has not yet been initialized,
 
 ## Detection signal
 
-The SDK-canonical "has this module been initialized" signal is the `fromVM` (module → consensus version) map passed to the handler:
+The SDK-canonical "has this module been initialized" signal is the `fromVM` (module → consensus version) map passed to the handler. v1.20.0 registers **all four** cosmos/evm modules atomically (`evm`, `feemarket`, `precisebank`, `erc20`), so the handler inspects the whole set rather than a single module:
 
-- A chain that ran v1.20.0 has `fromVM["evm"]` set (v1.20.0 registered all four EVM modules).
-- A chain that skipped v1.20.0 does not.
+- **None present** → a chain that skipped v1.20.0 (direct one-hop) → run the full bring-up.
+- **All present** → a chain that ran v1.20.0 → migration-only hotfix.
+- **Some but not all present** → an impossible state under any correct upgrade path → **fail closed** with an error, rather than silently taking the hotfix path and skipping param finalization for the absent modules.
 
-`evmtypes.ModuleName == "evm"`. The presence of that key in `fromVM` is the state signal for the handler. Upgrades are atomic (a failed handler aborts the block with no commit), so store presence and `fromVM` presence are always consistent — v1.20.0 either fully ran (stores mounted + module versions registered) or not at all.
+Upgrades are atomic (a failed handler aborts the block with no commit), so store presence and `fromVM` presence are always consistent — v1.20.0 either fully ran (stores mounted + all four module versions registered) or not at all.
 
 ## Design
 
@@ -49,6 +50,7 @@ New loader `AddOnlyStoreLoader(height, baseUpgrades, logger)` in `store_upgrade_
 - Compute `Added = baseUpgrades.Added \ existing` — the declared EVM stores that are **absent** from committed state.
 - Never computes `Deleted` or `Renamed`. It can only add stores; it can never wipe one.
 - If `Added` is empty → `DefaultStoreLoader` (no-op). Otherwise `ms.LoadLatestVersionAndUpgrade(&StoreUpgrades{Added})`.
+- **Fails closed** if `loadExistingStoreNames` errors: it returns the error rather than falling back to a blind `UpgradeStoreLoader(baseUpgrades)`. A blind fallback would try to add every declared EVM store, which on a chain that already ran v1.20.0 could halt during load — defeating the whole no-op guarantee. A loud, deterministic failure is preferable.
 
 This is a deliberately narrowed form of `AdaptiveStoreLoader`: it keeps the state-driven "add what's missing" half and drops the `Deleted = existing − expected` half, because that half would silently `deleteKVStore()` any store the running binary fails to register — turning a wiring regression into irreversible, consensus-splitting data loss on mainnet. Add-only makes that class of bug impossible.
 
@@ -69,10 +71,13 @@ This is a deliberately narrowed form of `AdaptiveStoreLoader`: it keeps the stat
 
 ## Testing
 
-- `evmAlreadyInitialized`: true when `fromVM` has `"evm"`, false otherwise (table test).
-- Add-only store computation: `Added = base \ existing`; empty when all present; full when all absent; partial mix.
-- `SetupUpgrades` routing for v1.20.1: `StoreUpgrade` non-nil and contains the five EVM store keys for **mainnet, testnet, and devnet** chain-ids; `Handler` non-nil for all.
-- The full bring-up internals (migration_end_time per network, ERC20 params, denom metadata) remain covered by the existing `v1_20_0/upgrade_test.go` — not re-tested.
+- `evmModuleState`: partitions the four EVM modules into present/absent (all-present, all-absent, partial mix).
+- Handler paths: migration-only when all four present; **hard error** on partial state; the full-bring-up path (none present) is exercised end-to-end by the external mainnet test.
+- Add-only store computation: `Added = base \ existing`; empty when all present; full when all absent; partial mix; deletes/renames on the base are dropped.
+- **Real store loader** (`add_only_store_loader_test.go`): commit a pre-EVM store set (`auth`+`bank`) to an in-memory `rootmulti`, run `AddOnlyStoreLoader` at the upgrade height, and assert the EVM stores get mounted while existing data survives; plus a no-op case where the EVM stores already exist. This exercises the loader through a genuine committed multistore, not just the pure diff.
+- Add-only routing (`StoreLoaderForUpgrade`) selects the add-only loader for v1.20.1 with adaptive on **and** off.
+- `SetupUpgrades` routing for v1.20.1: `StoreUpgrade` non-nil and contains the EVM store keys for **mainnet, testnet, and devnet** chain-ids; `Handler` non-nil for all.
+- The full bring-up internals (migration_end_time per network, ERC20 params, denom metadata) remain covered by `v1_20_0/upgrade_test.go` and the external mainnet integration test — not re-tested.
 
 ### Existing tests affected
 

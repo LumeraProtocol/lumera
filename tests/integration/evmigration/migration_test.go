@@ -717,8 +717,9 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_Success() {
 	s.Require().NotNil(resp)
 
 	// --- Verify validator record re-keyed ---
-	// The old validator key is orphaned (RemoveValidator cannot be used on bonded
-	// validators without destroying distribution state). The new record is canonical.
+	// The old validator record is deleted by V8 (DeleteValidatorRecordNoHooks — a
+	// raw KV delete that avoids RemoveValidator's hooks, which would destroy
+	// distribution state). The new record is canonical.
 	newVal, err := s.app.StakingKeeper.GetValidator(s.ctx, newValAddr)
 	s.Require().NoError(err, "new validator should exist")
 	s.Require().Equal(newValAddr.String(), newVal.OperatorAddress)
@@ -1205,9 +1206,10 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_MultisigToMultisig() {
 	s.Require().Equal(newValAddr.String(), newVal.OperatorAddress)
 	s.Require().Equal(stakingtypes.Bonded, newVal.Status)
 
-	// Old operator's validator record is orphaned (no delegations remain);
-	// removing a bonded validator record outright would destroy distribution
-	// state, so the migration leaves it dangling. The new record is canonical.
+	// Old operator's delegations are all re-keyed away (none remain); its validator
+	// record is deleted by V8 (DeleteValidatorRecordNoHooks — a raw KV delete that
+	// avoids RemoveValidator's distribution-destroying hooks), leaving no orphan.
+	// The new record is canonical.
 	oldDels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, oldValAddr)
 	s.Require().NoError(err)
 	s.Require().Empty(oldDels)

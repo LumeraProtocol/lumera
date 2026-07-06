@@ -224,11 +224,6 @@ func (ms msgServer) migrateAccount(ctx sdk.Context, legacyAddr, newAddr sdk.AccA
 		return fmt.Errorf("migrate actions: %w", err)
 	}
 
-	// Step 8: Update claim destAddress.
-	if err := ms.MigrateClaim(ctx, legacyAddr, newAddr); err != nil {
-		return fmt.Errorf("migrate claim: %w", err)
-	}
-
 	return nil
 }
 

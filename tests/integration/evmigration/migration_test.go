@@ -28,6 +28,7 @@ import (
 
 	"github.com/LumeraProtocol/lumera/app"
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	evmigrationkeeper "github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
@@ -82,7 +83,7 @@ func signMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr
 	return sig
 }
 
-func signValidatorMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+func signValidatorMigration(t testing.TB, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
 	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:validator:%s:%s", integrationTestChainID, lcfg.EVMChainID, legacyAddr.String(), newAddr.String())
 	hash := sha256.Sum256([]byte(msg))
@@ -91,7 +92,7 @@ func signValidatorMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr
 	return sig
 }
 
-func signNewMigration(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+func signNewMigration(t testing.TB, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
 	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", integrationTestChainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
 	sig, err := privKey.Sign([]byte(msg))
@@ -99,7 +100,7 @@ func signNewMigration(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey
 	return sig
 }
 
-func createNewEVMAddress(t *testing.T) (*evmcryptotypes.PrivKey, sdk.AccAddress) {
+func createNewEVMAddress(t testing.TB) (*evmcryptotypes.PrivKey, sdk.AccAddress) {
 	t.Helper()
 	privKey, err := evmcryptotypes.GenerateKey()
 	require.NoError(t, err)
@@ -124,7 +125,7 @@ func newClaimMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.
 	}
 }
 
-func newValidatorMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.AccAddress, newPrivKey *evmcryptotypes.PrivKey, newAddr sdk.AccAddress) *types.MsgMigrateValidator {
+func newValidatorMsg(t testing.TB, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.AccAddress, newPrivKey *evmcryptotypes.PrivKey, newAddr sdk.AccAddress) *types.MsgMigrateValidator {
 	t.Helper()
 	return &types.MsgMigrateValidator{
 		LegacyAddress: legacyAddr.String(),
@@ -210,6 +211,39 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Success() {
 	count, err := s.keeper.MigrationCounter.Get(s.ctx)
 	s.Require().NoError(err)
 	s.Require().Equal(uint64(1), count, "migration counter should be exactly 1")
+}
+
+// TestClaimLegacyAccount_LeavesClaimRecordUntouched verifies migration does NOT
+// rewrite claim records whose DestAddress points at the legacy address. The
+// claim DB is frozen (claiming ended 2025-01-01) and retained for reference
+// only; the legacy->new mapping lives in MigrationRecords, so the per-migration
+// full scan of the claim store (unscopable — no DestAddress index) was removed
+// from the hot path.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_LeavesClaimRecordUntouched() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
+	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	// Seed a claim record whose DestAddress points at the migrating legacy addr.
+	const oldAddress = "pastel1legacyoldaddress"
+	s.Require().NoError(s.app.ClaimKeeper.SetClaimRecord(s.ctx, claimtypes.ClaimRecord{
+		OldAddress:  oldAddress,
+		DestAddress: legacyAddr.String(),
+	}))
+
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	s.Require().NoError(err)
+
+	// The claim record must be left exactly as-is: still present, DestAddress
+	// unchanged. Migration must not touch the claim store.
+	got, found, err := s.app.ClaimKeeper.GetClaimRecord(s.ctx, oldAddress)
+	s.Require().NoError(err)
+	s.Require().True(found, "claim record should still exist after migration")
+	s.Require().Equal(legacyAddr.String(), got.DestAddress,
+		"migration must not rewrite claim record DestAddress")
 }
 
 // TestClaimLegacyAccount_MigratesAndRevokesFeegrants verifies that feegrant
@@ -683,8 +717,9 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_Success() {
 	s.Require().NotNil(resp)
 
 	// --- Verify validator record re-keyed ---
-	// The old validator key is orphaned (RemoveValidator cannot be used on bonded
-	// validators without destroying distribution state). The new record is canonical.
+	// The old validator record is deleted by V8 (DeleteValidatorRecordNoHooks — a
+	// raw KV delete that avoids RemoveValidator's hooks, which would destroy
+	// distribution state). The new record is canonical.
 	newVal, err := s.app.StakingKeeper.GetValidator(s.ctx, newValAddr)
 	s.Require().NoError(err, "new validator should exist")
 	s.Require().Equal(newValAddr.String(), newVal.OperatorAddress)
@@ -843,6 +878,79 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_JailedValidator() {
 
 	_, err = s.app.StakingKeeper.GetValidator(s.ctx, sdk.ValAddress(newAddr))
 	s.Require().Error(err, "destination validator must not be created")
+}
+
+// TestMigrateValidator_UnbondedNotJailedSucceeds verifies the recovery path for a
+// validator that fell out of the active set purely on stake weight (Unbonded, NOT
+// jailed). Such a validator has no entry in the unbonding-validator queue, so
+// re-keying and deleting the old record cannot orphan a queue entry (the halt risk
+// that keeps Unbonding blocked). Migration must therefore succeed, unblocking the
+// operator to recover keys, funds, and rewards without re-entering the active set.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_UnbondedNotJailedSucceeds() {
+	s.enableMigration()
+
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(operatorCoins)
+	oldValAddr, extDelegatorAddr := s.createTestValidator(legacyAddr, selfBondAmt)
+
+	// Simulate dropping out of the active set on stake weight: Unbonded, NOT
+	// jailed, and removed from the bonded power set (no last-validator-power entry).
+	val, err := s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	s.Require().False(val.Jailed, "precondition: validator is not jailed")
+	s.Require().NoError(s.app.StakingKeeper.DeleteValidatorByPowerIndex(s.ctx, val))
+	s.Require().NoError(s.app.StakingKeeper.DeleteLastValidatorPower(s.ctx, oldValAddr))
+	val.Status = stakingtypes.Unbonded
+	s.Require().NoError(s.app.StakingKeeper.SetValidator(s.ctx, val))
+
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	newValAddr := sdk.ValAddress(newAddr)
+
+	msg := newValidatorMsg(s.T(), legacyPrivKey, legacyAddr, newPrivKey, newAddr)
+	resp, err := s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().NoError(err, "unbonded (non-jailed) validator must be migratable")
+	s.Require().NotNil(resp)
+
+	// Validator record re-keyed to the new operator, still Unbonded.
+	newVal, err := s.app.StakingKeeper.GetValidator(s.ctx, newValAddr)
+	s.Require().NoError(err, "new validator should exist")
+	s.Require().Equal(newValAddr.String(), newVal.OperatorAddress)
+	s.Require().Equal(stakingtypes.Unbonded, newVal.Status)
+
+	// Old validator record is deleted (V8), leaving no orphan.
+	_, err = s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().Error(err, "old validator record should be deleted")
+
+	// Delegations re-keyed to the new validator; none left on the old.
+	dels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, newValAddr)
+	s.Require().NoError(err)
+	s.Require().Len(dels, 2, "self-delegation + external delegation re-keyed")
+	oldDels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	s.Require().Empty(oldDels)
+
+	// Distribution state re-keyed.
+	_, err = s.app.DistrKeeper.GetValidatorCurrentRewards(s.ctx, newValAddr)
+	s.Require().NoError(err, "current rewards should exist for new validator")
+
+	// Bank balances moved.
+	s.Require().True(s.app.BankKeeper.GetAllBalances(s.ctx, legacyAddr).IsZero())
+	s.Require().True(s.app.BankKeeper.GetAllBalances(s.ctx, newAddr).AmountOf("ulume").GT(sdkmath.ZeroInt()))
+
+	// Migration record + validator counter.
+	record, err := s.keeper.MigrationRecords.Get(s.ctx, legacyAddr.String())
+	s.Require().NoError(err)
+	s.Require().Equal(newAddr.String(), record.NewAddress)
+	valCount, err := s.keeper.ValidatorMigrationCounter.Get(s.ctx)
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(1), valCount)
+
+	// External delegator's delegation now points to the new validator.
+	extDels, err := s.app.StakingKeeper.GetDelegatorDelegations(s.ctx, extDelegatorAddr, 10)
+	s.Require().NoError(err)
+	s.Require().Len(extDels, 1)
+	s.Require().Equal(newValAddr.String(), extDels[0].ValidatorAddress)
 }
 
 // TestClaimLegacyAccount_LegacyAccountRemoved verifies that the legacy auth
@@ -1098,9 +1206,10 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_MultisigToMultisig() {
 	s.Require().Equal(newValAddr.String(), newVal.OperatorAddress)
 	s.Require().Equal(stakingtypes.Bonded, newVal.Status)
 
-	// Old operator's validator record is orphaned (no delegations remain);
-	// removing a bonded validator record outright would destroy distribution
-	// state, so the migration leaves it dangling. The new record is canonical.
+	// Old operator's delegations are all re-keyed away (none remain); its validator
+	// record is deleted by V8 (DeleteValidatorRecordNoHooks — a raw KV delete that
+	// avoids RemoveValidator's distribution-destroying hooks), leaving no orphan.
+	// The new record is canonical.
 	oldDels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, oldValAddr)
 	s.Require().NoError(err)
 	s.Require().Empty(oldDels)

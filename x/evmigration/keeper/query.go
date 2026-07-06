@@ -180,15 +180,17 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 			resp.ValUnbondingCount = uint64(len(ubds))
 		}
 		// Count redelegations where the validator is source OR destination
-		// (both are re-keyed during migration).
-		var redCount uint64
-		_ = qs.k.stakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) bool {
-			if red.ValidatorSrcAddress == valAddr.String() || red.ValidatorDstAddress == valAddr.String() {
-				redCount++
-			}
-			return false
-		})
-		resp.ValRedelegationCount = redCount
+		// (both are re-keyed during migration). Unlike the delegation/unbonding
+		// keeper reads above, the scoped redelegation lookup can fail on a
+		// corrupt src/dst index (an index row pointing at a missing record). We
+		// must NOT swallow that: undercounting redelegations would shrink
+		// totalRecords and could flip WouldSucceed to true for a validator whose
+		// real footprint exceeds MaxValidatorDelegations. Fail the estimate loudly.
+		reds, err := qs.k.redelegationsForValidator(ctx, valAddr)
+		if err != nil {
+			return nil, fmt.Errorf("count redelegations for validator %s: %w", valAddr, err)
+		}
+		resp.ValRedelegationCount = uint64(len(reds))
 
 		// Surface the validator's BondStatus + Jailed flag so callers can
 		// display the actionable cause when WouldSucceed is false. Jailed
@@ -212,12 +214,15 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 				"validator is jailed (status: %s); restart the node, wait for catch-up, then `lumerad tx slashing unjail`",
 				strings.ToLower(strings.TrimPrefix(val.Status.String(), "BOND_STATUS_")),
 			)
-		case val.Status == stakingtypes.Unbonding || val.Status == stakingtypes.Unbonded:
+		case val.Status == stakingtypes.Unbonding:
+			// Reject only Unbonding — an Unbonding validator still holds a live
+			// unbonding-validator-queue entry keyed by the old operator address;
+			// migrating would orphan it and halt the chain at maturity. Once the
+			// unbonding period elapses the validator becomes Unbonded (queue entry
+			// dequeued) and IS migratable, so the guidance is to wait, not re-bond.
+			// Unbonded (not jailed) falls through to the default → would_succeed=true.
 			resp.WouldSucceed = false
-			resp.RejectionReason = fmt.Sprintf(
-				"validator status is %s (not bonded); migration requires the validator to be in the active set",
-				strings.ToLower(strings.TrimPrefix(val.Status.String(), "BOND_STATUS_")),
-			)
+			resp.RejectionReason = "validator is unbonding; wait for the unbonding period to complete, then migrate"
 		default:
 			resp.WouldSucceed = true
 		}

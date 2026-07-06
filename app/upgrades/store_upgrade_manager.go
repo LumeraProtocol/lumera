@@ -77,6 +77,75 @@ func AdaptiveStoreLoader(
 	}
 }
 
+// AddOnlyStoreLoader builds a store loader that mounts the store keys declared in
+// baseUpgrades.Added that are NOT already present in committed state, and never
+// deletes or renames anything. Unlike AdaptiveStoreLoader it does not diff against
+// the app's expected store set, so it cannot be tricked by a binary that fails to
+// register a store into wiping that store's data. It is safe on any network,
+// which is why the state-driven v1.20.1 EVM bring-up uses it: on a chain that
+// already mounted the EVM stores (ran v1.20.0) it is a no-op; on a one-hop chain
+// it mounts the missing EVM stores.
+func AddOnlyStoreLoader(
+	upgradeHeight int64,
+	baseUpgrades *storetypes.StoreUpgrades,
+	logger log.Logger,
+) baseapp.StoreLoader {
+	return func(ms storetypes.CommitMultiStore) error {
+		if upgradeHeight != ms.LastCommitID().Version+1 {
+			return baseapp.DefaultStoreLoader(ms)
+		}
+
+		existingStoreNames, err := loadExistingStoreNames(ms)
+		if err != nil {
+			// Fail closed. The whole point of the add-only diff is to never re-add
+			// an already-present store; falling back to a blind UpgradeStoreLoader
+			// here would try to add every declared EVM store, which on a chain that
+			// already ran v1.20.0 could halt during load. Better a loud, deterministic
+			// failure than a silent duplicate-add.
+			logger.Error("Failed to load existing stores for add-only upgrade; failing closed", "error", err)
+			return fmt.Errorf("add-only store loader: cannot determine existing stores at height %d: %w", upgradeHeight, err)
+		}
+
+		effective := computeAddOnlyStoreUpgrades(baseUpgrades, existingStoreNames)
+		if len(effective.Added) == 0 {
+			logger.Info("No stores to add after diff; loading latest version", "height", upgradeHeight)
+			return baseapp.DefaultStoreLoader(ms)
+		}
+
+		logger.Info(
+			"Applying add-only store upgrades",
+			"height", upgradeHeight,
+			"added", effective.Added,
+		)
+
+		return ms.LoadLatestVersionAndUpgrade(&effective)
+	}
+}
+
+// computeAddOnlyStoreUpgrades returns the subset of baseUpgrades.Added that is not
+// already present in committed state. Deletions and renames declared on
+// baseUpgrades are intentionally dropped: this loader can only add stores.
+func computeAddOnlyStoreUpgrades(
+	baseUpgrades *storetypes.StoreUpgrades,
+	existingStoreNames map[string]struct{},
+) storetypes.StoreUpgrades {
+	if baseUpgrades == nil {
+		return storetypes.StoreUpgrades{}
+	}
+	if existingStoreNames == nil {
+		existingStoreNames = map[string]struct{}{}
+	}
+
+	added := make(map[string]struct{})
+	for _, name := range baseUpgrades.Added {
+		if _, exists := existingStoreNames[name]; !exists {
+			added[name] = struct{}{}
+		}
+	}
+
+	return storetypes.StoreUpgrades{Added: sortedKeys(added)}
+}
+
 type commitInfoReader interface {
 	GetCommitInfo(int64) (*storetypes.CommitInfo, error)
 }

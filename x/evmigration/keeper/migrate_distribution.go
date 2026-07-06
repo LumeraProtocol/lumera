@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 )
 
 // MigrateDistribution withdraws all pending delegation rewards for legacyAddr,
@@ -109,46 +108,28 @@ func (k Keeper) incrementHistoricalRewardsReferenceCount(ctx sdk.Context, valAdd
 	return k.adjustHistoricalRewardsReferenceCount(ctx, valAddr, period, 1, false)
 }
 
-// resetHistoricalRewardsReferenceCount sets the reference count to 1 (base only),
-// clearing stale delegator references before re-creating delegations.
-func (k Keeper) resetHistoricalRewardsReferenceCount(ctx sdk.Context, valAddr sdk.ValAddress, period uint64) error {
-	var (
-		found      bool
-		historical distrtypes.ValidatorHistoricalRewards
-	)
-
-	k.distributionKeeper.IterateValidatorHistoricalRewards(ctx, func(val sdk.ValAddress, p uint64, rewards distrtypes.ValidatorHistoricalRewards) (stop bool) {
-		if val.Equals(valAddr) && p == period {
-			found = true
-			historical = rewards
-			return true
-		}
-		return false
-	})
-
+// setHistoricalRewardsReferenceCount overwrites the reference count of a single
+// (valAddr, period) historical rewards row. Used to set the count in one write
+// instead of a reset-then-increment-per-delegation loop, clearing stale
+// delegator references in the process.
+func (k Keeper) setHistoricalRewardsReferenceCount(ctx sdk.Context, valAddr sdk.ValAddress, period uint64, count uint32) error {
+	historical, found, err := k.validatorHistoricalReward(ctx, valAddr, period)
+	if err != nil {
+		return err
+	}
 	if !found {
 		return fmt.Errorf("validator historical rewards not found for %s period %d", valAddr.String(), period)
 	}
 
-	historical.ReferenceCount = 1
+	historical.ReferenceCount = count
 	return k.distributionKeeper.SetValidatorHistoricalRewards(ctx, valAddr, period, historical)
 }
 
 func (k Keeper) adjustHistoricalRewardsReferenceCount(ctx sdk.Context, valAddr sdk.ValAddress, period uint64, delta int64, repairZero bool) error {
-	var (
-		found      bool
-		historical distrtypes.ValidatorHistoricalRewards
-	)
-
-	k.distributionKeeper.IterateValidatorHistoricalRewards(ctx, func(val sdk.ValAddress, p uint64, rewards distrtypes.ValidatorHistoricalRewards) (stop bool) {
-		if val.Equals(valAddr) && p == period {
-			found = true
-			historical = rewards
-			return true
-		}
-		return false
-	})
-
+	historical, found, err := k.validatorHistoricalReward(ctx, valAddr, period)
+	if err != nil {
+		return err
+	}
 	if !found {
 		return fmt.Errorf("validator historical rewards not found for %s period %d", valAddr.String(), period)
 	}

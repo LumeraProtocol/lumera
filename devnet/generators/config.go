@@ -9,7 +9,7 @@ const (
 	DefaultSupernodePort             = 4444
 	DefaultSupernodeP2PPort          = 4445
 	DefaultSupernodeGatewayPort      = 8002
-	DefaultLumeraUploaderGRPCPort    = 50051
+	DefaultLumeraUploaderGRPCPort    = 15051
 	DefaultLumeraUploaderHTTPPort    = 8080
 	DefaultLumeraUploaderUIPort      = 8088
 	DefaultGRPCWebPort               = 9091

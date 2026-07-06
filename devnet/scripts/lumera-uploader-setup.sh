@@ -28,7 +28,7 @@
 # Environment:
 #   MONIKER            - Validator moniker, set by docker-compose
 #   START_MODE         - "run" (default) or "wait"
-#   NM_GRPC_PORT       - gRPC listen port (default 50051)
+#   NM_GRPC_PORT       - gRPC listen port (default 15051)
 #   NM_HTTP_PORT       - HTTP gateway port (default 8080)
 #
 set -euo pipefail
@@ -92,7 +92,7 @@ NM_FILES_DIR_SHARED="/shared/nm-files"  # Shared scanner directory (across conta
 NM_LOG="${NM_LOG:-/root/logs/${NM}.log}"
 NM_TEMPLATE="${RELEASE_DIR}/uploader-config.toml"  # Config template from host
 NM_CONFIG="${NM_HOME}/config.toml"           # Active config (patched from template)
-NM_GRPC_PORT="${NM_GRPC_PORT:-50051}"
+NM_GRPC_PORT="${NM_GRPC_PORT:-15051}"
 NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"
 
 echo "[UL] Using uploader binary name: ${NM}"
@@ -194,7 +194,7 @@ VAL_REC_JSON="$(jq -c --arg m "$MONIKER" '[.[] | select(.moniker==$m)][0]' "${CF
 NM_ENABLED="$(echo "${VAL_REC_JSON}" | jq -r 'try .["lumera-uploader"].enabled // .["lumera-uploader"] // "false"')"
 NM_GRPC_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["lumera-uploader"].grpc_port // empty')"
 NM_HTTP_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["lumera-uploader"].http_port // empty')"
-if [ -z "${NM_GRPC_PORT}" ] || [ "${NM_GRPC_PORT}" = "null" ]; then NM_GRPC_PORT="${NM_GRPC_PORT:-50051}"; fi
+if [ -z "${NM_GRPC_PORT}" ] || [ "${NM_GRPC_PORT}" = "null" ]; then NM_GRPC_PORT="${NM_GRPC_PORT:-15051}"; fi
 if [ -z "${NM_HTTP_PORT}" ] || [ "${NM_HTTP_PORT}" = "null" ]; then NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"; fi
 
 # ─── Short-Circuit Checks ─────────────────────────────────────────────────────

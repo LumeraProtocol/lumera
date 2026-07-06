@@ -475,7 +475,7 @@ These parameters affect **RPC node operators** and **dApp developers**, not end-
 | `enable_migration` | `true` | Yes — disable after migration window closes |
 | `migration_end_time` | `0` (no deadline) | **Yes — set a deadline for mainnet** |
 | `max_migrations_per_block` | `50` | Review based on expected migration volume |
-| `max_validator_delegations` | `2,000` | Review based on largest validator delegation count |
+| `max_validator_delegations` | `2,500` | Review based on largest validator delegation count |
 
 **Recommendation:** **Set `migration_end_time` to a specific date before mainnet.** Open-ended migration windows are a governance and security risk. Consider 30-90 days post-launch.
 

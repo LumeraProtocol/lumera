@@ -51,7 +51,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Unit**        | OpenRPC / generator                  | 15    | High — [details](tests/unit-openrpc.md) |
 | **Unit**        | JSON-RPC rate limiting               | 25    | High — right-to-left XFF parsing, trusted-hop skipping, CIDR parsing |
 | **Unit**        | ERC20 policy                         | 14    | High — 3 modes, base denom + exact ibc/ allowlist CRUD |
-| **Unit**        | EVMigration keeper                   | 124+  | Excellent — [details](tests/unit-evmigration.md) |
+| **Unit**        | EVMigration keeper                   | 136+  | Excellent — [details](tests/unit-evmigration.md) |
 | **Unit**        | EVMigration types (proof)            | 6     | High — `TestMultisigProof_ValidateBasic`, `TestMultisigProof_ValidateParams_SizeCap`, `TestLegacyProof_ValidateBasic_Dispatch`, `TestSingleKeyProof_ValidateBasic` and variants |
 | **Unit**        | EVMigration CLI                      | 26    | High — [details](tests/unit-evmigration-cli.md) |
 | **Unit**        | Cross-runtime bridge (plugin helpers + crossruntime) | 46 | High — [details](tests/integration-precompiles.md#cosmwasm---evm-plugin-unit-tests) |
@@ -65,7 +65,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Integration** | Precisebank                          | 6     | High — [details](tests/integration-precisebank.md) |
 | **Integration** | Precompiles (standard + custom + wasm) | 42   | High — [details](tests/integration-precompiles.md) |
 | **Integration** | VM queries / state                   | 12    | High — [details](tests/integration-vm.md) |
-| **Integration** | EVMigration                          | 14 core + 4 mempool broadcast regressions | High — [details](tests/integration-evmigration.md) |
+| **Integration** | EVMigration                          | 15 core + 4 mempool broadcast regressions + 1 on-demand benchmark | High — [details](tests/integration-evmigration.md) |
 |                 |                                      |       |                  |
 | **Devnet**      | EVM / fee market / cross-peer / IBC  | 12+   | High — [details](tests/devnet.md) |
 | **Devnet**      | EVMigration tool                     | 7 modes | High — [details](tests/devnet.md#evm-migration-devnet-tests) |
@@ -115,7 +115,7 @@ Each area has its own detailed file with per-test descriptions:
 | Fee market (EIP-1559) | [unit-feemarket.md](tests/unit-feemarket.md) | 9 |
 | Precisebank (6↔18 bridge) | [unit-precisebank.md](tests/unit-precisebank.md) | 39 |
 | OpenRPC & generator | [unit-openrpc.md](tests/unit-openrpc.md) | 15 |
-| EVMigration keeper | [unit-evmigration.md](tests/unit-evmigration.md) | 124+ |
+| EVMigration keeper | [unit-evmigration.md](tests/unit-evmigration.md) | 136+ |
 | EVMigration types (proof) | `x/evmigration/types/proof_test.go` | 6 |
 | EVMigration CLI | [unit-evmigration-cli.md](tests/unit-evmigration-cli.md) | 26 |
 
@@ -132,7 +132,7 @@ Each area has its own detailed file with per-test descriptions:
 | Precisebank | [integration-precisebank.md](tests/integration-precisebank.md) | 6 |
 | Precompiles (standard + custom + wasm + crossruntime) | [integration-precompiles.md](tests/integration-precompiles.md) | 42 |
 | VM queries / state | [integration-vm.md](tests/integration-vm.md) | 12 |
-| EVMigration | [integration-evmigration.md](tests/integration-evmigration.md) | 14 core + 4 mempool broadcast regressions |
+| EVMigration | [integration-evmigration.md](tests/integration-evmigration.md) | 15 core (incl. `TestMigrateValidatorAtScale`, ~6000-record scale gate) + 4 mempool broadcast regressions + 1 on-demand scaling benchmark (`BenchmarkMigrateValidatorScaling`, excluded from pipeline) |
 
 ### Devnet Tests
 

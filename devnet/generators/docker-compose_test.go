@@ -124,3 +124,37 @@ func TestGenerateDockerComposeDoesNotDisableValidatorOneHostReporterByDefault(t 
 		t.Fatalf("EVERLIGHT_TEST_TARGET = %q, want %q", got, "0")
 	}
 }
+
+func TestGenerateDockerComposeUsesLumeraUploaderDefaultGRPCPort(t *testing.T) {
+	cfg := newEVMChainConfig("v1.12.0")
+	validators := []confg.Validator{
+		{
+			Name:     "supernova_validator_3",
+			Moniker:  "validator-3",
+			Port:     26686,
+			RPCPort:  26687,
+			RESTPort: 1347,
+			GRPCPort: 9093,
+			LumeraUploader: struct {
+				Enabled  bool `json:"enabled,omitempty"`
+				GRPCPort int  `json:"grpc_port,omitempty"`
+				HTTPPort int  `json:"http_port,omitempty"`
+			}{
+				Enabled: true,
+			},
+		},
+	}
+
+	compose, err := GenerateDockerCompose(cfg, validators, false)
+	if err != nil {
+		t.Fatalf("GenerateDockerCompose() error = %v", err)
+	}
+
+	ports := compose.Services["supernova_validator_3"].Ports
+	if !hasPort(ports, "15051:15051") {
+		t.Fatalf("lumera-uploader default gRPC mapping missing; got ports %v", ports)
+	}
+	if containsContainerPort(ports, "50051") {
+		t.Fatalf("lumera-uploader should not publish reserved container port 50051 by default; got ports %v", ports)
+	}
+}

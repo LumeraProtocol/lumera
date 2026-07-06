@@ -49,7 +49,6 @@ func initFixture(t *testing.T) *fixture {
 		nil, // feegrantKeeper
 		nil, // supernodeKeeper
 		nil, // actionKeeper
-		nil, // claimKeeper
 	)
 
 	// Initialize params and counters

@@ -45,7 +45,7 @@ x/evmigration/
 | `enable_migration`          | `true` | Master switch                          |
 | `migration_end_time`        | `0`    | Unix timestamp deadline                |
 | `max_migrations_per_block`  | `50`   | Rate limit                             |
-| `max_validator_delegations` | `2000` | Max delegators for validator migration |
+| `max_validator_delegations` | `2500` | Max delegators for validator migration |
 
 ### Fee waiving
 
@@ -64,8 +64,7 @@ x/evmigration/
 8. Re-key feegrant allowances
 9. Update supernode account field
 10. Update action creator/supernode references
-11. Update claim destAddress
-12. Store MigrationRecord, increment counters, emit event
+11. Store MigrationRecord, increment counters, emit event
 
 ### Queries
 

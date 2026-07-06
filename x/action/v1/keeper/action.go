@@ -515,6 +515,46 @@ func (k *Keeper) IterateActions(ctx sdk.Context, handler func(*actiontypes.Actio
 	return nil
 }
 
+// GetActionsByCreator returns every action whose Creator equals the given
+// address, resolved through the creator secondary index rather than a
+// full-store scan.
+func (k *Keeper) GetActionsByCreator(ctx sdk.Context, creator string) ([]*actiontypes.Action, error) {
+	return k.getActionsByIndexPrefix(ctx, ActionByCreatorPrefix+creator+"/")
+}
+
+// GetActionsBySuperNode returns every action that lists the given address in
+// its SuperNodes field, resolved through the supernode secondary index rather
+// than a full-store scan.
+func (k *Keeper) GetActionsBySuperNode(ctx sdk.Context, supernode string) ([]*actiontypes.Action, error) {
+	return k.getActionsByIndexPrefix(ctx, ActionBySuperNodePrefix+supernode+"/")
+}
+
+// getActionsByIndexPrefix scans a secondary-index prefix whose keys carry the
+// action ID as their suffix and returns the resolved actions.
+func (k *Keeper) getActionsByIndexPrefix(ctx sdk.Context, indexPrefix string) ([]*actiontypes.Action, error) {
+	store := k.storeService.OpenKVStore(ctx)
+	prefixBytes := []byte(indexPrefix)
+
+	iter, err := store.Iterator(prefixBytes, storetypes.PrefixEndBytes(prefixBytes))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create iterator for action index")
+	}
+	defer func() { _ = iter.Close() }()
+
+	var actions []*actiontypes.Action
+	for ; iter.Valid(); iter.Next() {
+		actionID := string(iter.Key()[len(prefixBytes):])
+		action, found := k.GetActionByID(ctx, actionID)
+		if !found {
+			// Stale or corrupted index entry; skip but keep scanning.
+			k.Logger().Error("action referenced in index not found", "action_id", actionID, "index_prefix", indexPrefix)
+			continue
+		}
+		actions = append(actions, action)
+	}
+	return actions, nil
+}
+
 // IterateActionsByState iterates over actions with a specific state
 func (k *Keeper) IterateActionsByState(ctx sdk.Context, state actiontypes.ActionState, handler func(*actiontypes.Action) bool) error {
 	store := k.storeService.OpenKVStore(ctx)

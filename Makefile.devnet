@@ -711,7 +711,7 @@ devnet-evm-upgrade:
 	@echo "Logging to $(DEVNET_EVM_UPGRADE_LOG)"
 	@bash -c 'set -euo pipefail; { \
 	BASE_VERSION=v1.12.0; \
-	EVM_VERSION=v1.20.0; \
+	EVM_VERSION=v1.20.1; \
 	echo "==> Stage: install $$BASE_VERSION devnet"; \
 	if ! $(MAKE) devnet-down; then \
 		echo "ERROR: stage install $$BASE_VERSION devnet failed during devnet-down" >&2; \

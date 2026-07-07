@@ -169,4 +169,12 @@ func TestActivityTargetsRespectExistingFlag(t *testing.T) {
 	if withExisting[0] != existing || withExisting[1] != created {
 		t.Fatalf("targets with existing activity = %v, want existing then created", withExisting)
 	}
+
+	resumeTargets := activityTargets(reg, nil, false)
+	if len(resumeTargets) != 2 {
+		t.Fatalf("targets on resume with no new records = %d, want 2 funded accounts", len(resumeTargets))
+	}
+	if resumeTargets[0] != existing || resumeTargets[1] != created {
+		t.Fatalf("targets on resume with no new records = %v, want existing then created", resumeTargets)
+	}
 }

@@ -35,6 +35,30 @@ func TestAddKeyWithStylePassesExplicitKeyStyleFlags(t *testing.T) {
 	})
 }
 
+func TestEnvWithoutDesktopBusStripsDBusSession(t *testing.T) {
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:abstract=/tmp/dbus-test")
+	t.Setenv("LUMERA_TEST_KEEP", "yes")
+
+	env := envWithoutDesktopBus()
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "DBUS_SESSION_BUS_ADDRESS=") {
+			t.Fatalf("envWithoutDesktopBus kept DBUS_SESSION_BUS_ADDRESS: %q", kv)
+		}
+	}
+	if !containsEnv(env, "LUMERA_TEST_KEEP=yes") {
+		t.Fatalf("envWithoutDesktopBus dropped unrelated env var: %v", env)
+	}
+}
+
+func containsEnv(env []string, want string) bool {
+	for _, kv := range env {
+		if kv == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestParseSyncBroadcastHandlesQueryTxResponse(t *testing.T) {
 	out := `{
 		"tx_response": {

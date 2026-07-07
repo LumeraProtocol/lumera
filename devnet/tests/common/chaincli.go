@@ -1,9 +1,11 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -63,8 +65,45 @@ func (c *ChainCLI) runWithFlags(includeNode, includeKeyring bool, args ...string
 		base = append(base, "--home", c.Home)
 	}
 	all := append(append([]string{}, args...), base...)
-	out, err := exec.Command(c.Bin, all...).CombinedOutput()
+	out, err := combinedOutputNoDesktopBus(c.Bin, all...)
 	return strings.TrimSpace(string(out)), err
+}
+
+func combinedOutputNoDesktopBus(bin string, args ...string) ([]byte, error) {
+	cmd, cancel := commandNoDesktopBus(bin, args...)
+	defer cancel()
+	return cmd.CombinedOutput()
+}
+
+func commandNoDesktopBus(bin string, args ...string) (*exec.Cmd, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout())
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Env = envWithoutDesktopBus()
+	return cmd, cancel
+}
+
+func commandTimeout() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("LUMERA_CLI_TIMEOUT"))
+	if raw == "" {
+		return 30 * time.Second
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return 30 * time.Second
+	}
+	return d
+}
+
+func envWithoutDesktopBus() []string {
+	env := os.Environ()
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "DBUS_SESSION_BUS_ADDRESS=") {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
 }
 
 func (c *ChainCLI) keyringBackend() string {
@@ -182,7 +221,7 @@ func (c *ChainCLI) Balance(addr string) (int64, error) {
 // ShowAddress returns the bech32 address for a keyring key name.
 func (c *ChainCLI) ShowAddress(name string) (string, error) {
 	args := append([]string{"keys", "show", name, "--keyring-backend", c.keyringBackend(), "--address"}, c.homeArgs()...)
-	out, err := exec.Command(c.Bin, args...).CombinedOutput()
+	out, err := combinedOutputNoDesktopBus(c.Bin, args...)
 	if err != nil {
 		return "", fmt.Errorf("keys show %s: %s: %w", name, strings.TrimSpace(string(out)), err)
 	}
@@ -217,7 +256,7 @@ func (c *ChainCLI) AddKeyWithStyle(name string, style KeyStyle) (GeneratedKey, e
 		"--algo", style.Algo,
 	}
 	args = append(args, c.homeArgs()...)
-	out, err := exec.Command(c.Bin, args...).CombinedOutput()
+	out, err := combinedOutputNoDesktopBus(c.Bin, args...)
 	if err != nil {
 		return GeneratedKey{}, fmt.Errorf("keys add %s: %s: %w", name, strings.TrimSpace(string(out)), err)
 	}
@@ -238,7 +277,8 @@ func (c *ChainCLI) AddKeyWithStyle(name string, style KeyStyle) (GeneratedKey, e
 // name already exists.
 func (c *ChainCLI) ImportKey(name, mnemonic string) (string, error) {
 	args := append([]string{"keys", "add", name, "--keyring-backend", c.keyringBackend(), "--recover", "--output", "json"}, c.homeArgs()...)
-	cmd := exec.Command(c.Bin, args...)
+	cmd, cancel := commandNoDesktopBus(c.Bin, args...)
+	defer cancel()
 	cmd.Stdin = strings.NewReader(mnemonic + "\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil {

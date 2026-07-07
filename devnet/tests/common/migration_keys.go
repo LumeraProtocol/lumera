@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -31,10 +32,14 @@ func recoverKeyArgs(name, keyringBackend string, style KeyStyle, home string) []
 // coin-type-118 secp256k1 legacy key. Reruns should delete a stale key first.
 func (c *ChainCLI) ImportKeyWithStyle(name, mnemonic string, style KeyStyle) (string, error) {
 	args := recoverKeyArgs(name, c.keyringBackend(), style, c.Home)
-	cmd, cancel := commandNoDesktopBus(c.Bin, args...)
+	cmd, cancel, ctx, release := commandNoDesktopBus(c.Bin, args...)
 	defer cancel()
+	defer release()
 	cmd.Stdin = strings.NewReader(mnemonic + "\n")
 	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", fmt.Errorf("keys add --recover %s: timeout after %s running %s: %w", name, commandTimeout(), commandString(c.Bin, args...), ctx.Err())
+	}
 	if err != nil {
 		return "", fmt.Errorf("keys add --recover %s: %s: %w", name, strings.TrimSpace(string(out)), err)
 	}

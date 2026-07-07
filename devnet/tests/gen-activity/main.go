@@ -512,12 +512,30 @@ func envWithoutDesktopBus() []string {
 	env := os.Environ()
 	out := make([]string, 0, len(env))
 	for _, kv := range env {
-		if strings.HasPrefix(kv, "DBUS_SESSION_BUS_ADDRESS=") {
+		if isDesktopSessionEnv(kv) {
 			continue
 		}
 		out = append(out, kv)
 	}
 	return out
+}
+
+func isDesktopSessionEnv(kv string) bool {
+	for _, prefix := range []string{
+		"DBUS_SESSION_BUS_ADDRESS=",
+		"DISPLAY=",
+		"WAYLAND_DISPLAY=",
+		"XDG_RUNTIME_DIR=",
+		"XDG_CURRENT_DESKTOP=",
+		"DESKTOP_SESSION=",
+		"GNOME_DESKTOP_SESSION_ID=",
+		"KDE_FULL_SESSION=",
+	} {
+		if strings.HasPrefix(kv, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // loadOrCreateRegistry loads an existing registry or creates a fresh one. A

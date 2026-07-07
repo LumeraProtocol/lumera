@@ -35,18 +35,28 @@ func TestAddKeyWithStylePassesExplicitKeyStyleFlags(t *testing.T) {
 	})
 }
 
-func TestEnvWithoutDesktopBusStripsDBusSession(t *testing.T) {
+func TestEnvWithoutDesktopBusStripsDesktopSession(t *testing.T) {
 	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:abstract=/tmp/dbus-test")
+	t.Setenv("DISPLAY", ":0")
+	t.Setenv("WAYLAND_DISPLAY", "wayland-0")
+	t.Setenv("XDG_RUNTIME_DIR", "/mnt/wslg/runtime-dir")
+	t.Setenv("GOMAXPROCS", "99")
 	t.Setenv("LUMERA_TEST_KEEP", "yes")
 
 	env := envWithoutDesktopBus()
 	for _, kv := range env {
-		if strings.HasPrefix(kv, "DBUS_SESSION_BUS_ADDRESS=") {
-			t.Fatalf("envWithoutDesktopBus kept DBUS_SESSION_BUS_ADDRESS: %q", kv)
+		if isDesktopSessionEnv(kv) {
+			t.Fatalf("envWithoutDesktopBus kept desktop session env: %q", kv)
 		}
 	}
 	if !containsEnv(env, "LUMERA_TEST_KEEP=yes") {
 		t.Fatalf("envWithoutDesktopBus dropped unrelated env var: %v", env)
+	}
+	if !containsEnv(env, "GOMAXPROCS=1") {
+		t.Fatalf("envWithoutDesktopBus did not set child GOMAXPROCS=1: %v", env)
+	}
+	if containsEnv(env, "GOMAXPROCS=99") {
+		t.Fatalf("envWithoutDesktopBus kept parent GOMAXPROCS: %v", env)
 	}
 }
 

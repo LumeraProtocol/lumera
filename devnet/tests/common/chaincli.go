@@ -136,9 +136,20 @@ func envWithoutDesktopBus() []string {
 		if strings.HasPrefix(kv, "GOMAXPROCS=") {
 			continue
 		}
+		if strings.HasPrefix(kv, "LUMERA_KEYRING_BACKEND=") {
+			continue
+		}
+		if strings.HasPrefix(kv, "DISABLE_KWALLET=") {
+			continue
+		}
 		out = append(out, kv)
 	}
-	return append(out, "GOMAXPROCS="+childGOMAXPROCS())
+	return append(out,
+		"DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/lumera-no-dbus-session-bus",
+		"DISABLE_KWALLET=1",
+		"GOMAXPROCS="+childGOMAXPROCS(),
+		"LUMERA_KEYRING_BACKEND=test",
+	)
 }
 
 func isDesktopSessionEnv(kv string) bool {

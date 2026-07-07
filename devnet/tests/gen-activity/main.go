@@ -515,9 +515,19 @@ func envWithoutDesktopBus() []string {
 		if isDesktopSessionEnv(kv) {
 			continue
 		}
+		if strings.HasPrefix(kv, "LUMERA_KEYRING_BACKEND=") {
+			continue
+		}
+		if strings.HasPrefix(kv, "DISABLE_KWALLET=") {
+			continue
+		}
 		out = append(out, kv)
 	}
-	return out
+	return append(out,
+		"DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/lumera-no-dbus-session-bus",
+		"DISABLE_KWALLET=1",
+		"LUMERA_KEYRING_BACKEND=test",
+	)
 }
 
 func isDesktopSessionEnv(kv string) bool {

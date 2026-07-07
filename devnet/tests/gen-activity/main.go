@@ -8,8 +8,11 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"os"
@@ -38,6 +41,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("configuration: %v", err)
 	}
+	logRuntimeBinary()
 
 	if wizard {
 		fc, _ := LoadFileConfig(cfg.ConfigPath)
@@ -104,6 +108,33 @@ func executableDir() string {
 		return ""
 	}
 	return filepath.Dir(exe)
+}
+
+func logRuntimeBinary() {
+	exe, err := os.Executable()
+	if err != nil {
+		log.Printf("runtime binary: unknown (%v)", err)
+		return
+	}
+	hash, err := fileSHA256(exe)
+	if err != nil {
+		log.Printf("runtime binary: %s (hash unavailable: %v)", exe, err)
+		return
+	}
+	log.Printf("runtime binary: %s sha256=%s", exe, hash)
+}
+
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // resolveConfigPath picks the config path to load when -config was not passed

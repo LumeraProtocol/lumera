@@ -42,6 +42,7 @@ COMMA := ,
 BUILD_TAGS_VERSION := $(subst $(SPACE),$(COMMA),$(strip $(BUILD_TAGS)))
 GIT_HEAD_HASH ?= $(strip $(shell git rev-parse HEAD 2>/dev/null))
 VERSION_TAG ?= $(strip $(shell tag_ref=$$(git for-each-ref --merged HEAD --sort=-creatordate --format='%(refname:strip=2)' refs/tags | head -n1); if [ -z "$$tag_ref" ]; then printf ''; else tag_name=$${tag_ref#v}; tag_commit=$$(git rev-list -n1 "$$tag_ref" 2>/dev/null); head_commit=$$(git rev-parse HEAD 2>/dev/null); if [ "$$tag_commit" = "$$head_commit" ]; then printf '%s' "$$tag_name"; else printf '%s-%s' "$$tag_name" "$$(git rev-parse --short=8 HEAD 2>/dev/null)"; fi; fi))
+RELEASE_VERSION_TAG ?= $(strip $(if $(VERSION_TAG),$(if $(filter v%,$(VERSION_TAG)),$(VERSION_TAG),v$(VERSION_TAG))))
 BUILD_LDFLAGS = \
 	-X github.com/cosmos/cosmos-sdk/version.Name=$(APP_TITLE) \
 	-X github.com/cosmos/cosmos-sdk/version.AppName=$(APP_NAME)d \
@@ -183,7 +184,7 @@ release: go.sum build-proto openrpc
 		mkdir -p $$outdir/scripts; \
 		cp scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh scripts/migrate-multisig.sh $$outdir/scripts/; \
 		chmod +x $$outdir/scripts/migrate-account.sh $$outdir/scripts/migrate-validator.sh $$outdir/scripts/migrate-multisig.sh; \
-		tar -C $$outdir -czf ${RELEASE_DIR}/${APP_NAME}_$${goos}_$${goarch}.tar.gz ${APP_BINARY} scripts; \
+		tar -C $$outdir -czf ${RELEASE_DIR}/${APP_NAME}$(if $(RELEASE_VERSION_TAG),_${RELEASE_VERSION_TAG})_$${goos}_$${goarch}.tar.gz ${APP_BINARY} scripts; \
 		rm -rf $$outdir; \
 	done
 	@(cd ${RELEASE_DIR} && sha256sum *.tar.gz > release_checksum)

@@ -2,6 +2,8 @@ package common
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -86,6 +88,40 @@ func TestParseMigrationParams(t *testing.T) {
 			t.Errorf("MigrationEndTime = %d, want 1781634504", p.MigrationEndTime)
 		}
 	})
+}
+
+func TestMigrationParamsReportsUnsupportedBinary(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "lumerad")
+	script := `#!/bin/sh
+cat <<'OUT'
+Querying subcommands
+
+Usage:
+  lumerad query [flags]
+  lumerad query [command]
+
+Available Commands:
+  action              Querying commands for the action module
+  audit               Audit query commands
+OUT
+exit 1
+`
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake lumerad: %v", err)
+	}
+
+	_, err := (&ChainCLI{Bin: bin, ChainID: "lumera-devnet-1", RPC: "tcp://localhost:26657"}).MigrationParams()
+	if err == nil {
+		t.Fatal("expected unsupported evmigration binary error")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "does not support x/evmigration queries") {
+		t.Fatalf("error %q missing unsupported evmigration context", msg)
+	}
+	if !strings.Contains(msg, bin) {
+		t.Fatalf("error %q missing configured binary path %q", msg, bin)
+	}
 }
 
 func TestParseMigrationStats(t *testing.T) {

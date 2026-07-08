@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -43,7 +44,22 @@ func (c *ChainCLI) ImportKeyWithStyle(name, mnemonic string, style KeyStyle) (st
 	if err != nil {
 		return "", fmt.Errorf("keys add --recover %s: %s: %w", name, strings.TrimSpace(string(out)), err)
 	}
-	return c.ShowAddress(name)
+	return parseRecoveredKeyAddress(name, out)
+}
+
+func parseRecoveredKeyAddress(name string, out []byte) (string, error) {
+	payload, ok := ExtractJSONPayload(string(out))
+	if !ok {
+		return "", fmt.Errorf("keys add --recover %s: no JSON in output: %s", name, truncate(string(out), 200))
+	}
+	var gk GeneratedKey
+	if err := json.Unmarshal([]byte(payload), &gk); err != nil {
+		return "", fmt.Errorf("parse keys add --recover %s output: %w", name, err)
+	}
+	if gk.Address == "" {
+		return "", fmt.Errorf("keys add --recover %s: missing address in output", name)
+	}
+	return gk.Address, nil
 }
 
 // claimLegacyAccountArgs builds the `tx evmigration claim-legacy-account` command

@@ -373,7 +373,7 @@ func (c *ChainCLI) ImportKey(name, mnemonic string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("keys add --recover %s: %s: %w", name, strings.TrimSpace(string(out)), err)
 	}
-	return c.ShowAddress(name)
+	return parseRecoveredKeyAddress(name, out)
 }
 
 // HasKey reports whether a key name already exists in the keyring.

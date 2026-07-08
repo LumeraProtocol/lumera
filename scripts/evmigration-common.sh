@@ -736,6 +736,11 @@ _handle_tx_query_json() {
   return 2
 }
 
+_query_tx_no_keyring() {
+  local hash="$1"
+  "$BIN" query tx "$hash" --node "$NODE" --output json
+}
+
 # wait_for_tx <hash>
 # Waits for the tx to commit using three paths in order:
 #   1. Fast path — `query tx <hash>`. Catches the case where the tx was
@@ -770,7 +775,7 @@ wait_for_tx() {
   # NOTE: `lumerad q tx <missing>` exits 0 with empty stdout (error goes to
   # stderr). So a "found" check is "stdout is non-empty AND parseable JSON",
   # not just "exit 0". Empty json → both nested ifs are false → fall through.
-  if json=$(lumerad_q tx "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
+  if json=$(_query_tx_no_keyring "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
     if _handle_tx_query_json "$hash" "$json" "$started"; then
       return 0
     else
@@ -801,7 +806,7 @@ wait_for_tx() {
     next_progress=10
     while (( SECONDS - started < timeout )); do
       sleep 1
-      if json=$(lumerad_q tx "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
+      if json=$(_query_tx_no_keyring "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
         if _handle_tx_query_json "$hash" "$json" "$started"; then
           return 0
         else

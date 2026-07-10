@@ -53,7 +53,7 @@ The consensus key, voting power at block height, and validator jailing/slashing 
    - `val_delegation_count + val_unbonding_count + val_redelegation_count` at or below `max_validator_delegations` (default `2500`). If exceeded, governance must raise the limit or delegators must redelegate out before migration.
    - `rejection_reason` empty. Common non-empty values: validator is jailed (recoverable via `unjail`), validator is unbonding (wait for the unbonding period to complete, then migrate), migration is disabled by param, deadline has passed.
 
-3. **Prepare both keys.** You need the legacy `secp256k1` key (coin-type 118) and a new `eth_secp256k1` key (coin-type 60) derived from the **same mnemonic**. See step 2 below.
+3. **Prepare both keys.** Keep the legacy `secp256k1` key (coin type 118) and prepare an `eth_secp256k1` destination key (coin type 60). It may use the same mnemonic or a different mnemonic. See step 2 below.
 4. **Pick a trusted external RPC.** Your own node will be stopped during the migration broadcast, so route the migration tx through a trusted peer.
 5. **Confirm the validator is healthy *now*.** Sample the active validator set (`lumerad query staking validators --output json | jq '.validators[] | select(.operator_address == "<your-valoper>") | {status, jailed, tokens}'`) and confirm `jailed: false` (and that status is not `BOND_STATUS_UNBONDING`) immediately before the maintenance window. A jail event between checklist completion and migration start is the most common preventable cause of a failed migration window — keep the gap short, and re-run pre-flight just before Step 4.
 
@@ -77,19 +77,19 @@ lumerad query evmigration params
 
 If `enable_migration: false`, migration is disabled chain-wide and you must wait for governance to enable it.
 
-## Step 2 — Import both keys from the same mnemonic
+## Step 2 — Prepare the EVM destination key
 
 ```bash
 # Legacy key (coin-type 118 / secp256k1) — the one currently registered on-chain
 lumerad keys add val-legacy --recover --coin-type 118 --algo secp256k1 --keyring-backend file
 
-# New EVM key (coin-type 60 / eth_secp256k1) — same mnemonic, different HD path
-lumerad keys add val-new --recover --coin-type 60 --algo eth_secp256k1 --keyring-backend file
+# New EVM key (coin type 60 / eth_secp256k1) — generate a mnemonic
+lumerad keys add val-new --coin-type 60 --key-type eth_secp256k1 --keyring-backend file
 ```
 
 > **Legacy key already in the keyring?** If the operator's legacy (coin-type 118) key is already present — which is the common case, since it's the key you've been running the validator with — `keys add val-legacy --recover` fails with **`duplicated address created`**. That's expected: the recovered key derives the *same* bech32 address as the one already stored, and a keyring can't hold the same address under two names. **Skip this `keys add` step and pass the existing key's name as the legacy argument** to the migration command (Step 4) or to `migrate-validator.sh`. You only need to recover the new EVM key (`val-new`).
 
-Both are recovered from the same BIP-39 mnemonic. The resulting bech32 addresses differ because the HD paths and address derivation differ — this is expected and is precisely what the migration fixes on-chain.
+Alternatively, add `--recover` to derive `val-new` from an existing mnemonic, including the legacy mnemonic. Same or different mnemonics are both valid. The destination requirements are coin type `60`, key type `eth_secp256k1`, a fresh on-chain address, and control of the key.
 
 > **The new EVM address must be fresh — do not fund or use it before migrating.** The migration moves all balances and state to the destination atomically and **refuses to run if the destination already exists on-chain** (the chain and `migrate-validator.sh` both check this). It's tempting to send "a little gas" to the new address first; don't. If the destination already has account state, derive a different coin-type 60 key, or complete the migration first and fund it afterward. The pre-flight will surface this as a destination-freshness failure (`new address ... already exists on-chain`).
 

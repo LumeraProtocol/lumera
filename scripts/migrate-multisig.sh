@@ -117,6 +117,7 @@ G_USAGE
   # shellcheck disable=SC2034
   HOME_DIR="$home_dir"
 
+  log_info "[generate 1/5] validating prerequisites and connecting to RPC $node"
   require_multisig_binary
   require_jq
   resolve_chain_id
@@ -126,6 +127,8 @@ G_USAGE
     exit 1
   fi
 
+  log_info "[generate 2/5] resolving legacy and destination multisig addresses"
+  [[ "$keyring_backend" == "file" ]] && log_info "the encrypted keyring may prompt for its passphrase; input is hidden while typing"
   local legacy_input="$legacy"
   if [[ "$legacy" != lumera1* ]]; then
     legacy=$(resolve_address "$legacy_input")
@@ -154,6 +157,7 @@ G_USAGE
     log_info "using destination EVM multisig key $(new_value "$new_key") -> address $(new_value "$new")"
   fi
 
+  log_info "[generate 3/5] checking the on-chain multisig shape and signer order"
   # Check on-chain pubkey BEFORE estimate so a nil-pubkey multisig gets
   # the exit-8 "seed the pubkey first" remediation, not a confusing
   # downstream error.
@@ -188,6 +192,7 @@ G_USAGE
     log_info "using on-chain legacy multisig threshold for new multisig: ${new_threshold}-of-${legacy_subkey_count}"
   fi
 
+  log_info "[generate 4/5] checking migration eligibility and destination freshness"
   # Pull estimate — provides is_validator, would_succeed, is_multisig confirmation.
   local estimate
   estimate=$(preflight_estimate "$legacy")
@@ -233,7 +238,7 @@ G_USAGE
   [[ -n "$home_dir"    ]] && args+=(--home "$home_dir")
   args+=(--node "$node" --chain-id "$chain_id" --output json)
 
-  log_info "generating proof template at $out"
+  log_info "[generate 5/5] writing proof template to $out"
   log_info "  legacy: $(legacy_value "$legacy")"
   [[ -n "$new" ]] && log_info "  new:    $(new_value "$new")"
   "$BIN" "${args[@]}"
@@ -247,7 +252,8 @@ G_USAGE
     log_info "Signing instruction: co-signers should sign the same signer index on both legacy and new sides"
     log_info "For same-mnemonic migrations: recover each EVM sub-key from the matching legacy mnemonic, then build the destination multisig with --nosort in the legacy order above"
   fi
-  log_info "done — distribute $out to the K co-signers"
+  log_info "generate complete — no transaction was broadcast"
+  log_info "NEXT: securely distribute $out to at least K co-signers; each runs 'migrate-multisig.sh sign'"
 }
 _mms_sign() {
   local input="" from="" new_key="" chain_id="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}" out="" binary="lumerad"
@@ -335,6 +341,7 @@ S_USAGE
   # shellcheck disable=SC2034
   HOME_DIR="$home_dir"
 
+  log_info "[sign 1/4] validating prerequisites and chain ID"
   require_multisig_binary
   require_jq
   resolve_chain_id
@@ -344,12 +351,15 @@ S_USAGE
     exit 1
   fi
 
+  log_info "[sign 2/4] validating proof file $input"
   # Parse + validate the input proof/partial. read_proof_file rejects
   # single-key-on-either-side (exit 3), bad payload_hex (exit 9), missing
   # fields (exit 9), and structural issues (exit 9).
   local pjson
   pjson=$(read_proof_file "$input")
 
+  log_info "[sign 3/4] matching your local key(s) to signer positions"
+  [[ "$keyring_backend" == "file" ]] && log_info "the encrypted keyring may prompt for its passphrase; input is hidden while typing"
   local from_idx="" new_idx=""
   if [[ -n "$from" ]]; then
     local from_pubkey listed
@@ -427,9 +437,11 @@ S_USAGE
   local sides=()
   [[ -n "$from"    ]] && sides+=("legacy($(legacy_value "$from"))")
   [[ -n "$new_key" ]] && sides+=("new($(new_value "$new_key"))")
-  log_info "signing $input: ${sides[*]}"
+  log_info "[sign 4/4] signing $input: ${sides[*]}"
+  [[ "$keyring_backend" == "file" ]] && log_info "enter the keyring passphrase when prompted; signing does not broadcast"
   "$BIN" "${args[@]}"
-  log_info "partial written to $out"
+  log_info "sign complete — partial written to $out; no transaction was broadcast"
+  log_info "NEXT: return $out to the coordinator"
 }
 _mms_combine() {
   local out="" binary="lumerad"
@@ -494,10 +506,12 @@ C_USAGE
   # shellcheck disable=SC2034
   NODE="$node"
 
+  log_info "[combine 1/3] validating prerequisites and RPC connectivity"
   require_multisig_binary
   require_jq
   resolve_chain_id
 
+  log_info "[combine 2/3] validating ${#positional[@]} partial file(s) and checking matching-index quorum"
   # Per-file + cross-file consistency check. summarize_partials prints the
   # K-of-N entry-presence matrix to stderr and exits 9 on cross-file
   # disagreement (it calls read_proof_file internally, which rejects
@@ -509,6 +523,8 @@ C_USAGE
 
   # Pass through to lumerad combine-proof. If lumerad reports fewer valid
   # signatures than the threshold, map its exit to exit 4.
+  log_info "[combine 3/3] combining signatures and simulating gas through $node"
+  log_info "gas simulation may take a while for validators with many delegations"
   local args=(tx evmigration combine-proof "${positional[@]}" --out "$out" \
     --node "$node" --chain-id "$CHAIN_ID" \
     --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT")
@@ -521,7 +537,8 @@ C_USAGE
   if (( combine_rc != 0 )); then
     exit "$combine_rc"
   fi
-  log_info "combined tx written to $out"
+  log_info "combine complete — transaction written to $out; nothing was broadcast"
+  log_info "NEXT: review the summary, then run 'migrate-multisig.sh submit $out'"
 }
 _mms_submit() {
   local input="" chain_id="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}" node="${LUMERA_NODE:-tcp://localhost:26657}" binary="lumerad"
@@ -610,6 +627,11 @@ SU_USAGE
   # shellcheck disable=SC2034
   DRY_RUN="$dry_run"
 
+  local submit_mode="LIVE (will ask before broadcast)"
+  (( dry_run == 1 )) && submit_mode="DRY RUN (no broadcast)"
+  log_info "multisig submit mode: $submit_mode"
+  log_info "RPC endpoint: $node (HTTP-only endpoints are supported)"
+  log_info "[1/6] validating local prerequisites and resolving chain ID"
   require_multisig_binary
   require_jq
   resolve_chain_id
@@ -619,6 +641,7 @@ SU_USAGE
     exit 1
   fi
 
+  log_info "[2/6] validating the combined multisig transaction file"
   # Parse + validate tx.json. Rejects non-multisig→multisig (exit 3),
   # missing fields / malformed (exit 9). Emits compact summary JSON.
   local tx_meta
@@ -632,16 +655,19 @@ SU_USAGE
   new_threshold=$(jq -r '.new_threshold' <<<"$tx_meta")
   new_num_signers=$(jq -r '.new_num_signers' <<<"$tx_meta")
 
+  log_info "[3/6] checking migration history and destination freshness"
   assert_not_migrated "$legacy" "$new"
   assert_new_address_unused "$new"
   assert_destination_fresh "$new"
 
   # Fresh estimate — catches ceremony-duration chain-state drift.
+  log_info "[4/6] requesting a fresh migration estimate"
   local estimate
   estimate=$(preflight_estimate "$legacy")
   assert_multisig "$estimate"
   assert_estimate_succeeds "$estimate"
 
+  log_info "[5/6] recording the legacy balance for post-migration verification"
   local snap
   snap=$(snapshot_bank_balances "$legacy")
 
@@ -683,9 +709,10 @@ BANNER
 
   # Skip the interactive prompt in --dry-run; nothing destructive will happen.
   if (( DRY_RUN == 1 )); then
-    log_info "--dry-run: stopping before broadcast"
+    log_info "[6/6] dry-run complete: all pre-flight checks passed; no transaction was broadcast"
     return 0
   fi
+  log_info "[6/6] requesting confirmation and broadcasting over RPC"
   confirm "Proceed with broadcast?"
 
   # submit-proof does not take --from; authorization is in the proof bytes.
@@ -694,6 +721,7 @@ BANNER
   local args=(tx evmigration submit-proof "$input"
     --chain-id "$chain_id"
     --node "$node"
+    --tx-timeout 0s
     --keyring-backend "$keyring_backend"
     --output json)
   [[ -n "$keyring_dir" ]] && args+=(--keyring-dir "$keyring_dir")
@@ -733,6 +761,11 @@ BANNER
   log_info "  legacy: $(legacy_value "$legacy")"
   log_info "  new:    $(new_value "$new")"
   log_info "  tx:     $tx_hash"
+  if [[ "$kind" == "validator" ]]; then
+    log_info "NEXT: restart the validator node immediately and monitor missed-block/jail status"
+  else
+    log_info "NEXT: distribute the confirmed destination address and use the destination multisig for future transactions"
+  fi
 }
 
 recover_submit_after_broadcast_error() {

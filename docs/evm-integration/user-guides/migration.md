@@ -49,7 +49,7 @@ After migration:
 
 - Migration is**irreversible** - once completed, it cannot be undone
 - Migration is**fee-free** - no LUME is required on either address to submit the transaction
-- Both addresses must come from the**same mnemonic** (same seed phrase)
+- The keys may use the **same or different mnemonics**; the destination must use coin type `60`, key type `eth_secp256k1`, and a fresh on-chain address
 - The migration transaction is unsigned at the Cosmos tx layer; authentication is embedded in the message as dual cryptographic proofs
 
 ### Using both Keplr and MetaMask after migration
@@ -219,9 +219,9 @@ Key things to check:
 - **"Eligible for migration"** banner at the top with the**Standard Account** badge (or**Validator** /**Supernode**, when applicable).
 - The asset summary:**Balance**,**Delegations**,**Unbonding**,**Authz / Feegrant**,**Supernode**.
 - **Legacy Address (coin-type 118)** — your current Lumera address, shown in cyan.
-- **New Address (coin-type 60)** — your destination, shown both as a Lumera bech32 (`Lumera bech32:`) and an Ethereum hex (`Ethereum hex:`). The Portal derives this from Keplr's Ethereum provider using the same mnemonic.
+- **New Address (coin-type 60)** — your destination, shown both as a Lumera bech32 (`Lumera bech32:`) and an Ethereum hex (`Ethereum hex:`).
 
-The note at the bottom reminds you that both addresses must come from the **same mnemonic**, derived on different coin-type paths (118 → 60).
+The destination must be a fresh on-chain address controlled by a coin-type `60`, `eth_secp256k1` key. Its mnemonic may be the same as or different from the legacy mnemonic.
 
 If you need to migrate a different account, expand **"Check a different legacy address"** at the bottom.
 
@@ -314,7 +314,7 @@ Right after the wizard closes you're still on the legacy Portal profile, so the 
 
 ![Post-migration on the legacy Portal profile — Wallet Re-Import Still Required](../assets/evmigration-11.png)
 
-The state panel still reads `Portal profile: lumera-devnet-1 / coin-type 118` (yellow), `Keplr chain config: coin-type 118` (yellow), and `Keplr account key: legacy key / coin-type 118` (yellow). The Portal knows your migration record from the chain ("Account migrated from legacy …" appears under the connected address) but the connected key is still the legacy 118 derivation, so your displayed Keplr balance is 0 — the assets now live at the new EVM address. The card states the **main action** directly: *re-import the same mnemonic in Keplr and use the new profile derived from coin-type 60.* The migration record (legacy address, new Lumera address, **Migration date**, **Block height**) is shown at the bottom.
+The state panel still reads `Portal profile: lumera-devnet-1 / coin-type 118` (yellow), `Keplr chain config: coin-type 118` (yellow), and `Keplr account key: legacy key / coin-type 118` (yellow). The Portal knows your migration record from the chain ("Account migrated from legacy …" appears under the connected address) but the connected key is still the legacy 118 key, so your displayed Keplr balance is 0 — the assets now live at the new EVM address. Import the fresh destination mnemonic in Keplr and use the coin-type 60 profile. The migration record (legacy address, new Lumera address, **Migration date**, **Block height**) is shown at the bottom.
 
 Work through the cleanup in the order below.
 
@@ -433,7 +433,7 @@ Both scripts:
 - Run`migration-estimate` before broadcast so you see what moves and why it might fail.
 - Compare post-migration balances against a pre-broadcast snapshot.
 
-The abbreviated invocations below cover the common cases. For the full reference — all flags, exit codes, troubleshooting keyed by exit code, mnemonic-file flow, and non-interactive / CI usage — see [migration-scripts.md](migration-scripts.md).
+The abbreviated invocations below cover the common cases. For the full reference — all flags, exit codes, troubleshooting keyed by exit code, fresh-destination-key flow, and non-interactive / CI usage — see [migration-scripts.md](migration-scripts.md).
 
 ### Single-sig account migration
 
@@ -444,7 +444,7 @@ The abbreviated invocations below cover the common cases. For the full reference
   --keyring-backend test
 ```
 
-Use `--mnemonic-file <path>` (file must be mode 0600) to import both keys from a mnemonic in one step. Add `--dry-run` to preview without broadcasting.
+Use `--mnemonic-file <path>` (mode `0600`) as an optional convenience when both derivations intentionally use one mnemonic. Otherwise import the keys separately. Add `--dry-run` to preview without broadcasting.
 
 ### Single-sig validator migration
 
@@ -505,7 +505,7 @@ The estimate response shows `would_succeed: true` if migration is possible. If `
 lumerad query evmigration migration-stats --node <rpc-endpoint>
 ```
 
-#### 2. Import Both Keys from the Same Mnemonic
+#### 2. Prepare the EVM Destination Key
 
 **Import the legacy key (coin-type 118, secp256k1):**
 
@@ -523,13 +523,12 @@ Enter your mnemonic when prompted.
 
 ```bash
 lumerad keys add new-key \
-  --recover \
   --coin-type 60 \
-  --algo eth_secp256k1 \
+  --key-type eth_secp256k1 \
   --keyring-backend test
 ```
 
-Enter the **same mnemonic** when prompted.
+Securely back up the generated mnemonic. Alternatively, use `--recover` with an existing mnemonic; it may be the legacy mnemonic or a different one.
 
 **Verify the addresses:**
 
@@ -685,7 +684,7 @@ No. Migration transactions are fee-free. The transaction carries a gas limit for
 
 **Q: Can I migrate to any address?**
 
-No. The new address must be derived from the **same mnemonic** as the legacy address using coin-type 60 and eth_secp256k1. The chain verifies this through the dual-signature proof.
+The destination may be any fresh on-chain address whose key you control. It must use coin type `60` and `eth_secp256k1`. The legacy and destination keys may come from the same mnemonic or different mnemonics; the chain verifies control of both keys through the dual-signature proof.
 
 **Q: What if I'm a validator - should I use `claim-legacy-account` or `migrate-validator`?**
 

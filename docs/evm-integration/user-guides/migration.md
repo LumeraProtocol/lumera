@@ -513,7 +513,7 @@ lumerad query evmigration migration-stats --node <rpc-endpoint>
 lumerad keys add legacy-key \
   --recover \
   --coin-type 118 \
-  --algo secp256k1 \
+  --key-type secp256k1 \
   --keyring-backend test
 ```
 

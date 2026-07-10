@@ -384,21 +384,25 @@ lumerad_tx() {
   # Primary: let the chain simulate the exact gas (migration fees are waived, so
   # the resulting limit is free). Capture stdout (the tx JSON) separately from
   # stderr (gas-estimate notes / errors) so callers receive clean JSON to parse.
-  # Tee stderr back to the terminal because file-keyring passphrase prompts are
-  # written there; hiding stderr makes the command appear to hang.
-  local err_file out rc=0
+  # For file keyrings, tee stderr back to the terminal because passphrase
+  # prompts are written there; hiding them makes the command appear to hang.
+  # Other backends retain capture-only behavior so errors are not duplicated.
+  local err_file out rc=0 tx_cmd
   err_file="$(mktemp)"
+  tx_cmd=("$BIN" tx "$@"
+    --node "$NODE"
+    --chain-id "$CHAIN_ID"
+    "${_KRF[@]}"
+    --tx-timeout 0s
+    --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT"
+    --output json)
   if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
     log_info "unlocking file keyring to sign and simulate the migration transaction"
     log_info "enter the keyring passphrase when prompted; input is hidden while typing"
+    out="$("${tx_cmd[@]}" 2> >(tee "$err_file" >&2))" || rc=$?
+  else
+    out="$("${tx_cmd[@]}" 2>"$err_file")" || rc=$?
   fi
-  out="$("$BIN" tx "$@" \
-    --node "$NODE" \
-    --chain-id "$CHAIN_ID" \
-    "${_KRF[@]}" \
-    --tx-timeout 0s \
-    --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT" \
-    --output json 2> >(tee "$err_file" >&2))" || rc=$?
   if (( rc == 0 )); then
     rm -f "$err_file"
     printf '%s\n' "$out"

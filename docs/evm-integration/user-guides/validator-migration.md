@@ -81,7 +81,7 @@ If `enable_migration: false`, migration is disabled chain-wide and you must wait
 
 ```bash
 # Legacy key (coin-type 118 / secp256k1) — the one currently registered on-chain
-lumerad keys add val-legacy --recover --coin-type 118 --algo secp256k1 --keyring-backend file
+lumerad keys add val-legacy --recover --coin-type 118 --key-type secp256k1 --keyring-backend file
 
 # New EVM key (coin type 60 / eth_secp256k1) — generate a mnemonic
 lumerad keys add val-new --coin-type 60 --key-type eth_secp256k1 --keyring-backend file

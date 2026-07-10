@@ -341,6 +341,11 @@ func migrateOne(rec *AccountRecord) migrateResult {
 			log.Printf("  FAIL: post-migration checks for already-migrated %s: %v", rec.Name, err)
 			return migrateFailed
 		}
+		// A previous run may have committed the migration and exited before
+		// updating the shared account registry. Reconcile it on every rerun so
+		// later upgrade, proposal, and voting helpers never reuse the spent
+		// legacy address. The update is idempotent by account name.
+		updateStatusRegistryMigratedAccount(rec.Name, recNewAddr)
 		return migrateAlreadyOnChain
 	}
 

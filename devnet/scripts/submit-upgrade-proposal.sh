@@ -17,8 +17,6 @@ CHAIN_ID="lumera-devnet-1"
 SERVICE="supernova_validator_1" # primary validator
 LUMERA_SHARED="/tmp/${CHAIN_ID}/shared"
 KEYRING="test"
-DENOM="ulume"
-DEFAULT_DEPOSIT="10000000$DENOM"
 HOST_PROPOSAL_FILE="${LUMERA_SHARED}/upgrade_${VERSION}.json"
 CONTAINER_PROPOSAL_FILE="/shared/upgrade_${VERSION}.json"
 COMPOSE_FILE="../docker-compose.yml"
@@ -272,7 +270,7 @@ try_migrated_proposer() {
 
 	update_status_registry_address "$legacy_key_name" "$migrated_address"
 	if [[ "$legacy_key_name" == "governance_key" ]]; then
-		if [[ -w "$GOV_ADDRESS_FILE" || ( ! -e "$GOV_ADDRESS_FILE" && -w "$(dirname "$GOV_ADDRESS_FILE")" ) ]]; then
+		if [[ -w "$GOV_ADDRESS_FILE" || (! -e "$GOV_ADDRESS_FILE" && -w "$(dirname "$GOV_ADDRESS_FILE")") ]]; then
 			printf '%s\n' "$migrated_address" >"$GOV_ADDRESS_FILE"
 		else
 			echo "⚠️  Cannot update ${GOV_ADDRESS_FILE}; file is not writable by this user." >&2
@@ -295,14 +293,37 @@ primary_validator_key_name() {
 }
 
 resolve_proposer() {
+	local keyring_address resolved_key mnemonic mnemonic_file
+
 	PROPOSER_KEY_NAME="governance_key"
-	PROPOSER_ADDRESS="$(key_address "$PROPOSER_KEY_NAME")"
+	keyring_address="$(key_address "$PROPOSER_KEY_NAME")"
+	PROPOSER_ADDRESS="$keyring_address"
 
 	if [[ -z "$PROPOSER_ADDRESS" && -f "$GOV_ADDRESS_FILE" ]]; then
 		PROPOSER_ADDRESS="$(tr -d '\r\n' <"$GOV_ADDRESS_FILE")"
 	fi
 
 	if account_exists "$PROPOSER_ADDRESS"; then
+		# The shared address file is updated after migration, but a fresh or
+		# restarted container may not have restored the matching EVM key yet.
+		# Never return an on-chain address with a key name that resolves to a
+		# different address (or to no local key at all).
+		resolved_key="$(key_name_for_address "$PROPOSER_ADDRESS")"
+		if [[ -n "$resolved_key" ]]; then
+			PROPOSER_KEY_NAME="$resolved_key"
+		elif [[ "$keyring_address" != "$PROPOSER_ADDRESS" ]]; then
+			mnemonic="$(registry_mnemonic "governance_key")"
+			mnemonic_file="$(governance_mnemonic_file)"
+			if [[ -z "$mnemonic" && -s "$mnemonic_file" ]]; then
+				mnemonic="$(cat "$mnemonic_file")"
+			fi
+			if [[ -z "$mnemonic" ]]; then
+				echo "❌ Governance address ${PROPOSER_ADDRESS} is live, but its local key is missing and no recovery mnemonic was found" >&2
+				exit 1
+			fi
+			PROPOSER_KEY_NAME="governance_key_evm"
+			recover_evm_key_from_mnemonic "$PROPOSER_KEY_NAME" "$mnemonic" "$PROPOSER_ADDRESS" || exit 1
+		fi
 		echo "Governance proposer: ${PROPOSER_KEY_NAME} (${PROPOSER_ADDRESS})"
 		return
 	fi
@@ -457,7 +478,8 @@ show_proposal_status() {
 		return 1
 	fi
 
-	local status=$(get_proposal_status_by_id "$proposal_id")
+	local status
+	status=$(get_proposal_status_by_id "$proposal_id")
 	echo "❗ Proposal for version $version already exists with ID: $proposal_id and status: $status"
 
 	case "$status" in
@@ -491,79 +513,85 @@ show_proposal_status() {
 	esac
 }
 
-CURRENT_HEIGHT=$(get_current_height)
-if [ $# -eq 1 ]; then
+main() {
+	CURRENT_HEIGHT=$(get_current_height)
+	if [ $# -eq 1 ]; then
+		EXISTING_PROPOSAL_ID=$(get_proposal_id_by_version_with_retry "$VERSION")
+		if [[ -n "$EXISTING_PROPOSAL_ID" ]]; then
+			show_proposal_status "$VERSION" "$EXISTING_PROPOSAL_ID"
+		fi
+	fi
+
+	if [ $# -ne 2 ]; then
+		if [[ "$CURRENT_HEIGHT" =~ ^[0-9]+$ ]]; then
+			echo "💡 Lumera chain is running, current height: $CURRENT_HEIGHT"
+		fi
+
+		echo "Usage: $0 <version> <upgrade_height>"
+		exit 1
+	fi
+
+	# Read the governance helper address, then resolve a live proposer key.
+	GOV_ADDRESS_FILE="${LUMERA_SHARED}/governance_address"
+	if [ ! -f "$GOV_ADDRESS_FILE" ]; then
+		echo "⚠️  Governance address file not found at $GOV_ADDRESS_FILE; using primary validator proposer if available." >&2
+	fi
+
+	resolve_proposer
+
+	validate_height_param
+
 	EXISTING_PROPOSAL_ID=$(get_proposal_id_by_version_with_retry "$VERSION")
 	if [[ -n "$EXISTING_PROPOSAL_ID" ]]; then
 		show_proposal_status "$VERSION" "$EXISTING_PROPOSAL_ID"
-	fi
-fi
 
-if [ $# -ne 2 ]; then
-	if [[ "$CURRENT_HEIGHT" =~ ^[0-9]+$ ]]; then
-		echo "💡 Lumera chain is running, current height: $CURRENT_HEIGHT"
-	fi
-
-	echo "Usage: $0 <version> <upgrade_height>"
-	exit 1
-fi
-
-# Read the governance helper address, then resolve a live proposer key.
-GOV_ADDRESS_FILE="${LUMERA_SHARED}/governance_address"
-if [ ! -f "$GOV_ADDRESS_FILE" ]; then
-	echo "⚠️  Governance address file not found at $GOV_ADDRESS_FILE; using primary validator proposer if available." >&2
-fi
-
-resolve_proposer
-
-validate_height_param
-
-EXISTING_PROPOSAL_ID=$(get_proposal_id_by_version_with_retry "$VERSION")
-if [[ -n "$EXISTING_PROPOSAL_ID" ]]; then
-	show_proposal_status "$VERSION" "$EXISTING_PROPOSAL_ID"
-
-	STATUS=$(get_proposal_status_by_id "$EXISTING_PROPOSAL_ID")
-	case "$STATUS" in
-	PROPOSAL_STATUS_DEPOSIT_PERIOD)
-		submit_proposal_deposit
-		exit 0
-		;;
-	PROPOSAL_STATUS_FAILED)
-		# Only resubmit if the new requested height is greater than the failed one
-		FAILED_HEIGHT=$(get_proposal_height_by_id "$EXISTING_PROPOSAL_ID")
-		CURRENT_HEIGHT=$(get_current_height)
-		if [[ -z "$FAILED_HEIGHT" ]]; then
-			echo "⚠️  Could not read failed proposal height; refusing to auto-resubmit."
-			exit 1
-		fi
-		echo "ℹ️  Failed proposal height: $FAILED_HEIGHT; requested new height: $UPGRADE_HEIGHT"
-		# check that UPGRADE_HEIGHT is greater than CURRENT_HEIGHT
-		if ((UPGRADE_HEIGHT <= CURRENT_HEIGHT)); then
-			echo "🚫 New height ($UPGRADE_HEIGHT) must be greater than current height ($CURRENT_HEIGHT)."
-			exit 1
-		fi
-		if ((UPGRADE_HEIGHT > FAILED_HEIGHT)); then
-			echo "✅ New height is greater than failed one — submitting a new proposal…"
+		STATUS=$(get_proposal_status_by_id "$EXISTING_PROPOSAL_ID")
+		case "$STATUS" in
+		PROPOSAL_STATUS_DEPOSIT_PERIOD)
+			submit_proposal_deposit
+			exit 0
+			;;
+		PROPOSAL_STATUS_FAILED)
+			# Only resubmit if the new requested height is greater than the failed one
+			FAILED_HEIGHT=$(get_proposal_height_by_id "$EXISTING_PROPOSAL_ID")
+			CURRENT_HEIGHT=$(get_current_height)
+			if [[ -z "$FAILED_HEIGHT" ]]; then
+				echo "⚠️  Could not read failed proposal height; refusing to auto-resubmit."
+				exit 1
+			fi
+			echo "ℹ️  Failed proposal height: $FAILED_HEIGHT; requested new height: $UPGRADE_HEIGHT"
+			# check that UPGRADE_HEIGHT is greater than CURRENT_HEIGHT
+			if ((UPGRADE_HEIGHT <= CURRENT_HEIGHT)); then
+				echo "🚫 New height ($UPGRADE_HEIGHT) must be greater than current height ($CURRENT_HEIGHT)."
+				exit 1
+			fi
+			if ((UPGRADE_HEIGHT > FAILED_HEIGHT)); then
+				echo "✅ New height is greater than failed one — submitting a new proposal…"
+				submit_proposal
+				exit 0
+			else
+				echo "🚫 New height ($UPGRADE_HEIGHT) must be greater than failed height ($FAILED_HEIGHT)."
+				exit 1
+			fi
+			;;
+		PROPOSAL_STATUS_REJECTED)
+			# Rejected (no veto): allow re-submit at caller’s chosen height
+			echo "ℹ️  Previous proposal was rejected. Submitting a new proposal…"
 			submit_proposal
 			exit 0
-		else
-			echo "🚫 New height ($UPGRADE_HEIGHT) must be greater than failed height ($FAILED_HEIGHT)."
+			;;
+		PROPOSAL_STATUS_REJECTED_WITH_VETO)
+			# Keep current safety behavior for veto
+			echo "❗ Previous proposal was rejected with veto. Not resubmitting automatically."
 			exit 1
-		fi
-		;;
-	PROPOSAL_STATUS_REJECTED)
-		# Rejected (no veto): allow re-submit at caller’s chosen height
-		echo "ℹ️  Previous proposal was rejected. Submitting a new proposal…"
+			;;
+		esac
+	else
+		echo "🔄 No existing proposal found for version $VERSION. Proceeding to submit a new upgrade proposal"
 		submit_proposal
-		exit 0
-		;;
-	PROPOSAL_STATUS_REJECTED_WITH_VETO)
-		# Keep current safety behavior for veto
-		echo "❗ Previous proposal was rejected with veto. Not resubmitting automatically."
-		exit 1
-		;;
-	esac
-else
-	echo "🔄 No existing proposal found for version $VERSION. Proceeding to submit a new upgrade proposal"
-	submit_proposal
+	fi
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+	main "$@"
 fi

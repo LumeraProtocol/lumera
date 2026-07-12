@@ -293,14 +293,20 @@ primary_validator_key_name() {
 }
 
 resolve_proposer() {
-	local keyring_address resolved_key mnemonic mnemonic_file
+	local keyring_address persisted_address resolved_key mnemonic mnemonic_file
 
 	PROPOSER_KEY_NAME="governance_key"
 	keyring_address="$(key_address "$PROPOSER_KEY_NAME")"
 	PROPOSER_ADDRESS="$keyring_address"
 
-	if [[ -z "$PROPOSER_ADDRESS" && -f "$GOV_ADDRESS_FILE" ]]; then
-		PROPOSER_ADDRESS="$(tr -d '\r\n' <"$GOV_ADDRESS_FILE")"
+	if [[ -f "$GOV_ADDRESS_FILE" ]]; then
+		persisted_address="$(tr -d '\r\n' <"$GOV_ADDRESS_FILE")"
+		# The shared file is updated to the destination address during migration,
+		# while container setup may restore the legacy governance_key afterward.
+		# Prefer a live persisted address so we do not regress to the legacy key.
+		if [[ -n "$persisted_address" ]] && { [[ -z "$keyring_address" ]] || account_exists "$persisted_address"; }; then
+			PROPOSER_ADDRESS="$persisted_address"
+		fi
 	fi
 
 	if account_exists "$PROPOSER_ADDRESS"; then
@@ -382,7 +388,7 @@ submit_proposal() {
 EOF
 
 	echo "🔍 Proposal JSON content at $HOST_PROPOSAL_FILE:" >&2
-	cat "$HOST_PROPOSAL_FILE" | jq || cat "$HOST_PROPOSAL_FILE"
+	jq . "$HOST_PROPOSAL_FILE" || cat "$HOST_PROPOSAL_FILE"
 
 	echo "Submitting software upgrade proposal for version $VERSION at height ${UPGRADE_HEIGHT}..." >&2
 

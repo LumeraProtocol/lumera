@@ -2115,6 +2115,176 @@ func TestRepairLegacyRawShareStartingInfo_ReconstructsPreSlashTokenStake(t *test
 	require.Equal(t, val.TokensFromShares(del.Shares), finalStake)
 }
 
+// TestRepairLegacyRawShareStartingInfo_EmptyValidatorSharesIsNoOp guards the
+// keeper-mock case (and any zero-share validator): with no delegator shares the
+// repair must bail out before the zero-denominator TokensFromShares conversion
+// and must not read or write distribution state. Strict mock expectations
+// (Times(0)) fail the test if it touches the distribution keeper.
+func TestRepairLegacyRawShareStartingInfo_EmptyValidatorSharesIsNoOp(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+
+	// DelegatorShares left as the zero value (nil) — the empty-state fingerprint.
+	val := stakingtypes.Validator{OperatorAddress: valAddr.String()}
+
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	require.NoError(t, f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr))
+}
+
+// TestRepairLegacyRawShareStartingInfo_NeverSlashedIsNoOp guards the healthy
+// common case: a validator at a 1.0 exchange rate whose current token stake
+// equals the delegation's shares was never slashed, so it cannot be the v1.20.0
+// failure mode. The repair must return before reading any starting info.
+func TestRepairLegacyRawShareStartingInfo_NeverSlashedIsNoOp(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+
+	// Tokens == DelegatorShares → exchange rate exactly 1.0, so currentStake
+	// equals del.Shares and the "was it slashed?" guard short-circuits.
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(1_000_000),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	require.NoError(t, f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr))
+}
+
+// TestRepairLegacyRawShareStartingInfo_CorrectTokenRowIsNoOp guards a slashed
+// validator whose starting info was written correctly (stake as tokens, not raw
+// shares) — either by the SDK or by the v1.20.1 forward fix. The row does not
+// carry the raw-shares fingerprint, so the repair must leave it untouched.
+func TestRepairLegacyRawShareStartingInfo_CorrectTokenRowIsNoOp(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	f.ctx = f.ctx.WithBlockHeight(300)
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(998_001),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+	// Stake stored as the token value (499,500), NOT the raw shares (500,000).
+	startingInfo := distrtypes.DelegatorStartingInfo{
+		PreviousPeriod: 180,
+		Stake:          math.LegacyNewDec(499_500),
+		Height:         100,
+	}
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).Return(startingInfo, nil)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	require.NoError(t, f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr))
+}
+
+// TestRepairLegacyRawShareStartingInfo_WithinMarginIsNoOp guards the row whose
+// single slash was recorded AFTER its starting height. The SDK replays that
+// slash itself, so the reconstructed final stake already lands at currentStake
+// (within the 3-ulp tolerance) and does not panic — this is a legitimate
+// pre-slash row, not a v1.20.0 corruption, and must not be rewritten even though
+// it superficially matches the Stake==shares fingerprint.
+func TestRepairLegacyRawShareStartingInfo_WithinMarginIsNoOp(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	f.ctx = f.ctx.WithBlockHeight(300)
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(1_000_000))
+
+	// Rate 0.999: a single 0.1% slash, recorded after the starting height.
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(999_000),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+	startingInfo := distrtypes.DelegatorStartingInfo{
+		PreviousPeriod: 180,
+		Stake:          del.Shares, // matches the raw-shares fingerprint...
+		Height:         100,
+	}
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).Return(startingInfo, nil)
+
+	// ...but the slash post-dates the starting height, so replaying it reconciles
+	// finalStake (1,000,000 × 0.999 = 999,000) exactly to currentStake.
+	f.writeValidatorSlashEvent(valAddr, 200, distrtypes.ValidatorSlashEvent{
+		ValidatorPeriod: 182,
+		Fraction:        math.LegacyMustNewDecFromStr("0.001"),
+	})
+
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	require.NoError(t, f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr))
+}
+
+// TestRepairLegacyRawShareStartingInfo_GetStartingInfoError propagates a read
+// failure (wrapped) rather than silently skipping the repair.
+func TestRepairLegacyRawShareStartingInfo_GetStartingInfoError(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(998_001),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).
+		Return(distrtypes.DelegatorStartingInfo{}, errors.New("boom"))
+
+	err := f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr)
+	require.ErrorContains(t, err, "get delegator starting info")
+}
+
+// TestRepairLegacyRawShareStartingInfo_SetStartingInfoError propagates a write
+// failure (wrapped) from the repair path.
+func TestRepairLegacyRawShareStartingInfo_SetStartingInfoError(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	f.ctx = f.ctx.WithBlockHeight(300)
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(998_001),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+	// Raw-shares fingerprint with no post-start slash events, so the repair
+	// clamps to currentStake and reaches the SetDelegatorStartingInfo call.
+	startingInfo := distrtypes.DelegatorStartingInfo{
+		PreviousPeriod: 180,
+		Stake:          del.Shares,
+		Height:         100,
+	}
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).Return(startingInfo, nil)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr, gomock.Any()).
+		Return(errors.New("boom"))
+
+	err := f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr)
+	require.ErrorContains(t, err, "set repaired delegator starting info")
+}
+
 func TestMigrateValidatorDistribution_RekeysAllPeriodsAndSlashEvents(t *testing.T) {
 	f := initMockFixture(t)
 	f.wireScopedMigrationStores()

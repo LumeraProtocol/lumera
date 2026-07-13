@@ -398,3 +398,31 @@ Meanwhile, the EVM keeper (initialized in `x/vm/keeper/keeper.go:119`) correctly
 **Fix** (`x/evmigration/keeper/migrate_validator.go`, `x/evmigration/keeper/migrate_staking.go`): Both paths now fetch the target validator and store `val.TokensFromSharesTruncated(del.Shares)`, matching the SDK invariant. In `MigrateValidatorDelegations` the fetch is hoisted out of the delegation loop (all delegations re-key to the same validator, so one `GetValidator(newValAddr)` suffices). In `migrateActiveDelegations` the fetch is per-delegation because each delegation targets a different third-party validator.
 
 **Tests**: `TestMigrateValidatorDelegations_SlashedValidatorStoresTokensNotShares`, `TestMigrateStaking_SlashedValidatorStoresTokensNotShares` — pin `DelegatorStartingInfo.Stake` to the tokens-from-shares value for a slashed validator (90 tokens / 100 shares) and assert it is strictly less than `del.Shares`.
+
+**Follow-up**: the forward fix above only prevents *new* corruption. Chains that already ran v1.20.0 carry poisoned rows that still panic — see bug #28 for the in-place repair.
+
+### 28) Chains that already ran v1.20.0 carry corrupted `DelegatorStartingInfo` rows that still brick withdrawals — needs in-place repair during migration
+
+**Severity**: High
+
+**Relationship to #27**: Bug #27 is the *forward* fix — later migrations stop writing raw shares. It does nothing for rows the buggy v1.20.0 code already persisted. Any chain that executed v1.20.0 (devnet/testnet) still holds those poisoned `DelegatorStartingInfo` rows on disk, and they panic the first time the delegation is touched. This entry is the *backward* repair for that already-written state.
+
+**Symptom**: On a chain that already ran v1.20.0, migrating a validator that was ever slashed (or that has delegators to such a validator) still aborts: `MigrateValidator`'s `WithdrawDelegationRewards` step panics in the SDK with `calculated final stake for delegator ... greater than current stake`. Because the panic aborts the whole transaction, the affected validator/delegator simply cannot be migrated — the forward fix in #27 does not help, since the bad value is already committed to state.
+
+**Root cause**: Identical to #27 — `DelegatorStartingInfo.Stake` holds the delegation's raw `Shares` instead of the token value of those shares. Shares and tokens diverge permanently once the validator is slashed (tokens burned, shares unchanged, exchange rate < 1.0), so `CalculateDelegationRewards` reconstructs a `stake` above `currentStake` and panics beyond its 3-ulp rounding margin. The distinguishing detail for the *already-written* case: v1.20.0 wrote the row at migration height, *after* any historical slash, and reset the starting height past that slash. `CalculateDelegationRewards` only replays slash events recorded at or after the starting height, so the pre-start slash is never replayed to correct the value — the raw-shares overstatement survives to the sanity check.
+
+**Fix** (`x/evmigration/keeper/migrate_distribution.go` — `repairLegacyRawShareStartingInfo`): runs per-delegation in `MigrateValidator` immediately before `WithdrawDelegationRewards`, and rewrites a row only when it carries the exact v1.20.0 fingerprint:
+
+1. Validator has positive `DelegatorShares` (rejects empty/mock state; avoids a zero-denominator conversion).
+2. `currentStake < del.Shares` — the validator was actually slashed (otherwise the panic is impossible).
+3. `startingInfo.Stake == del.Shares` exactly — the raw-shares smoking gun; a correctly-written row stores tokens and would not match.
+4. Replaying the slash events the SDK itself would replay (height ≥ starting height, period > starting `PreviousPeriod`) still leaves the reconstructed stake above `currentStake` by more than the SDK's 3-ulp margin.
+
+When all four hold, it reconstructs the token value *as of the row's own height* — `repairedStake = Stake × (currentStake / finalStake)` — so replaying the post-start slashes lands exactly on `currentStake`. This preserves the SDK's reward-period accounting (slashes recorded after the starting height keep their timing) rather than flattening every period to the current value. Truncation is deliberate: the SDK requires calculated stake ≤ current stake. The fingerprint is provably tight: the SDK's own hooks guarantee a corrupt row cannot drift into a different-but-still-corrupt state — any share change either panics before completing (`BeforeDelegationSharesModified` → `withdrawDelegationRewards`) or heals the row to tokens (`AfterDelegationModified` → `initializeDelegation`).
+
+**Tests**:
+
+- `TestRepairLegacyRawShareStartingInfo_ReconstructsPreSlashTokenStake` (unit) — pins the reconstruction arithmetic with one pre-start slash (reflected only in the exchange rate) and one post-start slash (replayed): a raw 500,000 is repaired to 499,500, and replaying the post-start slash lands exactly at `currentStake`.
+- `TestRepairLegacyRawShareStartingInfo_EmptyValidatorSharesIsNoOp`, `_NeverSlashedIsNoOp`, `_CorrectTokenRowIsNoOp`, `_WithinMarginIsNoOp` (unit) — the guard branches. Each asserts (via `Times(0)` on the distribution mock) that a healthy or non-matching row is never rewritten: empty validator state, a 1.0-rate never-slashed validator, a correctly-stored token row, and a legitimate pre-slash row whose slash post-dates the starting height (replayed correctly, within margin).
+- `TestRepairLegacyRawShareStartingInfo_GetStartingInfoError`, `_SetStartingInfoError` (unit) — wrapped error propagation on read/write failure.
+- `TestMigrateValidator_RepairsLegacyRawShareStartingInfo` (integration) — reproduces the panic end-to-end against real staking/distribution keepers: slashes a validator, injects the exact legacy fingerprint (`Stake` = raw shares, starting height dated between the slash and migration), then migrates. Without the repair `MigrateValidator` panics in `CalculateDelegationRewards`; with it, migration succeeds and the starting stake is corrected to the token value. The self-delegation is a built-in negative control — it carries the same `Stake == shares` shape but its slash post-dates its starting height, so normal SDK replay handles it and the repair leaves it untouched.

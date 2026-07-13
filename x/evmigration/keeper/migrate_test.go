@@ -2060,6 +2060,61 @@ func TestMigrateValidatorDelegations_SlashedValidatorStoresTokensNotShares(t *te
 	require.True(t, capturedStake.LT(del.Shares), "stake must be tokens (< shares) for a slashed validator")
 }
 
+// TestRepairLegacyRawShareStartingInfo_ReconstructsPreSlashTokenStake pins the
+// repair for rows already written by v1.20.0. The first slash predates the
+// starting row and is therefore reflected only in the validator exchange rate;
+// the second slash follows the row and must remain part of period replay.
+func TestRepairLegacyRawShareStartingInfo_ReconstructsPreSlashTokenStake(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	f.ctx = f.ctx.WithBlockHeight(300)
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+
+	// Two 0.1% slashes leave the validator at a 0.998001 token/share rate.
+	// The correct stake at the row's height (after only the first slash) was
+	// 499,500; v1.20.0 incorrectly stored the raw 500,000 shares instead.
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(998_001),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+	startingInfo := distrtypes.DelegatorStartingInfo{
+		PreviousPeriod: 180,
+		Stake:          del.Shares,
+		Height:         100,
+	}
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).Return(startingInfo, nil)
+
+	// The pre-start event must not be replayed; the post-start event must be.
+	f.writeValidatorSlashEvent(valAddr, 50, distrtypes.ValidatorSlashEvent{
+		ValidatorPeriod: 31,
+		Fraction:        math.LegacyMustNewDecFromStr("0.001"),
+	})
+	f.writeValidatorSlashEvent(valAddr, 200, distrtypes.ValidatorSlashEvent{
+		ValidatorPeriod: 182,
+		Fraction:        math.LegacyMustNewDecFromStr("0.001"),
+	})
+
+	var repaired distrtypes.DelegatorStartingInfo
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr, gomock.Any()).
+		DoAndReturn(func(_ sdk.Context, _ sdk.ValAddress, _ sdk.AccAddress, info distrtypes.DelegatorStartingInfo) error {
+			repaired = info
+			return nil
+		})
+
+	err := f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr)
+	require.NoError(t, err)
+	require.Equal(t, math.LegacyMustNewDecFromStr("499500"), repaired.Stake)
+
+	// Replaying the post-start slash now lands exactly at current token stake,
+	// satisfying the x/distribution invariant that previously panicked.
+	finalStake := repaired.Stake.MulTruncate(math.LegacyMustNewDecFromStr("0.999"))
+	require.Equal(t, val.TokensFromShares(del.Shares), finalStake)
+}
+
 func TestMigrateValidatorDistribution_RekeysAllPeriodsAndSlashEvents(t *testing.T) {
 	f := initMockFixture(t)
 	f.wireScopedMigrationStores()

@@ -284,7 +284,7 @@ _mb_classify_target() {
     # Walk the object for the first pub_key/pubkey @type we find. Matches the
     # priority-order traversal in auth_pubkey_type, without its hard-exit.
     pk_type_str=$(jq -r '
-      [.. | objects | (.pub_key // .pubkey) | objects | .["@type"] // empty]
+      [.. | objects | (.pub_key // .pubkey // .public_key) | objects | (.["@type"] // .type // empty)]
       | map(select(. != "")) | first // ""' <<<"$auth_json" 2>/dev/null || echo "")
   fi
 

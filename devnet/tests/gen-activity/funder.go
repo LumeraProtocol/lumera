@@ -39,8 +39,10 @@ func FundAccounts(chain fundingChain, targets []*AccountRecord, amountFor func(*
 	}
 	funded := len(targets) - len(remaining)
 	if len(remaining) == 0 {
+		log.Printf("funding: no unfunded bank account(s)")
 		return funded, nil
 	}
+	log.Printf("funding: starting %d bank account(s), already funded %d, batch-size %d, max-attempts %d", len(remaining), funded, batchSize, maxAttempts)
 
 	for attempt := 1; attempt <= maxAttempts && len(remaining) > 0; attempt++ {
 		accNum, startSeq, err := chain.FunderAccountSequence()
@@ -50,8 +52,13 @@ func FundAccounts(chain fundingChain, targets []*AccountRecord, amountFor func(*
 
 		// Burst each planned batch, then wait a block before the next batch.
 		batches := common.PlanFundingBatches(startSeq, len(remaining), batchSize)
+		log.Printf("funding: attempt %d/%d with %d remaining account(s), account-number %d, start-sequence %d, %d batch(es)",
+			attempt, maxAttempts, len(remaining), accNum, startSeq, len(batches))
 		idx := 0
-		for _, batch := range batches {
+		for batchIdx, batch := range batches {
+			batchStart := idx + 1
+			log.Printf("funding: attempt %d batch %d/%d submitting %d transfer(s) (remaining positions %d-%d)",
+				attempt, batchIdx+1, len(batches), len(batch.Sequences), batchStart, batchStart+len(batch.Sequences)-1)
 			for _, seq := range batch.Sequences {
 				rec := remaining[idx]
 				idx++
@@ -65,10 +72,13 @@ func FundAccounts(chain fundingChain, targets []*AccountRecord, amountFor func(*
 			if waitErr := chain.WaitForNextBlock(); waitErr != nil {
 				log.Printf("  WARN: wait for next block after funding batch: %v", waitErr)
 			}
+			log.Printf("funding: attempt %d batch %d/%d submitted; checking next batch after block wait", attempt, batchIdx+1, len(batches))
 		}
 
 		// Confirm and collect the accounts that still need funding.
+		log.Printf("funding: confirming %d account(s) after attempt %d", len(remaining), attempt)
 		still := remaining[:0:0]
+		attemptFunded := 0
 		for _, rec := range remaining {
 			ok, confErr := chain.IsFunded(rec.Address)
 			if confErr != nil {
@@ -78,10 +88,13 @@ func FundAccounts(chain fundingChain, targets []*AccountRecord, amountFor func(*
 				rec.Funded = true
 				rec.HasBalance = true
 				funded++
+				attemptFunded++
 			} else {
 				still = append(still, rec)
 			}
 		}
+		log.Printf("funding: attempt %d confirmed %d newly funded account(s); total funded %d/%d",
+			attempt, attemptFunded, funded, len(targets))
 		remaining = still
 		if len(remaining) > 0 {
 			log.Printf("  INFO: %d account(s) unfunded after attempt %d/%d", len(remaining), attempt, maxAttempts)

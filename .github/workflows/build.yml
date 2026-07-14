@@ -109,13 +109,11 @@ jobs:
 
           tar_file=$(ls *.tar.gz)
 
-          file_path=$(tar -tzf "$tar_file" | head -n 2 | grep -v '/$' | grep lumerad | sed 's|^/||')
+          file_path=$(tar -tzf "$tar_file" | sed 's|^\./||' | grep -Fx lumerad)
           echo "Binary: $file_path"
-          tar xzf "$tar_file" -C .
-          ls -l "$file_path"
-
           mkdir -p temp
-          mv "$file_path" temp/
+          tar xzf "$tar_file" -C temp
+          ls -l "temp/$file_path"
           ls -l temp/
 
           rm "$tar_file"
@@ -143,6 +141,21 @@ jobs:
           rm -rf temp
 
           tar tvf "$tar_file"
+
+          archive_files=$(tar tzf "$tar_file" | sed 's|^\./||')
+          for required_file in lumerad; do
+            if ! grep -Fxq "$required_file" <<< "$archive_files"; then
+              echo "Missing required release file: $required_file" >&2
+              exit 1
+            fi
+          done
+          for script in ../scripts/evmigration-common.sh ../scripts/migrate-*.sh; do
+            required_file="scripts/${script##*/}"
+            if ! grep -Fxq "$required_file" <<< "$archive_files"; then
+              echo "Missing required release file: $required_file" >&2
+              exit 1
+            fi
+          done
 
           sha256sum "$tar_file" > release_checksum
 

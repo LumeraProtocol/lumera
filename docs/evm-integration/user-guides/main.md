@@ -25,7 +25,7 @@ The canonical migration walkthrough for end users. Covers the three supported pa
 
 ### [migration-scripts.md](migration-scripts.md) — EVM Migration Helper Scripts
 
-Reference for the bundled `scripts/migrate-account.sh`, `scripts/migrate-validator.sh`, and `scripts/migrate-multisig.sh`. These layer pre-flight estimates, destination-freshness checks, post-migration verification, structured exit codes, and a one-shot mnemonic-file flow on top of the raw CLI commands. Use when migrating in bulk, scripting CI, or when you want safety rails the raw CLI doesn't provide.
+Reference for the bundled `scripts/migrate-account.sh`, `scripts/migrate-validator.sh`, and `scripts/migrate-multisig.sh`. These layer pre-flight estimates, destination-freshness checks, post-migration verification, structured exit codes, and an optional same-mnemonic file flow on top of the raw CLI commands. Use when migrating in bulk, scripting CI, or when you want safety rails the raw CLI doesn't provide.
 
 ### [validator-migration.md](validator-migration.md) — Validator Operator Migration
 

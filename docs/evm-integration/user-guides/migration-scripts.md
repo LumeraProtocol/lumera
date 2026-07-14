@@ -27,7 +27,7 @@ Important rules:
 
 - The **legacy key** is the old Lumera key: coin type 118, `secp256k1`.
 - The **new key** is the EVM-compatible key: coin type 60, `eth_secp256k1`.
-- For mnemonic-based migrations, both keys normally come from the **same mnemonic** with different coin types.
+- The keys may use the **same mnemonic or different mnemonics**. There is no mnemonic relationship requirement. The destination key must use coin type `60` and key type `eth_secp256k1`.
 - The destination address must be **fresh**. It must not already exist on-chain, must not have bank balance, and must not appear in any migration record.
 - Run `--dry-run` first. It performs the same safety checks and stops before broadcast.
 - Do not use `migrate-account.sh` for validators. Use `migrate-validator.sh`.
@@ -44,6 +44,8 @@ INFO  check OK: destination address lumera1... does not exist on-chain
 
 If any of these checks fails, stop and read the error. Reusing an already-used destination address is unsafe and the chain will reject it.
 
+The scripts also announce every stage before doing work. Single-key account and validator runs use seven numbered stages. The multisig ceremony labels each `generate`, `sign`, `combine`, and `submit` stage separately, explains whether a step can broadcast, warns before keyring passphrase prompts or potentially slow gas simulation, and ends with the exact next action. A passphrase is never echoed while typing.
+
 ---
 
 ## What The Scripts Add
@@ -57,6 +59,7 @@ Compared with raw `lumerad tx evmigration ...`, the scripts add:
 - **Validator cap checks**: validator migration checks `max_validator_delegations`.
 - **Validator downtime acknowledgement**: validator migration requires explicit acknowledgement that the node is stopped.
 - **Broadcast validation**: the scripts reject CheckTx failures immediately.
+- **HTTP-only RPC support**: broadcasts return immediately and inclusion is confirmed with HTTP `query tx` polling; WebSocket support is not required.
 - **Post-migration verification**: after broadcast, the scripts verify the migration record and balances.
 - **Dry-run mode**: runs safety checks and preview without broadcasting.
 - **Automatic gas sizing**: broadcasts with `--gas auto` (record-count fallback); no manual `--gas` needed.
@@ -71,7 +74,7 @@ On the machine where you run the scripts:
 - `bash` 4.4 or newer.
 - `jq` on `PATH`.
 - Access to a Lumera RPC endpoint. By default, the scripts use local CometBFT RPC at `tcp://localhost:26657`.
-- The legacy key and new EVM key in the keyring, or a mnemonic file for one-shot import.
+- The legacy key and new EVM key in the keyring, or a mnemonic file for the optional same-mnemonic convenience flow.
 
 Verify your binary supports the migration module:
 
@@ -125,7 +128,7 @@ They accept these common flags:
 | `--keyring-backend <b>`    | `test`                                                | `test`, `file`, or `os`.                                             |
 | `--keyring-dir <dir>`      | unset                                                 | Keyring directory independent of `--home`.                           |
 | `--home <dir>`             | `lumerad` default                                     | Passed through to `lumerad`.                                         |
-| `--mnemonic-file <path>`   | unset                                                 | One-shot import from a mnemonic file with mode `0600` or stricter.   |
+| `--mnemonic-file <path>`   | unset                                                 | Optional same-mnemonic import from a file with mode `0600` or stricter. |
 | `--yes`, `-y`              | off                                                   | Skip the normal broadcast confirmation prompt.                       |
 | `--dry-run`                | off                                                   | Run checks and preview, then stop before broadcast.                  |
 | `--binary <path>`          | `lumerad` from `PATH`                                 | Use a specific `lumerad` binary.                                     |
@@ -177,6 +180,8 @@ Lumera mainnet CometBFT RPC endpoint:
 
 Public endpoints can be rate-limited or temporarily unavailable. For production operations, prefer your own node or a provider endpoint with an SLA/API key.
 
+The scripts support RPC endpoints that expose only HTTP. They pass `--tx-timeout 0s` to the migration CLI to skip its WebSocket subscription, then poll `query tx` over HTTP and verify the final migration record and balances. A `/websocket` endpoint is therefore optional.
+
 ### Environment Variables
 
 - `LUMERA_NODE`: default RPC endpoint.
@@ -218,7 +223,7 @@ Import the new EVM-compatible key:
 lumerad keys add <new-evm-key> --recover --coin-type 60 --algo eth_secp256k1 --keyring-backend test
 ```
 
-Enter the same mnemonic for both if you are migrating a normal mnemonic-derived account.
+You may enter the legacy mnemonic or a different mnemonic. The chain does not compare mnemonics; it requires control of both keys, a fresh destination address, coin type `60`, and key type `eth_secp256k1`.
 
 Check addresses before proceeding:
 
@@ -351,83 +356,17 @@ lumerad keys delete <legacy-key> --keyring-backend test
 
 ---
 
-## One-Shot Mnemonic File Flow
+## Optional Same-Mnemonic File Flow
 
-Use this when you do not want to manually import keys first.
-
-Create a file containing the mnemonic and lock down permissions:
+Use `--mnemonic-file` only when you intentionally want both coin-type derivations from one mnemonic. This is a convenience, not a migration requirement. The file must be mode `0600` or stricter:
 
 ```bash
 chmod 0600 /secure/tmp/mnemonic.txt
+./scripts/migrate-account.sh <legacy-key> <new-evm-key> \
+  --mnemonic-file /secure/tmp/mnemonic.txt
 ```
 
-Run:
-
-```bash
-./scripts/migrate-account.sh <legacy-key-name> <new-key-name> \
-  --mnemonic-file /secure/tmp/mnemonic.txt \
-  --yes
-```
-
-The script imports missing keys, runs the migration, and deletes only the keyring entries it created for this run. The mnemonic file itself is not modified.
-
-If a key name already exists, the script derives the same role from the mnemonic and compares addresses:
-
-- if the existing key matches the mnemonic-derived address, the script reuses it
-- if the existing key points to a different address, the script stops before migration
-
-Example with the legacy key already present and the new EVM key imported from the mnemonic:
-
-```text
-$ ./scripts/migrate-account.sh bob-legacy bob-evm --mnemonic-file /secure/tmp/mnemonic.txt
-INFO  chain ID: lumera-devnet-1
-INFO  legacy key bob-legacy already exists in keyring and matches mnemonic; reusing it
-INFO  imported new EVM key bob-evm from mnemonic for this run
-INFO  legacy key bob-legacy -> address lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0
-INFO  new EVM key bob-evm -> address lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
-INFO  check OK: no migration record found for legacy address lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0
-INFO  check OK: destination address lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0 has no migration record as a legacy address
-INFO  check OK: no migration record found by new address lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
-INFO  check OK: destination address lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0 does not exist on-chain
-Migration preview for legacy account lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0 (coin-type 118, secp256k1):
-  Validator:         no
-  Multisig:          no
-  Balance:           25000ulume
-  Delegations:       none
-  Unbonding:         none
-  Redelegations:     none
-  Authz grants:      none
-  Feegrants:         none
-  Actions:           none
-  Supernode:         no
-  Would succeed:     yes
-INFO  migrating legacy account lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0 -> EVM-compatible lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
-
-Tx body to broadcast:
-  Type:           /lumera.evmigration.MsgClaimLegacyAccount
-  Legacy address: lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0
-  New address:    lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
-  Gas limit:      200000
-
-Proceed with migration? [y/N] y
-gas estimate: 668329
-INFO  broadcast tx 7F6CB7EF6DB1BAD888FA8D1371D6794A96171875A47AAE7579565A17BE7E07CF; waiting for inclusion...
-INFO  tx included at height 13496 (waited 1s)
-
-Migration record (chain state):
-  legacy address: lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0
-  new address:    lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
-  height:         13496
-  unix time:      1777910386
-
-New account balance (lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0):
-  25000ulume
-
-INFO  migration complete
-INFO    legacy: lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0
-INFO    new:    lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
-INFO    tx:     7F6CB7EF6DB1BAD888FA8D1371D6794A96171875A47AAE7579565A17BE7E07CF
-```
+If you prefer independent mnemonics, import or generate the two keys separately and omit this flag.
 
 ---
 
@@ -978,7 +917,7 @@ After broadcast, the scripts verify:
 | Code   | Meaning                                      | Typical cause                                                                                                      |
 | ------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `0`  | Success or clean dry-run                     | No broadcast in dry-run; migration verified in normal mode.                                                        |
-| `1`  | Usage error                                  | Bad arguments, missing required flag, bad mnemonic-file permissions, key name collision.                           |
+| `1`  | Usage error                                  | Bad arguments, missing required flag, bad mnemonic-file permissions, or key name collision.                        |
 | `2`  | Environment or query error                   | Missing binary, old binary, missing `jq`, RPC/query failure.                                                       |
 | `3`  | Single-key vs multisig mismatch              | Single-key script saw multisig, or multisig script saw single-sig.                                                 |
 | `4`  | Pre-flight or quorum failure                 | `migration-estimate.would_succeed=false`, or multisig combine lacks valid quorum.                                  |

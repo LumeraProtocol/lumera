@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -69,7 +70,7 @@ both proofs, simulates gas, and broadcasts. No fee is charged.
 
 <legacy-key> must be a secp256k1 key (coin-type 118).
 <new-key> must be an eth_secp256k1 key (coin-type 60).
-Both keys must come from the same mnemonic.`,
+The keys may come from the same mnemonic or different mnemonics; no mnemonic relationship is required.`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := preflightChainIDCheck(cmd); err != nil {
@@ -83,7 +84,7 @@ Both keys must come from the same mnemonic.`,
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)
-	cmd.Flags().String(flagTxTimeout, defaultTxTimeout, "How long to wait for the transaction to be included in a block (e.g. 30s, 1m)")
+	cmd.Flags().String(flagTxTimeout, defaultTxTimeout, "How long to wait for transaction inclusion; 0s returns after broadcast (e.g. 30s, 1m)")
 	return cmd
 }
 
@@ -100,7 +101,7 @@ both proofs, simulates gas, and broadcasts. No fee is charged.
 
 <legacy-validator-key> must be a secp256k1 key (coin-type 118).
 <new-validator-evm-key> must be an eth_secp256k1 key (coin-type 60).
-Both keys must come from the same mnemonic.
+The keys may come from the same mnemonic or different mnemonics; no mnemonic relationship is required.
 
 WARNING: Stop your validator node before running this command.
 Restart it immediately after the transaction is confirmed.`,
@@ -117,7 +118,7 @@ Restart it immediately after the transaction is confirmed.`,
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)
-	cmd.Flags().String(flagTxTimeout, defaultTxTimeout, "How long to wait for the transaction to be included in a block (e.g. 30s, 1m)")
+	cmd.Flags().String(flagTxTimeout, defaultTxTimeout, "How long to wait for transaction inclusion; 0s returns after broadcast (e.g. 30s, 1m)")
 	return cmd
 }
 
@@ -315,6 +316,21 @@ func runMigrationTx(cmd *cobra.Command, msg migrationProofMsg) error {
 		txTimeout, _ := cmd.Flags().GetString(flagTxTimeout)
 		if txTimeout == "" {
 			txTimeout = defaultTxTimeout
+		}
+		waitDuration, err := time.ParseDuration(txTimeout)
+		if err != nil {
+			return fmt.Errorf("invalid --%s value %q: %w", flagTxTimeout, txTimeout, err)
+		}
+		if waitDuration < 0 {
+			return fmt.Errorf("--%s must not be negative", flagTxTimeout)
+		}
+		// Wrappers that support HTTP-only RPC endpoints confirm inclusion by
+		// polling `query tx`, because those endpoints reject WebSocket upgrades.
+		// A zero timeout makes this command return the accepted broadcast result
+		// immediately so the wrapper can perform that confirmation without a
+		// misleading WebSocket handshake error.
+		if waitDuration == 0 {
+			return clientCtx.PrintProto(res)
 		}
 		waitCmd := rpc.WaitTxCmd()
 		waitCmd.SetArgs([]string{res.TxHash, "--timeout", txTimeout})

@@ -3,7 +3,6 @@ package common
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -35,7 +34,7 @@ func NewMultisig(cli *ChainCLI) *Multisig {
 	return &Multisig{
 		CLI: cli,
 		exec: func(bin string, args ...string) (string, error) {
-			out, err := exec.Command(bin, args...).CombinedOutput()
+			out, err := combinedOutputNoDesktopBus(bin, args...)
 			return strings.TrimSpace(string(out)), err
 		},
 	}

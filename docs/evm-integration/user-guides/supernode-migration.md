@@ -36,7 +36,7 @@ Path B is useful when you want to use Keplr's UX to see each step (the Portal sh
 >
 > Then continue with Step B3 (recover the new EVM key into the supernode keyring) onward.
 
-**Why both paths work deterministically**: `supernode keys recover` derives keys at HD path `m/44'/60'/0'/0/0` using `eth_secp256k1`. Keplr uses the identical derivation for Lumera's EVM chain definition. Given the same mnemonic, both produce the exact same bech32 address — so the new address in the on-chain migration record matches what the supernode derives locally, and the `alreadyMigrated` branch activates cleanly.
+**Why both paths work deterministically**: `supernode keys recover` derives keys at HD path `m/44'/60'/0'/0/0` using `eth_secp256k1`. Keplr uses the identical derivation for Lumera's EVM chain definition. Import the chosen destination mnemonic into both tools so they produce the same destination address. That mnemonic may be the legacy mnemonic or a different one.
 
 If you chose Path B, the steps below are the same but in Step 3 the logs will show a *skipped* broadcast (see the **Path B log variant** callout in that section).
 
@@ -52,7 +52,7 @@ Before starting:
 
 ---
 
-## Step 1 — Recover the new EVM key from the same mnemonic
+## Step 1 — Generate or recover the EVM destination key
 
 `supernode keys recover` always produces `eth_secp256k1` keys (coin-type 60). Run it with a **new key name** distinct from your legacy one:
 
@@ -66,13 +66,13 @@ Example:
 `supernode keys recover supernode-evm --mnemonic "inspire words ... about"
 ```
 
-The output prints the new EVM address (derived at coin-type 60 from the same mnemonic). Verify:
+The output prints the new EVM address derived at coin type 60 from the chosen destination mnemonic. Verify:
 
 ```bash
 supernode keys list
 ```
 
-You should see both your legacy key and the newly recovered EVM key. Both derive from the same mnemonic; only their HD paths differ.
+You should see both your legacy key and the newly recovered EVM key. They may use the same mnemonic or different mnemonics; the new key uses coin type `60` and `eth_secp256k1`.
 
 ## Step 2 — Add `evm_key_name` to `config.yml`
 
@@ -160,7 +160,7 @@ Use this section if you chose Path B from the ["Two ways to migrate"](#two-ways-
 
 ### Before you start
 
-- You need the **same mnemonic** in Keplr (for the Portal) and on the supernode host (for `supernode keys recover`). The deterministic address match between the Portal-submitted migration record and the key you'll import into the supernode keyring depends on this.
+- Import the chosen destination mnemonic in Keplr and on the supernode host so both control the destination recorded by the migration. It may be the legacy mnemonic or a different mnemonic.
 - Decide *when* you'll run each step. A safe order is: stop the supernode → migrate in Keplr → recover the EVM key → edit config → restart. Leaving the supernode running between the Portal migration and the final restart is not harmful (the legacy account no longer exists on-chain, so the supernode's outgoing txs will fail fast), but it produces alarming-looking errors in the logs until you restart.
 
 ### Step B1 — Stop the supernode

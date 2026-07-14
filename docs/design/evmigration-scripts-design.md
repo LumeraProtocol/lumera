@@ -49,7 +49,7 @@ source "${SCRIPT_DIR}/evmigration-common.sh"
 | `require_binary` | Verifies `$BIN` is runnable and the build supports `evmigration` subcommands |
 | `require_jq` | Aborts if `jq` is not on `$PATH` |
 | `lumerad_q <args...>` | Thin wrapper that runs `"$BIN" query "$@" --node "$NODE" --output json` |
-| `lumerad_tx <args...>` | Wrapper that runs `"$BIN" tx "$@" --node "$NODE" --chain-id "$CHAIN_ID" --keyring-backend "$KEYRING_BACKEND" --output json`, injecting `--keyring-dir` and `--home` when set. Auto-sizes gas: broadcasts with `--gas auto --gas-adjustment 1.5`, falling back to a record-count formula `6,000,000 + 1,500,000 × records` (clamped to block `max_gas`) when the simulate fails. Migration fees are waived, so the gas limit is free. See 4.7 |
+| `lumerad_tx <args...>` | Wrapper that runs `"$BIN" tx "$@" --node "$NODE" --chain-id "$CHAIN_ID" --keyring-backend "$KEYRING_BACKEND" --tx-timeout 0s --output json`, injecting `--keyring-dir` and `--home` when set. Auto-sizes gas: broadcasts with `--gas auto --gas-adjustment 1.5`, falling back to a record-count formula `6,000,000 + 1,500,000 × records` (clamped to block `max_gas`) when the simulate fails. Migration fees are waived, so the gas limit is free. See 4.7 |
 | `lumerad_keys <args...>` | Thin wrapper for `lumerad keys` with the same keyring flags |
 | `resolve_address <key-name>` | Returns bech32 via `lumerad keys show <k> -a` |
 | `assert_single_sig <estimate-json>` | Reads `is_multisig` from a captured `migration-estimate` response (see 4.4); errors with exit code 3 if true |
@@ -59,7 +59,7 @@ source "${SCRIPT_DIR}/evmigration-common.sh"
 | `assert_estimate_succeeds <estimate-json>` | Reads `would_succeed`; exits 4 with `rejection_reason` when false. Callers run this only after more specific checks that intentionally use exit 3 or 6. |
 | `snapshot_bank_balances <bech32>` | Captures `bank balances <addr>` as structured JSON (used as a pre-broadcast snapshot; see 4.6) |
 | `import_from_mnemonic <file> <legacy-name> <new-name>` | Reads mnemonic from file (after permission check), runs two `lumerad keys add --recover` invocations with correct coin-type/algo into the user's specified keyring, registers a `trap` that deletes the two keys on exit |
-| `wait_for_tx <hash>` | Polls `lumerad query tx <hash>` up to 30s; returns non-zero on timeout, missing tx, or non-zero execution code. This is intentionally idempotent because the underlying evmigration CLI already calls SDK `wait-tx` after sync broadcast. |
+| `wait_for_tx <hash>` | Confirms with `lumerad query tx <hash>` and falls back to bounded HTTP polling. Scripts disable the CLI's internal WebSocket wait with `--tx-timeout 0s`, so HTTP-only RPC providers are fully supported. |
 | `verify_migration <legacy-bech32> <new-bech32> <legacy-balance-snapshot-json>` | After broadcast: migration record must exist with matching `new_address`, legacy bank balance must be zero, new bank balance must be ≥ snapshot per-denom (see 4.6). Exits 7 on failure |
 | `confirm <prompt>` | Interactive y/N that respects `--yes` (returns 0 without prompting); returns 10 on user abort |
 | `log_info` / `log_warn` / `log_error` | Prefixed output to stderr; color if `stderr` is a TTY; no color otherwise |
@@ -75,7 +75,7 @@ Parsed by `parse_common_flags`. Positional arguments (two key names) are stored 
 | `--keyring-backend <b>` | `test` | Passed through to `lumerad` |
 | `--keyring-dir <dir>` | unset | Passed through when set |
 | `--home <dir>` | unset (lumerad default) | Passed through when set |
-| `--mnemonic-file <path>` | unset | Triggers mnemonic import flow |
+| `--mnemonic-file <path>` | unset | Optional convenience flow deriving both key types from one mnemonic |
 | `--yes` / `-y` | off | Skip standard confirmation prompts |
 | `--dry-run` | off | Exit after pre-flight; never broadcast |
 | `--binary <path>` | `lumerad` on `$PATH` | Override binary location |
@@ -84,14 +84,14 @@ Unknown flags abort with exit code 1 and a usage message.
 
 ### 4.3 Mnemonic handling
 
-Triggered only by `--mnemonic-file`. The file must be mode `0600` or stricter; a group/world-readable file aborts with exit code 1.
+Triggered only by `--mnemonic-file`. This is an optional convenience for users who choose the same mnemonic; migration itself does not require any mnemonic relationship. The file must be mode `0600` or stricter.
 
 Flow:
 
 1. Check both `$LEGACY_KEY` and `$NEW_KEY` do **not** already exist in the user's keyring. Abort with exit 1 if either does (no silent overwrite).
 2. Read the mnemonic from the file into a shell variable.
 3. Run `lumerad keys add "$LEGACY_KEY" --recover --coin-type 118 --algo secp256k1 <keyring-flags>` piping the mnemonic via `printf '%s\n'`.
-4. Run `lumerad keys add "$NEW_KEY" --recover --coin-type 60 --algo eth_secp256k1 <keyring-flags>` piping the same mnemonic.
+4. Run `lumerad keys add "$NEW_KEY" --recover --coin-type 60 --algo eth_secp256k1 <keyring-flags>` using the supplied mnemonic.
 5. `unset` the mnemonic variable.
 6. Register a cleanup trap that runs `lumerad keys delete "$LEGACY_KEY" --yes` and `lumerad keys delete "$NEW_KEY" --yes` on script exit, preserving the original exit code:
 

@@ -901,7 +901,13 @@ primary_validator_setup() {
 	if [ -z "${gov_mnemonic:-}" ] && [ -s "${GOV_MNEMONIC_FILE}" ]; then
 		gov_mnemonic="$(cat "${GOV_MNEMONIC_FILE}")"
 	fi
-	printf '%s\n' "${gov_addr}" >${SHARED_DIR}/governance_address
+	if [ -z "${gov_mnemonic:-}" ]; then
+		gov_mnemonic="$(accounts_registry_get_field "governance_key" "mnemonic")"
+	fi
+	if [ -n "${gov_mnemonic:-}" ]; then
+		printf '%s\n' "${gov_mnemonic}" >"${GOV_MNEMONIC_FILE}"
+	fi
+	printf '%s\n' "${gov_addr}" >"${SHARED_DIR}/governance_address"
 	run ${DAEMON} genesis add-genesis-account "${gov_addr}" "1000000000000${DENOM}"
 	accounts_registry_upsert "governance_key" "${gov_addr}" "${gov_mnemonic:-}" "cosmos" "1000000000000${DENOM}" "genesis" ""
 

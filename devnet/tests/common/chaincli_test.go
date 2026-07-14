@@ -35,6 +35,56 @@ func TestAddKeyWithStylePassesExplicitKeyStyleFlags(t *testing.T) {
 	})
 }
 
+func TestEnvWithoutDesktopBusStripsDesktopSession(t *testing.T) {
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:abstract=/tmp/dbus-test")
+	t.Setenv("DISPLAY", ":0")
+	t.Setenv("WAYLAND_DISPLAY", "wayland-0")
+	t.Setenv("XDG_RUNTIME_DIR", "/mnt/wslg/runtime-dir")
+	t.Setenv("GOMAXPROCS", "99")
+	t.Setenv("LUMERA_KEYRING_BACKEND", "secret-service")
+	t.Setenv("LUMERA_TEST_KEEP", "yes")
+
+	env := envWithoutDesktopBus()
+	for _, kv := range env {
+		if kv == "DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/lumera-no-dbus-session-bus" {
+			continue
+		}
+		if isDesktopSessionEnv(kv) {
+			t.Fatalf("envWithoutDesktopBus kept desktop session env: %q", kv)
+		}
+	}
+	if !containsEnv(env, "DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/lumera-no-dbus-session-bus") {
+		t.Fatalf("envWithoutDesktopBus did not disable D-Bus autolaunch: %v", env)
+	}
+	if !containsEnv(env, "DISABLE_KWALLET=1") {
+		t.Fatalf("envWithoutDesktopBus did not disable KWallet probing: %v", env)
+	}
+	if !containsEnv(env, "LUMERA_TEST_KEEP=yes") {
+		t.Fatalf("envWithoutDesktopBus dropped unrelated env var: %v", env)
+	}
+	if !containsEnv(env, "GOMAXPROCS=1") {
+		t.Fatalf("envWithoutDesktopBus did not set child GOMAXPROCS=1: %v", env)
+	}
+	if containsEnv(env, "GOMAXPROCS=99") {
+		t.Fatalf("envWithoutDesktopBus kept parent GOMAXPROCS: %v", env)
+	}
+	if !containsEnv(env, "LUMERA_KEYRING_BACKEND=test") {
+		t.Fatalf("envWithoutDesktopBus did not force test keyring backend: %v", env)
+	}
+	if containsEnv(env, "LUMERA_KEYRING_BACKEND=secret-service") {
+		t.Fatalf("envWithoutDesktopBus kept parent keyring backend: %v", env)
+	}
+}
+
+func containsEnv(env []string, want string) bool {
+	for _, kv := range env {
+		if kv == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestParseSyncBroadcastHandlesQueryTxResponse(t *testing.T) {
 	out := `{
 		"tx_response": {

@@ -1,8 +1,9 @@
 package common
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -32,13 +33,33 @@ func recoverKeyArgs(name, keyringBackend string, style KeyStyle, home string) []
 // coin-type-118 secp256k1 legacy key. Reruns should delete a stale key first.
 func (c *ChainCLI) ImportKeyWithStyle(name, mnemonic string, style KeyStyle) (string, error) {
 	args := recoverKeyArgs(name, c.keyringBackend(), style, c.Home)
-	cmd := exec.Command(c.Bin, args...)
+	cmd, cancel, ctx, release := commandNoDesktopBus(c.Bin, args...)
+	defer cancel()
+	defer release()
 	cmd.Stdin = strings.NewReader(mnemonic + "\n")
 	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", fmt.Errorf("keys add --recover %s: timeout after %s running %s: %w", name, commandTimeout(), commandString(c.Bin, args...), ctx.Err())
+	}
 	if err != nil {
 		return "", fmt.Errorf("keys add --recover %s: %s: %w", name, strings.TrimSpace(string(out)), err)
 	}
-	return c.ShowAddress(name)
+	return parseRecoveredKeyAddress(name, out)
+}
+
+func parseRecoveredKeyAddress(name string, out []byte) (string, error) {
+	payload, ok := ExtractJSONPayload(string(out))
+	if !ok {
+		return "", fmt.Errorf("keys add --recover %s: no JSON in output: %s", name, truncate(string(out), 200))
+	}
+	var gk GeneratedKey
+	if err := json.Unmarshal([]byte(payload), &gk); err != nil {
+		return "", fmt.Errorf("parse keys add --recover %s output: %w", name, err)
+	}
+	if gk.Address == "" {
+		return "", fmt.Errorf("keys add --recover %s: missing address in output", name)
+	}
+	return gk.Address, nil
 }
 
 // claimLegacyAccountArgs builds the `tx evmigration claim-legacy-account` command

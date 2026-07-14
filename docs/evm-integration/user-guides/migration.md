@@ -9,8 +9,8 @@
 
 The Lumera chain upgraded from a standard Cosmos SDK chain to an EVM-compatible chain. This changed the underlying cryptography used for account addresses:
 
-- **Before the upgrade (legacy)**: accounts used**coin-type 118** with`secp256k1` keys and Cosmos-style address hashing (`ripemd160(sha256(pubkey))`)
-- **After the upgrade (EVM)**: accounts use**coin-type 60** with`eth_secp256k1` keys and Ethereum-style address hashing (`keccak256(pubkey)[12:]`)
+- **Before the upgrade (legacy)**: accounts used**coin-type 118** with `secp256k1` keys and Cosmos-style address hashing (`ripemd160(sha256(pubkey))`)
+- **After the upgrade (EVM)**: accounts use**coin-type 60** with `eth_secp256k1` keys and Ethereum-style address hashing (`keccak256(pubkey)[12:]`)
 
 Because the address derivation changed, the same mnemonic now produces a **different Lumera address**. Your funds, delegations, and other on-chain state remain at the old (legacy) address. Migration moves all of that state to your new EVM-compatible address.
 
@@ -49,7 +49,7 @@ After migration:
 
 - Migration is**irreversible** - once completed, it cannot be undone
 - Migration is**fee-free** - no LUME is required on either address to submit the transaction
-- Both addresses must come from the**same mnemonic** (same seed phrase)
+- The keys may use the **same or different mnemonics**; the destination must use coin type `60`, key type `eth_secp256k1`, and a fresh on-chain address
 - The migration transaction is unsigned at the Cosmos tx layer; authentication is embedded in the message as dual cryptographic proofs
 
 ### Using both Keplr and MetaMask after migration
@@ -158,7 +158,7 @@ The state panel at the top of **Migration Status** summarises four pieces of con
 | Row                          | What it means                                                                                                                                                                                                                                                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **on-chain network**   | The `chain_id` of the connected node, plus a tag indicating the chain has EVM migration support (`/ EVM support`).                                                                                                                                                                                        |
-| **Portal profile**     | Which JSON profile the Portal is currently using (`lumera-devnet-1` or `lumera-devnet-evm`) and the `coin-type` it's configured for. Yellow when on the legacy profile (`118`), green on the EVM profile (`60`).                                                                                      |
+| **Portal profile**     | Which JSON profile the Portal is currently using (`lumera-devnet-1` or `lumera-devnet-evm`) and the `coin-type` it's configured for. Yellow when on the legacy profile (`118`), green on the EVM profile (`60`).                                                                                    |
 | **Keplr chain config** | The `bip44.coinType` Keplr has stored for this `chain_id` in its chain registry — independent of which profile the Portal is on. Yellow when Keplr is still on `118`, green on `60`.                                                                                                                 |
 | **Keplr account key**  | Which derivation Keplr is actually serving for the connected wallet (`legacy key / coin-type 118` or `EVM key / coin-type 60`). The Portal infers this by recomputing both bech32 variants from Keplr's pubkey and matching against `walletStore.currentAddress` (with a migration-record cross-check). |
 
@@ -219,9 +219,9 @@ Key things to check:
 - **"Eligible for migration"** banner at the top with the**Standard Account** badge (or**Validator** /**Supernode**, when applicable).
 - The asset summary:**Balance**,**Delegations**,**Unbonding**,**Authz / Feegrant**,**Supernode**.
 - **Legacy Address (coin-type 118)** — your current Lumera address, shown in cyan.
-- **New Address (coin-type 60)** — your destination, shown both as a Lumera bech32 (`Lumera bech32:`) and an Ethereum hex (`Ethereum hex:`). The Portal derives this from Keplr's Ethereum provider using the same mnemonic.
+- **New Address (coin-type 60)** — your destination, shown both as a Lumera bech32 (`Lumera bech32:`) and an Ethereum hex (`Ethereum hex:`).
 
-The note at the bottom reminds you that both addresses must come from the **same mnemonic**, derived on different coin-type paths (118 → 60).
+The destination must be a fresh on-chain address controlled by a coin-type `60`, `eth_secp256k1` key. Its mnemonic may be the same as or different from the legacy mnemonic.
 
 If you need to migrate a different account, expand **"Check a different legacy address"** at the bottom.
 
@@ -314,7 +314,7 @@ Right after the wizard closes you're still on the legacy Portal profile, so the 
 
 ![Post-migration on the legacy Portal profile — Wallet Re-Import Still Required](../assets/evmigration-11.png)
 
-The state panel still reads `Portal profile: lumera-devnet-1 / coin-type 118` (yellow), `Keplr chain config: coin-type 118` (yellow), and `Keplr account key: legacy key / coin-type 118` (yellow). The Portal knows your migration record from the chain ("Account migrated from legacy …" appears under the connected address) but the connected key is still the legacy 118 derivation, so your displayed Keplr balance is 0 — the assets now live at the new EVM address. The card states the **main action** directly: *re-import the same mnemonic in Keplr and use the new profile derived from coin-type 60.* The migration record (legacy address, new Lumera address, **Migration date**, **Block height**) is shown at the bottom.
+The state panel still reads `Portal profile: lumera-devnet-1 / coin-type 118` (yellow), `Keplr chain config: coin-type 118` (yellow), and `Keplr account key: legacy key / coin-type 118` (yellow). The Portal knows your migration record from the chain ("Account migrated from legacy …" appears under the connected address) but the connected key is still the legacy 118 key, so your displayed Keplr balance is 0 — the assets now live at the new EVM address. Import the fresh destination mnemonic in Keplr and use the coin-type 60 profile. The migration record (legacy address, new Lumera address, **Migration date**, **Block height**) is shown at the bottom.
 
 Work through the cleanup in the order below.
 
@@ -324,9 +324,11 @@ In Keplr, open the **☰** menu (top-right) and choose **Add/Remove Chains**:
 
 ![Keplr menu with Add/Remove Chains](../assets/evmigration-12.png)
 
-Find the legacy **lumera-devnet-1** entry and toggle it **off**. (Removing it now avoids a stale `coin-type 118` chain definition lingering in Keplr's registry.)
+Find the legacy **lumera-devnet-1** entry and toggle it **off**. This reduces the chance of Keplr serving the stale `coin-type 118` derivation.
 
 ![Keplr Add/Remove Chains — toggle the legacy lumera-devnet-1 chain off](../assets/evmigration-13.png)
+
+> ⚠️ **IMPORTANT — toggling off does NOT delete the chain.** If your legacy Lumera chain came from Keplr's built-in chain **registry** (which is how most users got `coin-type 118`), toggling it off in Add/Remove Chains only **disables** it — Keplr keeps the cached `coin-type 118` definition and can silently re-enable it. There is no way to truly delete a registry chain from Keplr. This is exactly why step **c** below must be done carefully: on the chain-approval dialog you must **NOT** just click **Approve**, or Keplr will restore this cached legacy definition instead of the EVM one.
 
 ###### b. Switch the Portal to the EVM profile
 
@@ -344,9 +346,21 @@ Click **Connect Wallet**. On the EVM profile the dialog now also offers **MetaMa
 
 ![Connect Wallet on the EVM profile — Keplr and MetaMask options](../assets/evmigration-16.png)
 
-The Portal asks Keplr to add the EVM chain definition. Approve the `suggestChain` dialog (`bip44.coinType: 60`, `features: ["eth-address-gen", "eth-key-sign", "eth-secp256k1-cosmos"]`):
+The Portal asks Keplr to add the EVM chain definition (`bip44.coinType: 60`, `features: ["eth-address-gen", "eth-key-sign", "eth-secp256k1-cosmos"]`).
 
-![Keplr suggestChain dialog — Add lumera-devnet-evm (coin-type 60)](../assets/evmigration-17.png)
+> 🛑 **DO NOT CLICK "APPROVE" ON KEPLR'S FIRST SCREEN.**
+>
+> This is the single most common way the cleanup goes wrong. Because Keplr still has the **cached legacy `coin-type 118`** chain definition from its registry (see the warning in step **a** — toggling it off did not delete it), clicking **Approve** directly on the first screen makes Keplr **re-enable that cached legacy `118` definition**, NOT the EVM `coin-type 60` definition the Portal is suggesting. Your `Keplr chain config` row goes **back to yellow / 118** and you are stuck in a loop.
+>
+> **YOU MUST CLICK "Add chain as suggested >" FIRST, verify coin-type 60, and ONLY THEN Approve.**
+
+**The trap — Keplr's collapsed first screen.** When a cached registry chain exists, this dialog opens *collapsed*: a title like **"Add Lumera Testnet to Keplr"**, a **"Community driven"** tag, a small **"Add chain as suggested >"** link, and a large blue **Approve** button. It does **not** show the chain's coin-type here, so there is nothing to tell you which definition Approve will use. **CLICK "Add chain as suggested >"** (the small link) — **NOT Approve**:
+
+![Keplr collapsed "Community driven" first screen — click "Add chain as suggested >", NOT Approve](../assets/evmigration-26.png)
+
+**The correct screen — verify, then Approve.** Keplr now expands the *actual* suggested definition (the header changes to **"Add lumera-…-evm to Keplr"** with a back arrow, and the full JSON is shown). Confirm it reads **`"coinType": 60`** under `bip44` and that the chain name ends in `-evm` — and **ONLY NOW click Approve**:
+
+![Keplr suggestChain dialog expanded — "Add lumera-testnet-evm", coinType 60 shown; Approve only on this screen](../assets/evmigration-27.png)
 
 > **Checkpoint — State B ("Update Keplr Chain Definition").** If you reconnected *before* removing the legacy chain in step a, the card reads **Update Keplr Chain Definition** instead: `Portal profile` is green but `Keplr chain config` is still `coin-type 118` (yellow). Disconnect, remove the legacy chain (step a), then reconnect so the Portal re-suggests the EVM definition.
 
@@ -355,7 +369,6 @@ The Portal asks Keplr to add the EVM chain definition. Approve the `suggestChain
 After the chain config is on `60` but before you re-import the mnemonic, the same Keplr profile is still serving its original 118-derived key, just rendered eth-style for the new chain config. The state panel shows the first three rows green but **Keplr account key: legacy key / coin-type 118** still yellow:
 
 ![State panel — Portal and chain on coin-type 60, but Keplr account key still legacy 118](../assets/evmigration-18.png)
-
 
 ###### e. Re-import the mnemonic into a fresh Keplr profile
 
@@ -392,7 +405,7 @@ Select the freshly-imported wallet profile. The state panel goes fully green and
 - **Portal profile**:`lumera-devnet-evm / coin-type 60` (green)
 - **Keplr chain config**:`coin-type 60` (green)
 - **Keplr account key**:`EVM key / coin-type 60` (green)
-- **Connected wallet address** is now your post-migration bech32, matching`migrationRecord.new_address`.
+- **Connected wallet address** is now your post-migration bech32, matching `migrationRecord.new_address`.
 
 The card body says *"Your wallet and Portal are already on the migrated EVM address."* The migration record is displayed with the legacy address, new Lumera address, **Ethereum hex**, **Migration date**, and **Block height**. Keplr now shows the new profile (e.g. `evm-acc`) serving the EVM-derived address.
 
@@ -404,7 +417,7 @@ The Keplr profile you're connected with still holds a legacy `coin-type 118` pri
 
 **The Migration Successful card says "Update Keplr Chain Definition":**
 
-The Portal is on the EVM profile but Keplr's chain registry is still on `coin-type 118`. Disconnect, remove the legacy Lumera chain in Keplr (Settings → Add/Remove Chains), and reconnect from the Portal — it'll re-suggest the EVM chain definition.
+The Portal is on the EVM profile but Keplr's chain registry is still on `coin-type 118`. Disconnect, remove the legacy Lumera chain in Keplr (Settings → Add/Remove Chains), and reconnect from the Portal — it'll re-suggest the EVM chain definition. **When Keplr's approval dialog appears, click "Add chain as suggested >" and verify `coin-type 60` before clicking Approve** — approving the collapsed first screen re-enables the cached legacy `118` definition and leaves you right back here (see step **c** above).
 
 **The Migration Successful card says "Switch Portal to Lumera EVM Network":**
 
@@ -430,10 +443,10 @@ The repository ships two bash wrappers in [scripts/](../../../scripts/) that lay
 Both scripts:
 
 - Detect and reject multisig accounts (use the offline 4-step flow in[legacy-migration.md](../evmigration/legacy-migration.md#multisig-account-migration) for those).
-- Run`migration-estimate` before broadcast so you see what moves and why it might fail.
+- Run `migration-estimate` before broadcast so you see what moves and why it might fail.
 - Compare post-migration balances against a pre-broadcast snapshot.
 
-The abbreviated invocations below cover the common cases. For the full reference — all flags, exit codes, troubleshooting keyed by exit code, mnemonic-file flow, and non-interactive / CI usage — see [migration-scripts.md](migration-scripts.md).
+The abbreviated invocations below cover the common cases. For the full reference — all flags, exit codes, troubleshooting keyed by exit code, fresh-destination-key flow, and non-interactive / CI usage — see [migration-scripts.md](migration-scripts.md).
 
 ### Single-sig account migration
 
@@ -444,7 +457,7 @@ The abbreviated invocations below cover the common cases. For the full reference
   --keyring-backend test
 ```
 
-Use `--mnemonic-file <path>` (file must be mode 0600) to import both keys from a mnemonic in one step. Add `--dry-run` to preview without broadcasting.
+Use `--mnemonic-file <path>` (mode `0600`) as an optional convenience when both derivations intentionally use one mnemonic. Otherwise import the keys separately. Add `--dry-run` to preview without broadcasting.
 
 ### Single-sig validator migration
 
@@ -505,7 +518,7 @@ The estimate response shows `would_succeed: true` if migration is possible. If `
 lumerad query evmigration migration-stats --node <rpc-endpoint>
 ```
 
-#### 2. Import Both Keys from the Same Mnemonic
+#### 2. Prepare the EVM Destination Key
 
 **Import the legacy key (coin-type 118, secp256k1):**
 
@@ -513,7 +526,7 @@ lumerad query evmigration migration-stats --node <rpc-endpoint>
 lumerad keys add legacy-key \
   --recover \
   --coin-type 118 \
-  --algo secp256k1 \
+  --key-type secp256k1 \
   --keyring-backend test
 ```
 
@@ -523,13 +536,12 @@ Enter your mnemonic when prompted.
 
 ```bash
 lumerad keys add new-key \
-  --recover \
   --coin-type 60 \
-  --algo eth_secp256k1 \
+  --key-type eth_secp256k1 \
   --keyring-backend test
 ```
 
-Enter the **same mnemonic** when prompted.
+Securely back up the generated mnemonic. Alternatively, use `--recover` with an existing mnemonic; it may be the legacy mnemonic or a different one.
 
 **Verify the addresses:**
 
@@ -563,12 +575,12 @@ lumerad tx evmigration migrate-validator legacy-validator-key new-validator-evm-
 The CLI will:
 
 1. Read both keys from the keyring, extract public keys, and derive bech32 addresses
-2. Verify the legacy key is`secp256k1` (coin-type 118)
-3. Build the migration payload and sign`SHA256(payload)` with the legacy key
-4. Sign the new proof with the new key (must be`eth_secp256k1`)
+2. Verify the legacy key is `secp256k1` (coin-type 118)
+3. Build the migration payload and sign `SHA256(payload)` with the legacy key
+4. Sign the new proof with the new key (must be `eth_secp256k1`)
 5. Build an unsigned, fee-free Cosmos transaction
 6. Simulate gas usage automatically
-7. Prompt for confirmation (unless`--yes` flag is used)
+7. Prompt for confirmation (unless `--yes` flag is used)
 8. Broadcast the transaction
 
 #### 4. Verify the Migration
@@ -660,7 +672,7 @@ Validators have their own step-by-step walkthrough covering maintenance-window p
 
 Key facts (repeated here for quick reference):
 
-- Validators**must** use`MsgMigrateValidator` (not`MsgClaimLegacyAccount`) — the chain rejects`claim-legacy-account` for validator operator addresses.
+- Validators**must** use `MsgMigrateValidator` (not `MsgClaimLegacyAccount`) — the chain rejects `claim-legacy-account` for validator operator addresses.
 - Validator migration is a superset of regular account migration. It re-keys the validator record, every delegation pointing to the validator, unbonding/redelegation records, distribution state, the supernode record (if the supernode account matches the validator's legacy address), and action references, atomically.
 - The validator consensus key (`priv_validator_key.json`, ed25519) is**not affected** by this migration — only the operator key.
 - Stop the validator node before broadcasting, route the tx through a trusted external RPC, then restart promptly to minimize missed blocks.
@@ -673,9 +685,9 @@ Supernode operators have their own step-by-step walkthrough covering the automat
 
 Key facts:
 
-- The supernode daemon performs automatic migration on startup when`evm_key_name` is set in`config.yml` and the supernode's legacy key is single-sig.
-- For multisig supernode accounts, the daemon refuses and directs you to the offline 4-step`lumerad` CLI ceremony (`generate-proof-payload` →`sign-proof` →`combine-proof` →`submit-proof`). Restart the supernode after the offline ceremony completes — the daemon detects the on-chain migration record and drives local cleanup.
-- If you run a supernode on the same account as a validator operator, migrate the validator (`MsgMigrateValidator` handles the supernode side as a side-effect), then restart both`lumerad` and the supernode.
+- The supernode daemon performs automatic migration on startup when `evm_key_name` is set in `config.yml` and the supernode's legacy key is single-sig.
+- For multisig supernode accounts, the daemon refuses and directs you to the offline 4-step `lumerad` CLI ceremony (`generate-proof-payload` →`sign-proof` →`combine-proof` →`submit-proof`). Restart the supernode after the offline ceremony completes — the daemon detects the on-chain migration record and drives local cleanup.
+- If you run a supernode on the same account as a validator operator, migrate the validator (`MsgMigrateValidator` handles the supernode side as a side-effect), then restart both `lumerad` and the supernode.
 
 ## FAQ
 
@@ -685,7 +697,7 @@ No. Migration transactions are fee-free. The transaction carries a gas limit for
 
 **Q: Can I migrate to any address?**
 
-No. The new address must be derived from the **same mnemonic** as the legacy address using coin-type 60 and eth_secp256k1. The chain verifies this through the dual-signature proof.
+The destination may be any fresh on-chain address whose key you control. It must use coin type `60` and `eth_secp256k1`. The legacy and destination keys may come from the same mnemonic or different mnemonics; the chain verifies control of both keys through the dual-signature proof.
 
 **Q: What if I'm a validator - should I use `claim-legacy-account` or `migrate-validator`?**
 
@@ -719,8 +731,8 @@ Multisig legacy accounts (flat K-of-N `secp256k1`) use an offline, coordinator-d
 >
 > - **Shape + K/N must mirror.** A K-of-N legacy multisig migrates to a K-of-N `eth_secp256k1` multisig — same K, same N. Different K, different N, or single↔multisig shape mismatch is rejected with `ErrMirrorSourceMismatch` (code 1121).
 > - **Same K signer positions sign both halves.** `legacy_proof.signer_indices` must equal `new_proof.signer_indices`. Co-signers who sign only one side don't count toward the K-of-K threshold on the other.
-> - **Sub-key uniqueness.** Each side's`sub_pub_keys` must have pairwise-distinct entries.
-> - **Zero-signer submit.**`submit-proof` takes no`--from`, no fee flags, no envelope signature — authorization is the proof bytes. Mempool acceptance of zero-signer migration txs requires `app/evmigration_signer_extraction_adapter.go` to be wired into the EVM mempool's `CosmosPoolConfig.SignerExtractor`; without it, `ExperimentalEVMMempool` falls back to the SDK's default extractor and rejects the tx with `tx must have at least one signer` during app-side mempool admission/proposal selection.
+> - **Sub-key uniqueness.** Each side's `sub_pub_keys` must have pairwise-distinct entries.
+> - **Zero-signer submit.**`submit-proof` takes no `--from`, no fee flags, no envelope signature — authorization is the proof bytes. Mempool acceptance of zero-signer migration txs requires `app/evmigration_signer_extraction_adapter.go` to be wired into the EVM mempool's `CosmosPoolConfig.SignerExtractor`; without it, `ExperimentalEVMMempool` falls back to the SDK's default extractor and rejects the tx with `tx must have at least one signer` during app-side mempool admission/proposal selection.
 >
 > Full reference with error codes and helper functions: [legacy-migration.md § Consensus invariants](../evmigration/legacy-migration.md#consensus-invariants).
 
@@ -813,7 +825,7 @@ lumerad tx evmigration generate-proof-payload \
   > ```
   >
   > where the `<eth-sub-i>` order matches the legacy multisig's on-chain `public_keys` order.
-
+  >
 - For same-mnemonic migrations, signer index 0's legacy mnemonic should be used to recover signer index 0's EVM sub-key, signer index 1's legacy mnemonic should be used for signer index 1's EVM sub-key, and so on. Reordering the same EVM sub-keys produces a different destination multisig address.
 - `--new <bech32>` is optional; the CLI derives the new multisig address from the sub-keys/threshold and cross-checks `--new` if supplied.
 - `--kind claim` targets `MsgClaimLegacyAccount`; `--kind validator` targets `MsgMigrateValidator`.

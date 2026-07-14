@@ -215,7 +215,12 @@ Bech32 Con: lumeravalconsshimxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ADDR
     ;;
   "query evmigration --help"*)                            printf 'help stub\n' ;;
-  "tx evmigration claim-legacy-account --help"*)         printf 'help stub\n' ;;
+  "tx evmigration claim-legacy-account --help"*)
+    printf 'help stub\n'
+    if [[ "${SHIM_IMMEDIATE_BROADCAST_RETURN:-0}" == "1" ]]; then
+      printf '%s\n' '0s returns after broadcast'
+    fi
+    ;;
   "tx evmigration migrate-validator --help"*)            printf 'help stub\n' ;;
   "tx evmigration generate-proof-payload --help"*)       printf 'help stub\n' ;;
   "tx evmigration sign-proof --help"*)                   printf 'help stub\n' ;;

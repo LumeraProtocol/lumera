@@ -10,6 +10,7 @@ BUILD_DIR ?= build
 RELEASE_DIR ?= release
 RELEASE_TARGETS ?= linux:amd64
 GOPROXY ?= https://proxy.golang.org,direct
+MIGRATION_SCRIPTS := scripts/evmigration-common.sh $(sort $(wildcard scripts/migrate-*.sh))
 
 # Build tags for conditional compilation
 BUILD_TAGS ?= ledger
@@ -182,9 +183,14 @@ release: go.sum build-proto openrpc
 		CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" GOFLAGS=${GOFLAGS} GOOS=$$goos GOARCH=$$goarch ${GO} build -mod=readonly $(if $(strip $(BUILD_TAGS)),-tags "$(BUILD_TAGS)",) -ldflags '$(BUILD_LDFLAGS)' -o $$outdir/${APP_BINARY} ./$(APP_MAIN); \
 		chmod +x $$outdir/${APP_BINARY}; \
 		mkdir -p $$outdir/scripts; \
-		cp scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh scripts/migrate-multisig.sh $$outdir/scripts/; \
-		chmod +x $$outdir/scripts/migrate-account.sh $$outdir/scripts/migrate-validator.sh $$outdir/scripts/migrate-multisig.sh; \
-		tar -C $$outdir -czf ${RELEASE_DIR}/${APP_NAME}$(if $(RELEASE_VERSION_TAG),_${RELEASE_VERSION_TAG})_$${goos}_$${goarch}.tar.gz ${APP_BINARY} scripts; \
+		cp ${MIGRATION_SCRIPTS} $$outdir/scripts/; \
+		chmod +x $$outdir/scripts/*.sh; \
+		artifact=${RELEASE_DIR}/${APP_NAME}$(if $(RELEASE_VERSION_TAG),_${RELEASE_VERSION_TAG})_$${goos}_$${goarch}.tar.gz; \
+		tar -C $$outdir -czf $$artifact ${APP_BINARY} scripts; \
+		for script in ${MIGRATION_SCRIPTS}; do \
+			archive_path=scripts/$$(basename $$script); \
+			tar -tzf $$artifact | grep -Fqx $$archive_path || { echo "Missing required release file: $$archive_path" >&2; exit 1; }; \
+		done; \
 		rm -rf $$outdir; \
 	done
 	@(cd ${RELEASE_DIR} && sha256sum *.tar.gz > release_checksum)
@@ -204,7 +210,7 @@ NOCACHE_FLAG := $(if $(NOCACHE),-count=1)
 
 lint-scripts:
 	@echo "Running shellcheck on scripts/ ..."
-	@shellcheck -x scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh scripts/migrate-multisig.sh
+	@shellcheck -x ${MIGRATION_SCRIPTS}
 
 test-scripts:
 	@echo "Running bats tests for scripts/ ..."

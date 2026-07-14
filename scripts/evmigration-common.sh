@@ -270,6 +270,23 @@ _read_keyring_flags() {
   mapfile -t _KRF < <(_keyring_flags)
 }
 
+# The original v1.20.1 migration CLI accepts --tx-timeout=0s, but still enters
+# the SDK WebSocket wait path. Newer CLIs explicitly document and implement
+# zero as "return after broadcast", allowing these wrappers to confirm over
+# HTTP with wait_for_tx. Use the zero-timeout optimization only when the CLI
+# advertises that contract; otherwise retain v1.20.1's built-in confirmation.
+_supports_immediate_broadcast_return() {
+  "$BIN" tx evmigration claim-legacy-account --help 2>&1 \
+    | grep -Fq '0s returns after broadcast'
+}
+
+_read_migration_tx_timeout_flags() {
+  _MIGRATION_TX_TIMEOUT_FLAGS=()
+  if _supports_immediate_broadcast_return; then
+    _MIGRATION_TX_TIMEOUT_FLAGS=(--tx-timeout 0s)
+  fi
+}
+
 # resolve_chain_id
 # Pin down the effective chain ID and log it for the user. Resolution order:
 #   1. $CHAIN_ID already set by parse_common_flags (from --chain-id flag,
@@ -380,6 +397,7 @@ lumerad_tx() {
     exit 1
   fi
   _read_keyring_flags
+  _read_migration_tx_timeout_flags
 
   # Primary: let the chain simulate the exact gas (migration fees are waived, so
   # the resulting limit is free). Capture stdout (the tx JSON) separately from
@@ -393,7 +411,7 @@ lumerad_tx() {
     --node "$NODE"
     --chain-id "$CHAIN_ID"
     "${_KRF[@]}"
-    --tx-timeout 0s
+    "${_MIGRATION_TX_TIMEOUT_FLAGS[@]}"
     --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT"
     --output json)
   if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
@@ -427,7 +445,7 @@ lumerad_tx() {
     --node "$NODE" \
     --chain-id "$CHAIN_ID" \
     "${_KRF[@]}" \
-    --tx-timeout 0s \
+    "${_MIGRATION_TX_TIMEOUT_FLAGS[@]}" \
     --gas "$fallback_gas" \
     --output json
 }

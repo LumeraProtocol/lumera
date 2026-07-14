@@ -718,12 +718,13 @@ BANNER
   # submit-proof does not take --from; authorization is in the proof bytes.
   # We still pass keyring flags so the SDK's NewFactoryCLI can construct a
   # keyring-less context without erroring, and --output json for parsing.
+  _read_migration_tx_timeout_flags
   local args=(tx evmigration submit-proof "$input"
     --chain-id "$chain_id"
     --node "$node"
-    --tx-timeout 0s
     --keyring-backend "$keyring_backend"
     --output json)
+  args+=("${_MIGRATION_TX_TIMEOUT_FLAGS[@]}")
   [[ -n "$keyring_dir" ]] && args+=(--keyring-dir "$keyring_dir")
   [[ -n "$home_dir"    ]] && args+=(--home "$home_dir")
   (( yes == 1 )) && args+=(-y)

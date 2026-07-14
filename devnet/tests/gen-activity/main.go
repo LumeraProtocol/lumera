@@ -7,13 +7,18 @@
 package main
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gen/tests/common"
@@ -36,6 +41,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("configuration: %v", err)
 	}
+	logRuntimeBinary()
 
 	if wizard {
 		fc, _ := LoadFileConfig(cfg.ConfigPath)
@@ -102,6 +108,33 @@ func executableDir() string {
 		return ""
 	}
 	return filepath.Dir(exe)
+}
+
+func logRuntimeBinary() {
+	exe, err := os.Executable()
+	if err != nil {
+		log.Printf("runtime binary: unknown (%v)", err)
+		return
+	}
+	hash, err := fileSHA256(exe)
+	if err != nil {
+		log.Printf("runtime binary: %s (hash unavailable: %v)", exe, err)
+		return
+	}
+	log.Printf("runtime binary: %s sha256=%s", exe, hash)
+}
+
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // resolveConfigPath picks the config path to load when -config was not passed
@@ -175,22 +208,31 @@ func run(cfg *Config) error {
 	}
 
 	// Step 2: detect key style from the current lumerad runtime.
+	log.Printf("phase: detect chain key style")
 	keyStyle := detectKeyStyle(cfg.Bin, cfg.EVMCutoverVer)
 	log.Printf("key style: %s (algo=%s coin-type=%d)", keyStyle.Name(), keyStyle.Algo, keyStyle.CoinType)
 
 	cli := newChainCLI(cfg)
 
-	// Steps 3-4: query validators and resolve the funder address. These are
-	// read-only; in dry-run they are best-effort so planning works without a
-	// node, but a live run requires both.
-	validators := queryValidators(cli, cfg.DryRun)
-	funderAddr := resolveFunder(cli, cfg.FundingKey, cfg.DryRun)
-
-	// Step 5: load the registry if present, else start a new one.
+	// Step 5: load the registry if present, else start a new one. Load this
+	// before validator discovery so reruns can fall back to the last known set
+	// if the staking CLI query is unavailable.
+	log.Printf("phase: load registry")
 	now := time.Now().UTC().Format(time.RFC3339)
 	reg, err := loadOrCreateRegistry(cfg, keyStyle, now)
 	if err != nil {
 		return err
+	}
+
+	// Steps 3-4: query validators and resolve the funder address. These are
+	// read-only; in dry-run they are best-effort so planning works without a
+	// node, but a live run requires both.
+	log.Printf("phase: query validators and funder")
+	validators := queryValidators(cli, cfg.DryRun, reg.Validators)
+	log.Printf("validators: %d discovered", len(validators))
+	funderAddr := resolveFunder(cli, cfg.FundingKey, cfg.DryRun, reg.FunderAddress)
+	if funderAddr != "" {
+		log.Printf("funder: %s -> %s", cfg.FundingKey, funderAddr)
 	}
 
 	// Step 6: reconcile envelope metadata with the current run. An existing
@@ -206,6 +248,8 @@ func run(cfg *Config) error {
 	// Decide how many new accounts to allocate this run.
 	newCount := plannedNewAccountCount(cfg, reg)
 	plannedNames := reg.AllocateNames(cfg.AccountPrefix, newCount)
+	log.Printf("plan: mode=%s existing=%d new-regular=%d multisig23=%d multisig35=%d permanent-locked=%d actions=%v dry-run=%v",
+		cfg.resolvedMode, len(reg.Accounts), len(plannedNames), cfg.NumMultisig23, cfg.NumMultisig35, cfg.NumPermanentLocked, cfg.Actions, cfg.DryRun)
 
 	if cfg.DryRun {
 		printPlan(cfg, reg, plannedNames)
@@ -223,6 +267,7 @@ func run(cfg *Config) error {
 
 	// Step 7-8: generate keys for the planned accounts and persist before any
 	// funding so an interrupted run can resume.
+	log.Printf("phase: create/reuse regular account keys")
 	newRecs := generateAccounts(cli, plannedNames, keyStyle)
 	for _, rec := range newRecs {
 		reg.UpsertAccount(rec)
@@ -235,6 +280,7 @@ func run(cfg *Config) error {
 	// Generate multisig accounts (2-of-3 / 3-of-5) alongside regular accounts.
 	var newMultisig []*AccountRecord
 	if specs := multisigPlan(cfg.NumMultisig23, cfg.NumMultisig35); len(specs) > 0 && !cfg.ActivityExisting {
+		log.Printf("phase: create multisig account keys")
 		newMultisig = generateMultisigAccounts(cli, reg, cfg.AccountPrefix, specs, keyStyle)
 		if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
 			return fmt.Errorf("save registry after multisig key generation: %w", err)
@@ -264,6 +310,7 @@ func run(cfg *Config) error {
 	// Step 9: fund unfunded accounts via the single-funder batcher.
 	chain := &cliFundingChain{cli: cli, funderKey: cfg.FundingKey, funderAddr: funderAddr, blockWait: 30 * time.Second}
 	bankTargets, vestingTargets := splitFundingTargets(reg)
+	log.Printf("phase: fund accounts (bank-targets=%d vesting-targets=%d)", len(bankTargets), len(vestingTargets))
 	amountFor := func(*AccountRecord) string {
 		return common.Coin{Amount: randomFundingAmount(cfg.maxAmount.Amount, rng), Denom: common.ChainDenom}.String()
 	}
@@ -294,6 +341,7 @@ func run(cfg *Config) error {
 
 	// Step 10: per-account activity mix. Only funded accounts can transact, and
 	// they serve as each other's peers for transfers and grants.
+	log.Printf("phase: generate account activity")
 	generateActivity(cli, reg, newRecs, validators, cfg, rng)
 	reconcileReceivedGrants(reg.Accounts)
 	if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
@@ -304,6 +352,7 @@ func run(cfg *Config) error {
 	// default; -require-actions makes supernode unavailability or creation
 	// failures fatal.
 	if cfg.Actions {
+		log.Printf("phase: generate CASCADE actions")
 		actionAccts := activityTargets(reg, newRecs, cfg.ActivityExisting)
 		creator := newSDKActionCreator(cfg, cli)
 		if err := generateActions(creator, cli, actionAccts, validators, cfg.actionStates,
@@ -370,11 +419,17 @@ func newChainCLI(cfg *Config) *common.ChainCLI {
 	}
 }
 
-// queryValidators returns the validator set. In dry-run a query failure is a
-// warning; a live run treats an empty set as fatal at the call site.
-func queryValidators(cli *common.ChainCLI, dryRun bool) []string {
+// queryValidators returns the validator set. If the live CLI query fails, a
+// previously persisted registry validator set is good enough for reruns.
+// Dry-run treats total failure as a warning; a live run treats an empty set as
+// fatal at the call site.
+func queryValidators(cli *common.ChainCLI, dryRun bool, fallback []string) []string {
 	vals, err := cli.Validators()
 	if err != nil {
+		if len(fallback) > 0 {
+			log.Printf("WARN: validator query failed, using %d validator(s) from registry: %v", len(fallback), err)
+			return append([]string(nil), fallback...)
+		}
 		if dryRun {
 			log.Printf("WARN: validator query failed (dry-run, continuing): %v", err)
 			return nil
@@ -385,10 +440,16 @@ func queryValidators(cli *common.ChainCLI, dryRun bool) []string {
 	return vals
 }
 
-// resolveFunder resolves the funder key's address, best-effort in dry-run.
-func resolveFunder(cli *common.ChainCLI, key string, dryRun bool) string {
+// resolveFunder resolves the funder key's address, best-effort in dry-run. On
+// reruns, a registry funder address is a useful fallback when the local keyring
+// command is temporarily unavailable.
+func resolveFunder(cli *common.ChainCLI, key string, dryRun bool, fallback string) string {
 	addr, err := cli.ShowAddress(key)
 	if err != nil {
+		if fallback != "" {
+			log.Printf("WARN: funder address lookup failed, using registry address %s: %v", fallback, err)
+			return fallback
+		}
 		if dryRun {
 			log.Printf("WARN: funder address lookup failed (dry-run, continuing): %v", err)
 		} else {
@@ -420,7 +481,11 @@ func detectKeyStyle(bin, cutover string) common.KeyStyle {
 // detectLumeradVersion runs the binary's version command and extracts a semver.
 func detectLumeradVersion(bin string) (string, error) {
 	for _, args := range [][]string{{"version"}, {"version", "--long"}} {
-		out, err := exec.Command(bin, args...).CombinedOutput()
+		ctx, cancel := context.WithTimeout(context.Background(), commandTimeout())
+		cmd := exec.CommandContext(ctx, bin, args...)
+		cmd.Env = envWithoutDesktopBus()
+		out, err := cmd.CombinedOutput()
+		cancel()
 		if err != nil {
 			continue
 		}
@@ -429,6 +494,58 @@ func detectLumeradVersion(bin string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("could not determine %s version", bin)
+}
+
+func commandTimeout() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("LUMERA_CLI_TIMEOUT"))
+	if raw == "" {
+		return 30 * time.Second
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return 30 * time.Second
+	}
+	return d
+}
+
+func envWithoutDesktopBus() []string {
+	env := os.Environ()
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		if isDesktopSessionEnv(kv) {
+			continue
+		}
+		if strings.HasPrefix(kv, "LUMERA_KEYRING_BACKEND=") {
+			continue
+		}
+		if strings.HasPrefix(kv, "DISABLE_KWALLET=") {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return append(out,
+		"DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/lumera-no-dbus-session-bus",
+		"DISABLE_KWALLET=1",
+		"LUMERA_KEYRING_BACKEND=test",
+	)
+}
+
+func isDesktopSessionEnv(kv string) bool {
+	for _, prefix := range []string{
+		"DBUS_SESSION_BUS_ADDRESS=",
+		"DISPLAY=",
+		"WAYLAND_DISPLAY=",
+		"XDG_RUNTIME_DIR=",
+		"XDG_CURRENT_DESKTOP=",
+		"DESKTOP_SESSION=",
+		"GNOME_DESKTOP_SESSION_ID=",
+		"KDE_FULL_SESSION=",
+	} {
+		if strings.HasPrefix(kv, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // loadOrCreateRegistry loads an existing registry or creates a fresh one. A

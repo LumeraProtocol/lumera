@@ -113,7 +113,7 @@ func buildActivityPlans(accounts []*AccountRecord, validators []string, rng *ran
 // guaranteed-failing delegate/bank-send/action attempts.
 func activityTargets(reg *ActivityRegistry, newRecords []*AccountRecord, includeExisting bool) []*AccountRecord {
 	var out []*AccountRecord
-	if includeExisting {
+	if includeExisting || len(newRecords) == 0 {
 		for _, rec := range reg.Accounts {
 			if rec.Funded && rec.Multisig == nil {
 				out = append(out, rec)

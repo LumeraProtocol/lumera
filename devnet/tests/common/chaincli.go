@@ -1,12 +1,15 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -63,8 +66,129 @@ func (c *ChainCLI) runWithFlags(includeNode, includeKeyring bool, args ...string
 		base = append(base, "--home", c.Home)
 	}
 	all := append(append([]string{}, args...), base...)
-	out, err := exec.Command(c.Bin, all...).CombinedOutput()
+	out, err := combinedOutputNoDesktopBus(c.Bin, all...)
 	return strings.TrimSpace(string(out)), err
+}
+
+func combinedOutputNoDesktopBus(bin string, args ...string) ([]byte, error) {
+	cmd, cancel, ctx, release := commandNoDesktopBus(bin, args...)
+	defer cancel()
+	defer release()
+	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return out, fmt.Errorf("timeout after %s running %s: %w", commandTimeout(), commandString(bin, args...), ctx.Err())
+	}
+	return out, err
+}
+
+func commandNoDesktopBus(bin string, args ...string) (*exec.Cmd, context.CancelFunc, context.Context, func()) {
+	release := acquireCommandSlot()
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout())
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Env = envWithoutDesktopBus()
+	return cmd, cancel, ctx, release
+}
+
+func commandTimeout() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("LUMERA_CLI_TIMEOUT"))
+	if raw == "" {
+		return 30 * time.Second
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return 30 * time.Second
+	}
+	return d
+}
+
+var commandSlotState struct {
+	once sync.Once
+	ch   chan struct{}
+}
+
+func acquireCommandSlot() func() {
+	commandSlotState.once.Do(func() {
+		commandSlotState.ch = make(chan struct{}, commandParallelism())
+	})
+	commandSlotState.ch <- struct{}{}
+	return func() { <-commandSlotState.ch }
+}
+
+func commandParallelism() int {
+	raw := strings.TrimSpace(os.Getenv("LUMERA_CLI_PARALLELISM"))
+	if raw == "" {
+		return 1
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return 1
+	}
+	return n
+}
+
+func envWithoutDesktopBus() []string {
+	env := os.Environ()
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		if isDesktopSessionEnv(kv) {
+			continue
+		}
+		if strings.HasPrefix(kv, "GOMAXPROCS=") {
+			continue
+		}
+		if strings.HasPrefix(kv, "LUMERA_KEYRING_BACKEND=") {
+			continue
+		}
+		if strings.HasPrefix(kv, "DISABLE_KWALLET=") {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return append(out,
+		"DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/lumera-no-dbus-session-bus",
+		"DISABLE_KWALLET=1",
+		"GOMAXPROCS="+childGOMAXPROCS(),
+		"LUMERA_KEYRING_BACKEND=test",
+	)
+}
+
+func isDesktopSessionEnv(kv string) bool {
+	for _, prefix := range []string{
+		"DBUS_SESSION_BUS_ADDRESS=",
+		"DISPLAY=",
+		"WAYLAND_DISPLAY=",
+		"XDG_RUNTIME_DIR=",
+		"XDG_CURRENT_DESKTOP=",
+		"DESKTOP_SESSION=",
+		"GNOME_DESKTOP_SESSION_ID=",
+		"KDE_FULL_SESSION=",
+	} {
+		if strings.HasPrefix(kv, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func childGOMAXPROCS() string {
+	raw := strings.TrimSpace(os.Getenv("LUMERA_CHILD_GOMAXPROCS"))
+	if raw == "" {
+		return "1"
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return "1"
+	}
+	return strconv.Itoa(n)
+}
+
+func commandString(bin string, args ...string) string {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, strconv.Quote(bin))
+	for _, arg := range args {
+		parts = append(parts, strconv.Quote(arg))
+	}
+	return strings.Join(parts, " ")
 }
 
 func (c *ChainCLI) keyringBackend() string {
@@ -182,7 +306,7 @@ func (c *ChainCLI) Balance(addr string) (int64, error) {
 // ShowAddress returns the bech32 address for a keyring key name.
 func (c *ChainCLI) ShowAddress(name string) (string, error) {
 	args := append([]string{"keys", "show", name, "--keyring-backend", c.keyringBackend(), "--address"}, c.homeArgs()...)
-	out, err := exec.Command(c.Bin, args...).CombinedOutput()
+	out, err := combinedOutputNoDesktopBus(c.Bin, args...)
 	if err != nil {
 		return "", fmt.Errorf("keys show %s: %s: %w", name, strings.TrimSpace(string(out)), err)
 	}
@@ -217,7 +341,7 @@ func (c *ChainCLI) AddKeyWithStyle(name string, style KeyStyle) (GeneratedKey, e
 		"--algo", style.Algo,
 	}
 	args = append(args, c.homeArgs()...)
-	out, err := exec.Command(c.Bin, args...).CombinedOutput()
+	out, err := combinedOutputNoDesktopBus(c.Bin, args...)
 	if err != nil {
 		return GeneratedKey{}, fmt.Errorf("keys add %s: %s: %w", name, strings.TrimSpace(string(out)), err)
 	}
@@ -238,13 +362,18 @@ func (c *ChainCLI) AddKeyWithStyle(name string, style KeyStyle) (GeneratedKey, e
 // name already exists.
 func (c *ChainCLI) ImportKey(name, mnemonic string) (string, error) {
 	args := append([]string{"keys", "add", name, "--keyring-backend", c.keyringBackend(), "--recover", "--output", "json"}, c.homeArgs()...)
-	cmd := exec.Command(c.Bin, args...)
+	cmd, cancel, ctx, release := commandNoDesktopBus(c.Bin, args...)
+	defer cancel()
+	defer release()
 	cmd.Stdin = strings.NewReader(mnemonic + "\n")
 	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", fmt.Errorf("keys add --recover %s: timeout after %s running %s: %w", name, commandTimeout(), commandString(c.Bin, args...), ctx.Err())
+	}
 	if err != nil {
 		return "", fmt.Errorf("keys add --recover %s: %s: %w", name, strings.TrimSpace(string(out)), err)
 	}
-	return c.ShowAddress(name)
+	return parseRecoveredKeyAddress(name, out)
 }
 
 // HasKey reports whether a key name already exists in the keyring.

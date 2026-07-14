@@ -93,9 +93,19 @@ func parseMigrationStats(out string) (MigrationStats, error) {
 func (c *ChainCLI) MigrationParams() (MigrationParams, error) {
 	out, err := c.Run("query", "evmigration", "params")
 	if err != nil {
+		if missingEVMigrationQuery(out) {
+			return MigrationParams{}, fmt.Errorf("configured lumerad binary %q does not support x/evmigration queries; use an EVM-enabled lumerad binary for migration mode: %s: %w", c.Bin, truncate(out, 200), err)
+		}
 		return MigrationParams{}, fmt.Errorf("query evmigration params: %s: %w", truncate(out, 200), err)
 	}
 	return parseMigrationParams(out)
+}
+
+func missingEVMigrationQuery(out string) bool {
+	low := strings.ToLower(out)
+	return strings.Contains(low, "available commands") &&
+		(strings.Contains(low, "usage:\n  lumerad query") || strings.Contains(low, "usage:\r\n  lumerad query")) &&
+		!strings.Contains(low, "evmigration")
 }
 
 // MigrationEstimate queries the migration estimate for a legacy address.

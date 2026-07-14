@@ -147,6 +147,21 @@ setup_shim() {
   [[ "$output" == *"{"* ]]
 }
 
+@test "v1.20.1 CLI omits the zero-timeout optimization" {
+  setup_shim
+  _read_migration_tx_timeout_flags
+  [ "${#_MIGRATION_TX_TIMEOUT_FLAGS[@]}" -eq 0 ]
+}
+
+@test "new CLI enables immediate broadcast return" {
+  setup_shim
+  export SHIM_IMMEDIATE_BROADCAST_RETURN=1
+  _read_migration_tx_timeout_flags
+  [ "${#_MIGRATION_TX_TIMEOUT_FLAGS[@]}" -eq 2 ]
+  [ "${_MIGRATION_TX_TIMEOUT_FLAGS[0]}" = "--tx-timeout" ]
+  [ "${_MIGRATION_TX_TIMEOUT_FLAGS[1]}" = "0s" ]
+}
+
 @test "resolve_address returns keys-show output" {
   setup_shim
   run bash -c '
@@ -154,7 +169,7 @@ setup_shim() {
     BIN='"$SHIM_BIN"'
     NODE="tcp://local:26657"
     KEYRING_BACKEND="test"
-    resolve_address mykey
+    resolve_address mykey 2>/dev/null
   '
   [ "$status" -eq 0 ]
   [[ "$output" == lumera1* ]]

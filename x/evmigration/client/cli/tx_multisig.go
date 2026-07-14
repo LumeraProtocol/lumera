@@ -1277,6 +1277,6 @@ func cmdSubmitProof() *cobra.Command {
 	cmd.Flags().String(flags.FlagChainID, "", "The network chain ID")
 	cmd.Flags().StringP(flags.FlagBroadcastMode, "b", flags.BroadcastSync, "Transaction broadcasting mode (sync|async)")
 	cmd.Flags().BoolP(flags.FlagSkipConfirmation, "y", false, "Skip tx broadcasting prompt confirmation")
-	cmd.Flags().String(flagTxTimeout, defaultTxTimeout, "How long to wait for the transaction to be included in a block")
+	cmd.Flags().String(flagTxTimeout, defaultTxTimeout, "How long to wait for transaction inclusion; 0s returns after broadcast")
 	return cmd
 }

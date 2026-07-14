@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 
 	"gen/tests/common"
 )
@@ -97,8 +98,17 @@ func runActivityWorkers(chain activityChain, accounts []*AccountRecord, planFor 
 	if parallelism < 1 {
 		parallelism = 1
 	}
+	totalAccounts := len(accounts)
+	if totalAccounts == 0 {
+		log.Printf("activity progress: no accounts to process")
+		return
+	}
+	accountStep := progressEvery(totalAccounts)
 	sem := make(chan struct{}, parallelism)
 	var wg sync.WaitGroup
+	var completedAccounts atomic.Int64
+	var completedActivities atomic.Int64
+	log.Printf("activity progress: starting %d account(s) with parallelism %d", totalAccounts, parallelism)
 	for _, acct := range accounts {
 		wg.Add(1)
 		go func(acct *AccountRecord) {
@@ -106,14 +116,29 @@ func runActivityWorkers(chain activityChain, accounts []*AccountRecord, planFor 
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			for _, act := range planFor(acct) {
+			plan := planFor(acct)
+			log.Printf("activity progress: %s starting %d planned operation(s)", acct.Name, len(plan))
+			localDone := 0
+			for _, act := range plan {
 				if err := executeActivity(chain, acct, act); err != nil {
 					log.Printf("  WARN: %s %s failed: %v", acct.Name, act.Kind, err)
+				} else {
+					localDone++
 				}
+				doneActs := completedActivities.Add(1)
+				if doneActs%50 == 0 {
+					log.Printf("activity progress: %d operation(s) attempted", doneActs)
+				}
+			}
+			doneAccounts := completedAccounts.Add(1)
+			if doneAccounts == int64(totalAccounts) || doneAccounts%int64(accountStep) == 0 {
+				log.Printf("activity progress: %d/%d account(s) completed; latest %s succeeded %d/%d operation(s)",
+					doneAccounts, totalAccounts, acct.Name, localDone, len(plan))
 			}
 		}(acct)
 	}
 	wg.Wait()
+	log.Printf("activity progress: completed %d account(s), attempted %d operation(s)", completedAccounts.Load(), completedActivities.Load())
 }
 
 // reconcileReceivedGrants backfills the received-grant arrays: for every authz

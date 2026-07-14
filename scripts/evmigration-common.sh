@@ -79,6 +79,22 @@ log_info()  { printf '%sINFO%s  %s\n' "$_C_INFO" "$_C_RESET" "$*" >&2; }
 log_warn()  { printf '%sWARN%s  %s\n' "$_C_WARN" "$_C_RESET" "$*" >&2; }
 log_error() { printf '%sERROR%s %s\n' "$_C_ERR"  "$_C_RESET" "$*" >&2; }
 
+# Print a concise orientation block before work begins. Never prints secrets.
+log_run_summary() {
+  local operation="$1" mode="LIVE (will ask before broadcast)" keyring_location="default"
+  (( ${DRY_RUN:-0} == 1 )) && mode="DRY RUN (no broadcast)"
+  [[ -n "${KEYRING_DIR:-}" ]] && keyring_location="$KEYRING_DIR"
+  {
+    printf '\n==== %s ====\n' "$operation"
+    printf '  Mode:     %s\n' "$mode"
+    printf '  RPC:      %s\n' "${NODE:-<not set>}"
+    printf '  Keyring:  %s (%s)\n' "${KEYRING_BACKEND:-test}" "$keyring_location"
+    printf '  Legacy:   %s\n' "${LEGACY_KEY:-<from input file>}"
+    printf '  New key:  %s\n' "${NEW_KEY:-<from input file>}"
+    printf '==============================\n\n'
+  } >&2
+}
+
 _role_color() { printf '%s%s%s' "$1" "$2" "$_C_RESET"; }
 legacy_value() { _role_color "$_C_LEGACY" "$1"; }
 new_value() { _role_color "$_C_NEW" "$1"; }
@@ -142,7 +158,7 @@ Flags:
   --keyring-backend <b>     test|file|os (default test)
   --keyring-dir <dir>       Keyring directory (overrides --home for keys)
   --home <dir>              lumerad home directory
-  --mnemonic-file <path>    Import both keys from a mnemonic file (mode 0600 or stricter)
+  --mnemonic-file <path>    Import both derivations from one mnemonic (mode 0600 or stricter)
   --yes, -y                 Skip standard confirmation prompts
   --dry-run                 Run pre-flight only; do not broadcast
   --binary <path>           Override lumerad binary (default: lumerad on PATH)
@@ -252,6 +268,23 @@ _keyring_flags() {
 
 _read_keyring_flags() {
   mapfile -t _KRF < <(_keyring_flags)
+}
+
+# The original v1.20.1 migration CLI accepts --tx-timeout=0s, but still enters
+# the SDK WebSocket wait path. Newer CLIs explicitly document and implement
+# zero as "return after broadcast", allowing these wrappers to confirm over
+# HTTP with wait_for_tx. Use the zero-timeout optimization only when the CLI
+# advertises that contract; otherwise retain v1.20.1's built-in confirmation.
+_supports_immediate_broadcast_return() {
+  "$BIN" tx evmigration claim-legacy-account --help 2>&1 \
+    | grep -Fq '0s returns after broadcast'
+}
+
+_read_migration_tx_timeout_flags() {
+  _MIGRATION_TX_TIMEOUT_FLAGS=()
+  if _supports_immediate_broadcast_return; then
+    _MIGRATION_TX_TIMEOUT_FLAGS=(--tx-timeout 0s)
+  fi
 }
 
 # resolve_chain_id
@@ -364,18 +397,30 @@ lumerad_tx() {
     exit 1
   fi
   _read_keyring_flags
+  _read_migration_tx_timeout_flags
 
   # Primary: let the chain simulate the exact gas (migration fees are waived, so
   # the resulting limit is free). Capture stdout (the tx JSON) separately from
   # stderr (gas-estimate notes / errors) so callers receive clean JSON to parse.
-  local err_file out rc=0
+  # For file keyrings, tee stderr back to the terminal because passphrase
+  # prompts are written there; hiding them makes the command appear to hang.
+  # Other backends retain capture-only behavior so errors are not duplicated.
+  local err_file out rc=0 tx_cmd
   err_file="$(mktemp)"
-  out="$("$BIN" tx "$@" \
-    --node "$NODE" \
-    --chain-id "$CHAIN_ID" \
-    "${_KRF[@]}" \
-    --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT" \
-    --output json 2>"$err_file")" || rc=$?
+  tx_cmd=("$BIN" tx "$@"
+    --node "$NODE"
+    --chain-id "$CHAIN_ID"
+    "${_KRF[@]}"
+    "${_MIGRATION_TX_TIMEOUT_FLAGS[@]}"
+    --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT"
+    --output json)
+  if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
+    log_info "unlocking file keyring to sign and simulate the migration transaction"
+    log_info "enter the keyring passphrase when prompted; input is hidden while typing"
+    out="$("${tx_cmd[@]}" 2> >(tee "$err_file" >&2))" || rc=$?
+  else
+    out="$("${tx_cmd[@]}" 2>"$err_file")" || rc=$?
+  fi
   if (( rc == 0 )); then
     rm -f "$err_file"
     printf '%s\n' "$out"
@@ -400,6 +445,7 @@ lumerad_tx() {
     --node "$NODE" \
     --chain-id "$CHAIN_ID" \
     "${_KRF[@]}" \
+    "${_MIGRATION_TX_TIMEOUT_FLAGS[@]}" \
     --gas "$fallback_gas" \
     --output json
 }
@@ -424,12 +470,18 @@ preview_tx_body() {
   fi
   _read_keyring_flags
   local generated
+  if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
+    log_info "unlocking file keyring to generate the transaction preview"
+    log_info "enter the keyring passphrase when prompted; input is hidden while typing"
+  else
+    log_info "generating transaction preview"
+  fi
   if ! generated=$("$BIN" tx "$@" \
         --node "$NODE" \
         --chain-id "$CHAIN_ID" \
         "${_KRF[@]}" \
         --generate-only \
-        --output json 2>/dev/null); then
+        --output json); then
     log_warn "  could not generate tx body for preview (continuing anyway)"
     return 0
   fi
@@ -459,7 +511,15 @@ preview_tx_body() {
 resolve_address() {
   local key_name="$1"
   local addr
-  if ! addr=$(lumerad_keys show "$key_name" -a 2>/dev/null); then
+  if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
+    log_info "unlocking file keyring for key $(legacy_value "$key_name") (enter the keyring passphrase when prompted)"
+  else
+    log_info "resolving address for key $(legacy_value "$key_name")"
+  fi
+  # Do not suppress stderr here. File-backed keyrings write their passphrase
+  # prompt to stderr; redirecting it made the script appear to hang while it
+  # was actually waiting for input.
+  if ! addr=$(lumerad_keys show "$key_name" -a); then
     log_error "key not found in keyring: $key_name"
     exit 1
   fi
@@ -736,6 +796,11 @@ _handle_tx_query_json() {
   return 2
 }
 
+_query_tx_no_keyring() {
+  local hash="$1"
+  "$BIN" query tx "$hash" --node "$NODE" --output json
+}
+
 # wait_for_tx <hash>
 # Waits for the tx to commit using three paths in order:
 #   1. Fast path — `query tx <hash>`. Catches the case where the tx was
@@ -770,7 +835,7 @@ wait_for_tx() {
   # NOTE: `lumerad q tx <missing>` exits 0 with empty stdout (error goes to
   # stderr). So a "found" check is "stdout is non-empty AND parseable JSON",
   # not just "exit 0". Empty json → both nested ifs are false → fall through.
-  if json=$(lumerad_q tx "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
+  if json=$(_query_tx_no_keyring "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
     if _handle_tx_query_json "$hash" "$json" "$started"; then
       return 0
     else
@@ -801,7 +866,7 @@ wait_for_tx() {
     next_progress=10
     while (( SECONDS - started < timeout )); do
       sleep 1
-      if json=$(lumerad_q tx "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
+      if json=$(_query_tx_no_keyring "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
         if _handle_tx_query_json "$hash" "$json" "$started"; then
           return 0
         else

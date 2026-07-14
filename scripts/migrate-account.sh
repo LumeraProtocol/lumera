@@ -31,9 +31,9 @@ _USAGE_EXAMPLES="  # Standard migration — both keys already in the keyring:
   migrate-account.sh alice alice-new \\
     --chain-id lumera-mainnet-1 --node https://rpc.lumera.io:443
 
-  # Import both keys from a single mnemonic file first (file mode must be 0600):
-  migrate-account.sh alice alice-new \\
-    --chain-id lumera-mainnet-1 --node https://rpc.lumera.io:443 \\
+  # Optional convenience: import both derivations from one mnemonic file:
+  migrate-account.sh alice alice-new \
+    --chain-id lumera-mainnet-1 --node https://rpc.lumera.io:443 \
     --mnemonic-file /run/user/1000/alice.seed
 
   # Dry-run only (pre-flight + preview, no broadcast):
@@ -41,14 +41,21 @@ _USAGE_EXAMPLES="  # Standard migration — both keys already in the keyring:
 
 main() {
   parse_common_flags "$@"
+  log_run_summary "Lumera account migration"
+  log_info "[1/7] validating local prerequisites"
   require_binary
   require_jq
+  log_info "[2/7] resolving chain ID from RPC endpoint $NODE"
   resolve_chain_id
 
   if [[ -n "$MNEMONIC_FILE" ]]; then
     import_from_mnemonic "$MNEMONIC_FILE" "$LEGACY_KEY" "$NEW_KEY"
   fi
 
+  log_info "[3/7] loading legacy and destination keys"
+  if [[ "$KEYRING_BACKEND" == "file" ]]; then
+    log_info "the encrypted keyring may prompt once for each key; input is hidden while typing"
+  fi
   local legacy_addr new_addr
   legacy_addr=$(resolve_address "$LEGACY_KEY")
   new_addr=$(resolve_address "$NEW_KEY")
@@ -56,10 +63,12 @@ main() {
   log_info "legacy key $(legacy_value "$LEGACY_KEY") -> address $(legacy_value "$legacy_addr")"
   log_info "new EVM key $(new_value "$NEW_KEY") -> address $(new_value "$new_addr")"
 
+  log_info "[4/7] checking migration history and destination freshness"
   assert_not_migrated "$legacy_addr" "$new_addr"
   assert_new_address_unused "$new_addr"
   assert_destination_fresh "$new_addr"
 
+  log_info "[5/7] requesting account migration estimate"
   local estimate
   estimate=$(preflight_estimate "$legacy_addr")
 
@@ -83,6 +92,7 @@ main() {
     + ((.redelegation_count // 0) | tonumber)
   ' <<<"$estimate")"
 
+  log_info "[6/7] recording the legacy balance for post-migration verification"
   local snap
   snap=$(snapshot_bank_balances "$legacy_addr")
 
@@ -90,9 +100,10 @@ main() {
 
   # Skip the interactive prompt in --dry-run; nothing destructive will happen.
   if (( DRY_RUN == 1 )); then
-    log_info "--dry-run: stopping before broadcast"
+    log_info "[7/7] dry-run complete: all pre-flight checks passed; no transaction was broadcast"
     return 0
   fi
+  log_info "[7/7] generating transaction preview and requesting broadcast confirmation"
   preview_tx_body evmigration claim-legacy-account "$LEGACY_KEY" "$NEW_KEY"
   confirm "Proceed with migration?"
 
@@ -118,6 +129,7 @@ main() {
   log_info "  legacy: $(legacy_value "$legacy_addr")"
   log_info "  new:    $(new_value "$new_addr")"
   log_info "  tx:     $tx_hash"
+  log_info "NEXT: use $(new_value "$NEW_KEY") for future transactions and keep both key backups secure"
 }
 
 main "$@"

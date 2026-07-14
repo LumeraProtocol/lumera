@@ -59,7 +59,14 @@ func randomFundingAmount(maxAmount int64, rng *rand.Rand) int64 {
 func generateAccounts(cli *common.ChainCLI, names []string, keyStyle common.KeyStyle) []*AccountRecord {
 	now := time.Now().UTC().Format(time.RFC3339)
 	recs := make([]*AccountRecord, 0, len(names))
-	for _, name := range names {
+	total := len(names)
+	if total == 0 {
+		log.Printf("account key generation: nothing to create")
+		return recs
+	}
+	step := progressEvery(total)
+	log.Printf("account key generation: starting %d account(s)", total)
+	for i, name := range names {
 		if cli.HasKey(name) {
 			addr, err := cli.ShowAddress(name)
 			if err != nil {
@@ -76,8 +83,26 @@ func generateAccounts(cli *common.ChainCLI, names []string, keyStyle common.KeyS
 			continue
 		}
 		recs = append(recs, newAccountRecord(name, gk.Address, gk.Mnemonic, gk.PubKey, keyStyle.Name(), now))
+		done := i + 1
+		if done == total || done%step == 0 {
+			log.Printf("account key generation: %d/%d processed (%d usable)", done, total, len(recs))
+		}
 	}
+	log.Printf("account key generation: completed %d/%d usable account(s)", len(recs), total)
 	return recs
+}
+
+func progressEvery(total int) int {
+	switch {
+	case total <= 10:
+		return 1
+	case total <= 100:
+		return 10
+	case total <= 500:
+		return 25
+	default:
+		return 100
+	}
 }
 
 func newAccountRecord(name, addr, mnemonic, pubkey, keyStyle, now string) *AccountRecord {

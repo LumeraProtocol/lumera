@@ -10,6 +10,7 @@ BUILD_DIR ?= build
 RELEASE_DIR ?= release
 RELEASE_TARGETS ?= linux:amd64
 GOPROXY ?= https://proxy.golang.org,direct
+MIGRATION_SCRIPTS := scripts/evmigration-common.sh $(sort $(wildcard scripts/migrate-*.sh))
 
 # Build tags for conditional compilation
 BUILD_TAGS ?= ledger
@@ -42,6 +43,7 @@ COMMA := ,
 BUILD_TAGS_VERSION := $(subst $(SPACE),$(COMMA),$(strip $(BUILD_TAGS)))
 GIT_HEAD_HASH ?= $(strip $(shell git rev-parse HEAD 2>/dev/null))
 VERSION_TAG ?= $(strip $(shell tag_ref=$$(git for-each-ref --merged HEAD --sort=-creatordate --format='%(refname:strip=2)' refs/tags | head -n1); if [ -z "$$tag_ref" ]; then printf ''; else tag_name=$${tag_ref#v}; tag_commit=$$(git rev-list -n1 "$$tag_ref" 2>/dev/null); head_commit=$$(git rev-parse HEAD 2>/dev/null); if [ "$$tag_commit" = "$$head_commit" ]; then printf '%s' "$$tag_name"; else printf '%s-%s' "$$tag_name" "$$(git rev-parse --short=8 HEAD 2>/dev/null)"; fi; fi))
+RELEASE_VERSION_TAG ?= $(strip $(if $(VERSION_TAG),$(if $(filter v%,$(VERSION_TAG)),$(VERSION_TAG),v$(VERSION_TAG))))
 BUILD_LDFLAGS = \
 	-X github.com/cosmos/cosmos-sdk/version.Name=$(APP_TITLE) \
 	-X github.com/cosmos/cosmos-sdk/version.AppName=$(APP_NAME)d \
@@ -181,9 +183,14 @@ release: go.sum build-proto openrpc
 		CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" GOFLAGS=${GOFLAGS} GOOS=$$goos GOARCH=$$goarch ${GO} build -mod=readonly $(if $(strip $(BUILD_TAGS)),-tags "$(BUILD_TAGS)",) -ldflags '$(BUILD_LDFLAGS)' -o $$outdir/${APP_BINARY} ./$(APP_MAIN); \
 		chmod +x $$outdir/${APP_BINARY}; \
 		mkdir -p $$outdir/scripts; \
-		cp scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh scripts/migrate-multisig.sh $$outdir/scripts/; \
-		chmod +x $$outdir/scripts/migrate-account.sh $$outdir/scripts/migrate-validator.sh $$outdir/scripts/migrate-multisig.sh; \
-		tar -C $$outdir -czf ${RELEASE_DIR}/${APP_NAME}_$${goos}_$${goarch}.tar.gz ${APP_BINARY} scripts; \
+		cp ${MIGRATION_SCRIPTS} $$outdir/scripts/; \
+		chmod +x $$outdir/scripts/*.sh; \
+		artifact=${RELEASE_DIR}/${APP_NAME}$(if $(RELEASE_VERSION_TAG),_${RELEASE_VERSION_TAG})_$${goos}_$${goarch}.tar.gz; \
+		tar -C $$outdir -czf $$artifact ${APP_BINARY} scripts; \
+		for script in ${MIGRATION_SCRIPTS}; do \
+			archive_path=scripts/$$(basename $$script); \
+			tar -tzf $$artifact | grep -Fqx $$archive_path || { echo "Missing required release file: $$archive_path" >&2; exit 1; }; \
+		done; \
 		rm -rf $$outdir; \
 	done
 	@(cd ${RELEASE_DIR} && sha256sum *.tar.gz > release_checksum)
@@ -203,7 +210,7 @@ NOCACHE_FLAG := $(if $(NOCACHE),-count=1)
 
 lint-scripts:
 	@echo "Running shellcheck on scripts/ ..."
-	@shellcheck -x scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh scripts/migrate-multisig.sh
+	@shellcheck -x ${MIGRATION_SCRIPTS}
 
 test-scripts:
 	@echo "Running bats tests for scripts/ ..."

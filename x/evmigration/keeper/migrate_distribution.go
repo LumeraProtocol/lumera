@@ -3,7 +3,9 @@ package keeper
 import (
 	"fmt"
 
+	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
 // MigrateDistribution withdraws all pending delegation rewards for legacyAddr,
@@ -94,6 +96,90 @@ func (k Keeper) temporaryRedirectWithdrawAddr(ctx sdk.Context, addr sdk.AccAddre
 		return nil, false, err
 	}
 	return withdrawAddr, true, nil
+}
+
+// repairLegacyRawShareStartingInfo repairs DelegatorStartingInfo rows written by
+// the v1.20.0 evmigration implementation. That implementation stored delegation
+// shares in Stake when re-keying an account; x/distribution requires the token
+// value of those shares. The two values differ after a validator has been
+// slashed, and reward withdrawal then panics in CalculateDelegationRewards.
+//
+// The repair is deliberately narrow: the validator must have a sub-1 exchange
+// rate, the stored stake must exactly equal the delegation's raw shares (the
+// v1.20.0 fingerprint), and replaying slash events after the starting height
+// must still leave stake above the current token value. The corrected starting
+// stake is scaled so that replaying those later slashes lands at currentStake;
+// this preserves the SDK's reward-period accounting instead of simply clamping
+// every period to the current value.
+func (k Keeper) repairLegacyRawShareStartingInfo(
+	ctx sdk.Context,
+	val stakingtypes.Validator,
+	del stakingtypes.Delegation,
+	delAddr sdk.AccAddress,
+) error {
+	// Empty validator share state appears in keeper-level mocks and cannot be a
+	// real active delegation. It also avoids a zero-denominator conversion.
+	if val.DelegatorShares.IsNil() || !val.DelegatorShares.IsPositive() {
+		return nil
+	}
+
+	currentStake := val.TokensFromShares(del.Shares)
+	if !currentStake.LT(del.Shares) {
+		return nil // never slashed (or otherwise not the v1.20.0 failure mode)
+	}
+
+	valAddr, err := sdk.ValAddressFromBech32(del.ValidatorAddress)
+	if err != nil {
+		return err
+	}
+	startingInfo, err := k.distributionKeeper.GetDelegatorStartingInfo(ctx, valAddr, delAddr)
+	if err != nil {
+		return fmt.Errorf("get delegator starting info: %w", err)
+	}
+	if !startingInfo.Stake.Equal(del.Shares) {
+		return nil // not a row produced by the v1.20.0 raw-shares bug
+	}
+
+	finalStake := startingInfo.Stake
+	slashEvents, err := k.validatorSlashEvents(ctx, valAddr)
+	if err != nil {
+		return fmt.Errorf("load validator slash events: %w", err)
+	}
+	for _, entry := range slashEvents {
+		if entry.height < startingInfo.Height || entry.height > uint64(ctx.BlockHeight()) {
+			continue
+		}
+		if entry.event.ValidatorPeriod <= startingInfo.PreviousPeriod {
+			continue
+		}
+		finalStake = finalStake.MulTruncate(math.LegacyOneDec().Sub(entry.event.Fraction))
+	}
+
+	// Match the SDK's three-smallest-decimal rounding tolerance. Rows within
+	// that margin do not panic and must not be rewritten.
+	marginOfErr := math.LegacySmallestDec().MulInt64(3)
+	if finalStake.LTE(currentStake.Add(marginOfErr)) {
+		return nil
+	}
+
+	// Scale the starting value by the observed final/current discrepancy. When
+	// post-start slash events exist, replaying them over this repaired value
+	// retains their timing for reward calculation. Truncation is intentional:
+	// the SDK requires calculated stake to be <= current stake.
+	repairedStake := startingInfo.Stake.MulTruncate(currentStake.QuoTruncate(finalStake))
+	startingInfo.Stake = repairedStake
+	if err := k.distributionKeeper.SetDelegatorStartingInfo(ctx, valAddr, delAddr, startingInfo); err != nil {
+		return fmt.Errorf("set repaired delegator starting info: %w", err)
+	}
+
+	ctx.Logger().Info(
+		"repaired v1.20.0 raw-share delegator starting info",
+		"validator", valAddr.String(),
+		"delegator", delAddr.String(),
+		"repaired_stake", repairedStake.String(),
+		"current_stake", currentStake.String(),
+	)
+	return nil
 }
 
 func (k Keeper) ensureDelegatorStartingInfoReferenceCount(ctx sdk.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress) error {

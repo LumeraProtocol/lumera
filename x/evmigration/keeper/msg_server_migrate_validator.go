@@ -159,6 +159,13 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		if err != nil {
 			return nil, err
 		}
+		// v1.20.0 account migrations initialized distribution Stake with raw
+		// shares. For delegations to a previously-slashed validator this makes
+		// the SDK panic during the withdrawal below. Repair only rows carrying
+		// that exact legacy fingerprint before invoking x/distribution.
+		if err := ms.repairLegacyRawShareStartingInfo(ctx, val, del, delAddr); err != nil {
+			return nil, fmt.Errorf("repair rewards state for delegator %s: %w", del.DelegatorAddress, err)
+		}
 		origWD, restored, err := ms.temporaryRedirectWithdrawAddr(ctx, delAddr)
 		if err != nil {
 			return nil, fmt.Errorf("temporary redirect withdraw addr for delegator %s: %w", del.DelegatorAddress, err)

@@ -775,6 +775,103 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_Success() {
 		"external delegation should point to new validator")
 }
 
+// TestMigrateValidator_RepairsLegacyRawShareStartingInfo reproduces the v1.20.0
+// data-corruption bug end-to-end and proves the repair prevents it. v1.20.0
+// re-keyed distribution DelegatorStartingInfo with the delegation's raw *shares*
+// as Stake instead of the token value of those shares. Once the validator has
+// been slashed (exchange rate < 1), the SDK's CalculateDelegationRewards panics
+// when Stake exceeds the current token stake — so WithdrawDelegationRewards
+// inside MigrateValidator aborts the whole migration.
+//
+// The test slashes a real validator, injects the exact v1.20.0 fingerprint on
+// the external delegation (Stake == raw shares, starting height moved past the
+// slash event so the SDK does not replay it), then runs the real MigrateValidator
+// against real staking/distribution keepers. With the repair in place migration
+// succeeds; a regression that drops the repair makes msgServer.MigrateValidator
+// panic in the SDK and turns this test red.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_RepairsLegacyRawShareStartingInfo() {
+	s.enableMigration()
+
+	// Three distinct heights matter here: the delegations are created at 100, the
+	// slash lands at 110, and the corrupt starting row is dated 120. Migration
+	// then runs at 130. CalculateDelegationRewards skips slashes recorded before
+	// the starting height (so the 110 slash is NOT replayed for the corrupt row)
+	// and short-circuits when the starting height equals the current height (so
+	// the row must predate migration for the panic to be reachable).
+	s.ctx = s.ctx.WithBlockHeight(100)
+
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(operatorCoins)
+
+	// Builds a bonded validator with a self-delegation + external delegator,
+	// each with genuine starting info written by the real distribution hooks
+	// at height 100.
+	oldValAddr, extAddr := s.createTestValidator(legacyAddr, selfBondAmt)
+
+	// --- Slash the validator so the token/share exchange rate drops below 1 ---
+	s.ctx = s.ctx.WithBlockHeight(110)
+	val, err := s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	consBz, err := val.GetConsAddr()
+	s.Require().NoError(err)
+	power := val.GetConsensusPower(s.app.StakingKeeper.PowerReduction(s.ctx))
+	_, err = s.app.StakingKeeper.Slash(
+		s.ctx, sdk.ConsAddress(consBz), s.ctx.BlockHeight(), power,
+		sdkmath.LegacyNewDecWithPrec(1, 1), // 10%
+	)
+	s.Require().NoError(err)
+
+	val, err = s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	s.Require().True(val.TokensFromShares(val.DelegatorShares).LT(val.DelegatorShares),
+		"validator must be slashed (token/share rate < 1) to reproduce the bug")
+
+	// --- Inject the v1.20.0 corruption on the EXTERNAL delegation ---
+	// Rewrite its starting info the way v1.20.0 did: Stake = raw shares, dated
+	// past the slash event (110) but before migration, so the SDK neither
+	// replays the slash nor short-circuits on "started this height".
+	extDel, err := s.app.StakingKeeper.GetDelegation(s.ctx, extAddr, oldValAddr)
+	s.Require().NoError(err)
+	extStarting, err := s.app.DistrKeeper.GetDelegatorStartingInfo(s.ctx, oldValAddr, extAddr)
+	s.Require().NoError(err)
+	extStarting.Stake = extDel.Shares
+	extStarting.Height = 120
+	s.Require().NoError(s.app.DistrKeeper.SetDelegatorStartingInfo(s.ctx, oldValAddr, extAddr, extStarting))
+
+	// Migration runs a couple of blocks later.
+	s.ctx = s.ctx.WithBlockHeight(130)
+
+	// Precondition: this is exactly the panicking fingerprint the repair targets.
+	currentStake := val.TokensFromShares(extDel.Shares)
+	s.Require().True(extStarting.Stake.Equal(extDel.Shares), "stored stake must equal raw shares")
+	s.Require().True(currentStake.LT(extDel.Shares), "current token stake must be below raw shares")
+
+	// --- Migrate. Without the repair this panics in CalculateDelegationRewards. ---
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	newValAddr := sdk.ValAddress(newAddr)
+	msg := newValidatorMsg(s.T(), legacyPrivKey, legacyAddr, newPrivKey, newAddr)
+
+	resp, err := s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().NoError(err, "migration must succeed; failure here means the raw-share repair regressed")
+	s.Require().NotNil(resp)
+
+	// Both delegations re-keyed to the new validator.
+	dels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, newValAddr)
+	s.Require().NoError(err)
+	s.Require().Len(dels, 2, "self-delegation + external delegation should follow the validator")
+
+	// The external delegation's starting stake is now the token value (repaired),
+	// not the raw share count that v1.20.0 stored.
+	marginOfErr := sdkmath.LegacySmallestDec().MulInt64(3)
+	extStartingAfter, err := s.app.DistrKeeper.GetDelegatorStartingInfo(s.ctx, newValAddr, extAddr)
+	s.Require().NoError(err)
+	s.Require().True(extStartingAfter.Stake.LTE(currentStake.Add(marginOfErr)),
+		"repaired starting stake must not exceed the current token stake")
+	s.Require().True(extStartingAfter.Stake.LT(extDel.Shares),
+		"repaired starting stake must be below the raw share count v1.20.0 wrote")
+}
+
 // TestClaimLegacyAccount_AfterValidatorMigration verifies that legacy account
 // migration still succeeds after the validator it delegates to has already been
 // migrated to a new operator address.

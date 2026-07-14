@@ -240,6 +240,8 @@ func TestMigrateValidator_Success(t *testing.T) {
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)
 	// temporaryRedirectWithdrawAddr: withdraw addr = self → no-op.
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
+	// RepairV120DistributionStake reads validator + starting-info; healthy row → no-op.
+	expectHealthyStakeRepair(f.stakingKeeper, f.distributionKeeper, oldValAddr, legacyAddr, math.LegacyNewDec(100))
 	f.distributionKeeper.EXPECT().WithdrawDelegationRewards(gomock.Any(), legacyAddr, oldValAddr).Return(sdk.Coins{}, nil)
 
 	// Step V2: MigrateValidatorRecord.
@@ -413,6 +415,8 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 	// Step V1: Withdraw commission + self-delegation rewards.
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
+	// RepairV120DistributionStake reads validator + starting-info; healthy row → no-op.
+	expectHealthyStakeRepair(f.stakingKeeper, f.distributionKeeper, oldValAddr, legacyAddr, math.LegacyNewDec(100))
 	f.distributionKeeper.EXPECT().WithdrawDelegationRewards(gomock.Any(), legacyAddr, oldValAddr).Return(sdk.Coins{}, nil)
 
 	// Steps V2-V4 via setupV1toV4-like inline (with self-delegation in V4).
@@ -485,9 +489,11 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 		[]stakingtypes.Delegation{otherDel}, nil,
 	)
 	// ensureDelegatorStartingInfoReferenceCount for (otherValAddr, legacyAddr).
+	// RepairV120DistributionStake also reads starting-info (second read) so
+	// return the same row twice; Stake=50 == shares so no repair fires.
 	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), otherValAddr, legacyAddr).Return(
-		distrtypes.DelegatorStartingInfo{PreviousPeriod: 1}, nil,
-	)
+		distrtypes.DelegatorStartingInfo{PreviousPeriod: 1, Stake: math.LegacyNewDec(50)}, nil,
+	).Times(2)
 	// adjustHistoricalRewardsReferenceCount — ref count > 0, repairZero=true → no-op.
 	otherHistRewards := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1}
 	f.distributionKeeper.EXPECT().IterateValidatorHistoricalRewards(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -496,6 +502,11 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 		},
 	)
 	// Withdraw delegation rewards from otherValAddr.
+	// RepairV120DistributionStake reads GetValidator (starting-info is already mocked
+	// via Times(2) above); healthy row → no-op.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), otherValAddr).Return(
+		stakingtypes.Validator{Tokens: math.NewInt(50), DelegatorShares: math.LegacyNewDec(50)}, nil,
+	)
 	f.distributionKeeper.EXPECT().WithdrawDelegationRewards(gomock.Any(), legacyAddr, otherValAddr).Return(sdk.Coins{}, nil)
 
 	// MigrateStaking: re-key the delegation to otherValAddr.
@@ -611,12 +622,16 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 
 	// Self-delegation: withdraw addr = self → no redirect needed.
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
+	// RepairV120DistributionStake reads validator + starting-info; healthy → no-op.
+	expectHealthyStakeRepair(f.stakingKeeper, f.distributionKeeper, oldValAddr, legacyAddr, math.LegacyNewDec(100))
 	f.distributionKeeper.EXPECT().WithdrawDelegationRewards(gomock.Any(), legacyAddr, oldValAddr).Return(sdk.Coins{}, nil)
 
 	// Third-party delegator: withdraw addr = alreadyMigratedWD → redirect to self, withdraw, restore.
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), thirdPartyDelegator).Return(alreadyMigratedWD, nil)
 	// Temporary redirect to self.
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), thirdPartyDelegator, thirdPartyDelegator).Return(nil)
+	// RepairV120DistributionStake for third-party delegator; healthy → no-op.
+	expectHealthyStakeRepair(f.stakingKeeper, f.distributionKeeper, oldValAddr, thirdPartyDelegator, math.LegacyNewDec(50))
 	f.distributionKeeper.EXPECT().WithdrawDelegationRewards(gomock.Any(), thirdPartyDelegator, oldValAddr).Return(sdk.Coins{}, nil)
 	// Restore original withdraw address.
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), thirdPartyDelegator, alreadyMigratedWD).Return(nil)

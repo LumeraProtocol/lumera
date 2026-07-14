@@ -12,6 +12,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -370,6 +371,13 @@ func TestQueryMigrationEstimate_ValidatorUsesScopedRedelegationIndexesForLimit(t
 			stakingtypes.NewDelegation(delegator.String(), valAddr.String(), math.LegacyNewDec(50)),
 		}, nil,
 	)
+	// previewV120StakeRepair for the one validator-side delegation: reads val + starting-info.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{Tokens: math.NewInt(50), DelegatorShares: math.LegacyNewDec(50)}, nil,
+	)
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delegator).Return(
+		distrtypes.DelegatorStartingInfo{Stake: math.LegacyNewDec(50)}, nil,
+	)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), valAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
@@ -421,6 +429,13 @@ func TestMigrationEstimate_ValidatorUnbondedNotJailed_WouldSucceed(t *testing.T)
 			stakingtypes.NewDelegation(delegator.String(), valAddr.String(), math.LegacyNewDec(50)),
 		}, nil,
 	)
+	// previewV120StakeRepair for the one validator-side delegation.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{Tokens: math.NewInt(50), DelegatorShares: math.LegacyNewDec(50)}, nil,
+	)
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delegator).Return(
+		distrtypes.DelegatorStartingInfo{Stake: math.LegacyNewDec(50)}, nil,
+	)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), valAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
@@ -471,6 +486,13 @@ func TestMigrationEstimate_ValidatorUnbonding_WouldFail(t *testing.T) {
 		[]stakingtypes.Delegation{
 			stakingtypes.NewDelegation(delegator.String(), valAddr.String(), math.LegacyNewDec(50)),
 		}, nil,
+	)
+	// previewV120StakeRepair for the one validator-side delegation.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{Tokens: math.NewInt(50), DelegatorShares: math.LegacyNewDec(50)}, nil,
+	)
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delegator).Return(
+		distrtypes.DelegatorStartingInfo{Stake: math.LegacyNewDec(50)}, nil,
 	)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), valAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)

@@ -1184,9 +1184,14 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 		[]stakingtypes.Delegation{del}, nil,
 	)
 	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, legacyAddr).Return(
-		distrtypes.DelegatorStartingInfo{PreviousPeriod: 4}, nil,
-	)
+		distrtypes.DelegatorStartingInfo{PreviousPeriod: 4, Stake: math.LegacyNewDec(100)}, nil,
+	).Times(2)
 	expectHistoricalRewardsLookup(f.distributionKeeper, valAddr, 4, 1)
+	// RepairV120DistributionStake reads validator; healthy row → no-op (no SetDelegatorStartingInfo).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)},
+		nil,
+	)
 	f.distributionKeeper.EXPECT().WithdrawDelegationRewards(gomock.Any(), legacyAddr, valAddr).Return(sdk.Coins{}, nil)
 
 	// Step 2: MigrateStaking — re-key delegation.

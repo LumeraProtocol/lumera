@@ -208,6 +208,33 @@ func testAccAddr() sdk.AccAddress {
 	return sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
 }
 
+// expectHealthyStakeRepair adds mock expectations for a RepairV120DistributionStake
+// call against a healthy row. The helper reads validator and starting-info; when
+// stored.Stake ≤ TokensFromShares(shares) it is a no-op (no SetDelegatorStartingInfo).
+// Callers pass the shares value; a 1:1 bond ratio validator is returned so that
+// expected == shares and the guard's ≤ branch fires.
+func expectHealthyStakeRepair(
+	stakingKeeper *evmigrationmocks.MockStakingKeeper,
+	distributionKeeper *evmigrationmocks.MockDistributionKeeper,
+	valAddr sdk.ValAddress,
+	delAddr sdk.AccAddress,
+	shares math.LegacyDec,
+) {
+	// Bond ratio 1:1 so TokensFromSharesTruncated(shares) == shares.
+	tokens := shares.TruncateInt()
+	if tokens.IsZero() {
+		tokens = math.NewInt(1)
+	}
+	stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{Tokens: tokens, DelegatorShares: shares},
+		nil,
+	)
+	distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).Return(
+		distrtypes.DelegatorStartingInfo{Stake: shares},
+		nil,
+	)
+}
+
 func expectHistoricalRewardsLookup(
 	mock *evmigrationmocks.MockDistributionKeeper,
 	val sdk.ValAddress,
@@ -977,18 +1004,29 @@ func TestMigrateDistribution_WithDelegations(t *testing.T) {
 	legacy := testAccAddr()
 	valAddr := sdk.ValAddress(testAccAddr())
 
+	shares := math.LegacyNewDec(100)
 	delegations := []stakingtypes.Delegation{
-		stakingtypes.NewDelegation(legacy.String(), valAddr.String(), math.LegacyNewDec(100)),
+		stakingtypes.NewDelegation(legacy.String(), valAddr.String(), shares),
 	}
 
 	// redirectWithdrawAddrIfMigrated: withdraw addr returns self — no redirect needed.
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacy).Return(legacy, nil)
 
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return(delegations, nil)
+	// ensureDelegatorStartingInfoReferenceCount reads starting info once,
+	// RepairV120DistributionStake reads it a second time (both are no-ops
+	// against a healthy row).
 	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, legacy).Return(
-		distrtypes.DelegatorStartingInfo{PreviousPeriod: 4}, nil,
-	)
+		distrtypes.DelegatorStartingInfo{PreviousPeriod: 4, Stake: shares},
+		nil,
+	).Times(2)
 	expectHistoricalRewardsLookup(f.distributionKeeper, valAddr, 4, 1)
+	// RepairV120DistributionStake reads the validator to compute expected tokens.
+	// Bond ratio 1:1 → expected == shares → no repair, no SetDelegatorStartingInfo.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)},
+		nil,
+	)
 	f.distributionKeeper.EXPECT().WithdrawDelegationRewards(gomock.Any(), legacy, valAddr).Return(sdk.Coins{}, nil)
 
 	err := f.keeper.MigrateDistribution(f.ctx, legacy)

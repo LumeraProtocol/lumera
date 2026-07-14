@@ -163,6 +163,13 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		if err != nil {
 			return nil, fmt.Errorf("temporary redirect withdraw addr for delegator %s: %w", del.DelegatorAddress, err)
 		}
+		// Repair v1.20.0-corrupted DelegatorStartingInfo before withdraw so
+		// third-party delegators whose rows were written under v1.20.0 do not
+		// block the operator's migration with an SDK stake-sanity panic.
+		// No-op on healthy rows.
+		if _, _, _, err := ms.RepairV120DistributionStake(ctx, oldValAddr, delAddr, del); err != nil {
+			return nil, fmt.Errorf("repair distribution stake for delegator %s: %w", del.DelegatorAddress, err)
+		}
 		if _, err := ms.distributionKeeper.WithdrawDelegationRewards(ctx, delAddr, oldValAddr); err != nil {
 			return nil, fmt.Errorf("withdraw rewards for delegator %s: %w", del.DelegatorAddress, err)
 		}

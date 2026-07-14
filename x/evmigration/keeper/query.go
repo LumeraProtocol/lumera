@@ -172,9 +172,21 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 	val, valErr := qs.k.stakingKeeper.GetValidator(ctx, valAddr)
 	if valErr == nil {
 		resp.IsValidator = true
-		// Count delegations TO this validator.
+		// Count delegations TO this validator, and enumerate v1.20.0-corrupted
+		// starting-info rows that the validator migration would repair for
+		// third-party delegators.
 		if dels, err := qs.k.stakingKeeper.GetValidatorDelegations(ctx, valAddr); err == nil {
 			resp.ValDelegationCount = uint64(len(dels))
+			for _, del := range dels {
+				delAddr, err := sdk.AccAddressFromBech32(del.DelegatorAddress)
+				if err != nil {
+					continue
+				}
+				repair, ok := qs.k.previewV120StakeRepair(ctx, valAddr, delAddr, del)
+				if ok {
+					resp.DistributionRepairsNeeded = append(resp.DistributionRepairsNeeded, repair)
+				}
+			}
 		}
 		if ubds, err := qs.k.stakingKeeper.GetUnbondingDelegationsFromValidator(ctx, valAddr); err == nil {
 			resp.ValUnbondingCount = uint64(len(ubds))
@@ -233,6 +245,19 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 	// Count delegations FROM this address.
 	if dels, err := qs.k.stakingKeeper.GetDelegatorDelegations(ctx, addr, ^uint16(0)); err == nil {
 		resp.DelegationCount = uint64(len(dels))
+		// Enumerate v1.20.0-corrupted DelegatorStartingInfo rows for these
+		// delegations; migration would repair them transparently. Deterministic
+		// order: same order GetDelegatorDelegations returns (SDK contract).
+		for _, del := range dels {
+			valAddr, err := sdk.ValAddressFromBech32(del.ValidatorAddress)
+			if err != nil {
+				continue
+			}
+			repair, ok := qs.k.previewV120StakeRepair(ctx, valAddr, addr, del)
+			if ok {
+				resp.DistributionRepairsNeeded = append(resp.DistributionRepairsNeeded, repair)
+			}
+		}
 	}
 	if ubds, err := qs.k.stakingKeeper.GetUnbondingDelegations(ctx, addr, ^uint16(0)); err == nil {
 		resp.UnbondingCount = uint64(len(ubds))

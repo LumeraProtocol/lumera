@@ -44,4 +44,12 @@ var (
 	// or both multisig); when both multisig, threshold (K) and sub-key count
 	// (N) must match. A 2-of-3 legacy must migrate to a 2-of-3 destination.
 	ErrMirrorSourceMismatch = errors.Register(ModuleName, 1121, "legacy and new proofs violate the mirror-source rule")
+
+	// Distribution state inconsistency that does NOT match the known v1.20.0
+	// raw-shares bug signature. Returned by AssertDistributionStakeSane when
+	// stored DelegatorStartingInfo.Stake still exceeds the token-denominated
+	// expected value after a repair attempt. This branch should be unreachable
+	// on any chain that has ever executed v1.20.0 or later; it exists to
+	// fail-closed rather than proceed into a chain-recovery-caught panic.
+	ErrDistributionStateInconsistent = errors.Register(ModuleName, 1122, "distribution state inconsistency: stored delegation stake exceeds token-denominated value")
 )

@@ -33,6 +33,12 @@ func (k Keeper) MigrateDistribution(ctx sdk.Context, legacyAddr sdk.AccAddress) 
 		if err := k.ensureDelegatorStartingInfoReferenceCount(ctx, valAddr, legacyAddr); err != nil {
 			return err
 		}
+		// Repair v1.20.0-corrupted DelegatorStartingInfo before withdraw,
+		// otherwise the SDK's stake-sanity guard panics with
+		// "greater than current stake". No-op on healthy rows.
+		if _, _, _, err := k.RepairV120DistributionStake(ctx, valAddr, legacyAddr, del); err != nil {
+			return fmt.Errorf("repair distribution stake for (%s, %s): %w", legacyAddr.String(), valAddr.String(), err)
+		}
 		// WithdrawDelegationRewards sends rewards to the delegator's withdraw
 		// address which we ensured points to legacyAddr above.
 		if _, err := k.distributionKeeper.WithdrawDelegationRewards(ctx, legacyAddr, valAddr); err != nil {

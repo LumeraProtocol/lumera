@@ -58,7 +58,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/time v0.15.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260203192932-546029d2fa20

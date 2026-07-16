@@ -16,6 +16,17 @@ setup() {
   [[ "$output" == *"Migration preview"* ]]
 }
 
+@test "migrate-account.sh resolves keyring backend from client.toml" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/config"
+  printf 'keyring-backend = "file"\n' > "$home/config/client.toml"
+  run "$SCRIPTS_DIR/migrate-account.sh" \
+    --binary "$SHIM" --chain-id shim-test --home "$home" \
+    --dry-run --yes legacykey newkey
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"keyring backend: file (from $home/config/client.toml)"* ]]
+}
+
 @test "migrate-account.sh rejects multisig account with exit 3" {
   run env SHIM_ESTIMATE_FIXTURE=estimate-multisig \
     "$SCRIPTS_DIR/migrate-account.sh" \

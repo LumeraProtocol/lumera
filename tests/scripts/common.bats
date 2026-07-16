@@ -941,3 +941,31 @@ JSON
   resolve_keyring_backend
   [ "$KEYRING_BACKEND" = "os" ]
 }
+
+@test "lumerad_tx announces keyring unlock for a prompting backend" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    NODE="tcp://example:1234"
+    CHAIN_ID="shim-test"
+    KEYRING_BACKEND="os"
+    KEYRING_BACKEND_EXPLICIT=1
+    lumerad_tx evmigration migrate-validator k1 k2 --yes 2>&1 1>/dev/null || true
+  '
+  [[ "$output" == *"unlocking keyring to sign and simulate"* ]]
+}
+
+@test "lumerad_tx stays quiet about unlock for the test backend" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    NODE="tcp://example:1234"
+    CHAIN_ID="shim-test"
+    KEYRING_BACKEND="test"
+    KEYRING_BACKEND_EXPLICIT=1
+    lumerad_tx evmigration migrate-validator k1 k2 --yes 2>&1 1>/dev/null || true
+  '
+  [[ "$output" != *"unlocking keyring to sign and simulate"* ]]
+}

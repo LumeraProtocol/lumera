@@ -41,6 +41,7 @@ _USAGE_EXAMPLES="  # Standard migration — both keys already in the keyring:
 
 main() {
   parse_common_flags "$@"
+  resolve_keyring_backend
   log_run_summary "Lumera account migration"
   log_info "[1/7] validating local prerequisites"
   require_binary
@@ -53,7 +54,7 @@ main() {
   fi
 
   log_info "[3/7] loading legacy and destination keys"
-  if [[ "$KEYRING_BACKEND" == "file" ]]; then
+  if _keyring_prompts_for_passphrase; then
     log_info "the encrypted keyring may prompt once for each key; input is hidden while typing"
   fi
   local legacy_addr new_addr

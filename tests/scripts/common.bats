@@ -809,3 +809,44 @@ JSON
   [ "$status" -eq 9 ]
   [[ "$output" == *"chain_id"* ]]
 }
+
+@test "migration_gas_for_records: base with zero records" {
+  [ "$(migration_gas_for_records 0)" = "6000000" ]
+}
+
+@test "migration_gas_for_records: base plus per-record marginal" {
+  [ "$(migration_gas_for_records 1597)" = "2401500000" ]
+  [ "$(migration_gas_for_records 2500)" = "3756000000" ]
+}
+
+@test "gas_exceeds_block_limit: true only when over a positive limit" {
+  run gas_exceeds_block_limit 30000000 25000000
+  [ "$status" -eq 0 ]
+  run gas_exceeds_block_limit 11379000 25000000
+  [ "$status" -eq 1 ]
+  run gas_exceeds_block_limit 99999999 -1
+  [ "$status" -eq 1 ]
+  run gas_exceeds_block_limit 99999999 ""
+  [ "$status" -eq 1 ]
+}
+
+@test "_keyring_prompts_for_passphrase: test backend is silent" {
+  KEYRING_BACKEND=test
+  run _keyring_prompts_for_passphrase
+  [ "$status" -eq 1 ]
+}
+
+@test "_keyring_prompts_for_passphrase: file and os backends prompt" {
+  KEYRING_BACKEND=file
+  run _keyring_prompts_for_passphrase
+  [ "$status" -eq 0 ]
+  KEYRING_BACKEND=os
+  run _keyring_prompts_for_passphrase
+  [ "$status" -eq 0 ]
+}
+
+@test "_keyring_prompts_for_passphrase: unset defaults to silent" {
+  unset KEYRING_BACKEND
+  run _keyring_prompts_for_passphrase
+  [ "$status" -eq 1 ]
+}

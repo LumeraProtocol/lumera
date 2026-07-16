@@ -850,3 +850,94 @@ JSON
   run _keyring_prompts_for_passphrase
   [ "$status" -eq 1 ]
 }
+
+@test "resolve_keyring_backend: explicit flag wins over client.toml" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/config"
+  printf 'keyring-backend = "file"\n' > "$home/config/client.toml"
+  KEYRING_BACKEND=os
+  KEYRING_BACKEND_EXPLICIT=1
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "os" ]
+}
+
+@test "resolve_keyring_backend: reads value from client.toml" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/config"
+  printf 'chain-id = "x"\nkeyring-backend = "file"\noutput = "text"\n' > "$home/config/client.toml"
+  KEYRING_BACKEND=test
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "file" ]
+}
+
+@test "resolve_keyring_backend: client.toml wins over on-disk keyring-test dir" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/config" "$home/keyring-test"
+  printf 'keyring-backend = "os"\n' > "$home/config/client.toml"
+  KEYRING_BACKEND=test
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "os" ]
+}
+
+@test "resolve_keyring_backend: detects test from keyring-test dir" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/keyring-test"
+  KEYRING_BACKEND=""
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "test" ]
+}
+
+@test "resolve_keyring_backend: detects file from keyring-file dir" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/keyring-file"
+  KEYRING_BACKEND=""
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "file" ]
+}
+
+@test "resolve_keyring_backend: uses --keyring-dir for detection" {
+  local home kr; home=$(mktemp -d); kr=$(mktemp -d)
+  mkdir -p "$kr/keyring-file"
+  KEYRING_BACKEND=""
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR="$kr"
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "file" ]
+}
+
+@test "resolve_keyring_backend: client.toml read from --home even when keyring-dir differs" {
+  local home kr; home=$(mktemp -d); kr=$(mktemp -d)
+  mkdir -p "$home/config"
+  printf 'keyring-backend = "file"\n' > "$home/config/client.toml"
+  KEYRING_BACKEND=""
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR="$kr"
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "file" ]
+}
+
+@test "resolve_keyring_backend: empty home falls back to os" {
+  local home; home=$(mktemp -d)
+  KEYRING_BACKEND=""
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "os" ]
+}

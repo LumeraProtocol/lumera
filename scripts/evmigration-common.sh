@@ -31,6 +31,9 @@ CHAIN_ID="${CHAIN_ID:-}"
 # shellcheck disable=SC2034
 KEYRING_BACKEND="test"
 # shellcheck disable=SC2034
+# 1 once --keyring-backend is passed explicitly; gates resolve_keyring_backend.
+KEYRING_BACKEND_EXPLICIT=0
+# shellcheck disable=SC2034
 KEYRING_DIR=""
 # shellcheck disable=SC2034
 HOME_DIR=""
@@ -183,6 +186,7 @@ parse_common_flags() {
   # The --chain-id flag (parsed below) overrides whichever default applies.
   CHAIN_ID="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}"
   KEYRING_BACKEND="test"
+  KEYRING_BACKEND_EXPLICIT=0
   KEYRING_DIR=""
   HOME_DIR=""
   MNEMONIC_FILE=""
@@ -198,7 +202,7 @@ parse_common_flags() {
     case "$1" in
       --node)            _require_value "$1" "$#" "${2-}"; NODE="$2"; shift 2 ;;
       --chain-id)        _require_value "$1" "$#" "${2-}"; CHAIN_ID="$2"; shift 2 ;;
-      --keyring-backend) _require_value "$1" "$#" "${2-}"; KEYRING_BACKEND="$2"; shift 2 ;;
+      --keyring-backend) _require_value "$1" "$#" "${2-}"; KEYRING_BACKEND="$2"; KEYRING_BACKEND_EXPLICIT=1; shift 2 ;;
       --keyring-dir)     _require_value "$1" "$#" "${2-}"; KEYRING_DIR="$2"; shift 2 ;;
       --home)            _require_value "$1" "$#" "${2-}"; HOME_DIR="$2"; shift 2 ;;
       --mnemonic-file)   _require_value "$1" "$#" "${2-}"; MNEMONIC_FILE="$2"; shift 2 ;;
@@ -284,6 +288,50 @@ _read_keyring_flags() {
 # Only `test` is silent (its FilePasswordFunc returns a fixed passphrase).
 _keyring_prompts_for_passphrase() {
   [[ "${KEYRING_BACKEND:-test}" != "test" ]]
+}
+
+# resolve_keyring_backend
+# Pin the effective keyring backend and log its source, when the user did not
+# pass --keyring-backend. Resolution order (first hit wins):
+#   1. explicit --keyring-backend (KEYRING_BACKEND_EXPLICIT=1)
+#   2. keyring-backend from <home>/config/client.toml (--home selects home;
+#      --keyring-dir does NOT move client.toml)
+#   3. on-disk detection under --keyring-dir (else --home):
+#      keyring-test/ -> test, keyring-file/ -> file (os is not on-disk-detectable)
+#   4. os — the Cosmos SDK default
+# Mirrors resolve_chain_id: logs the decision so the operator sees it before signing.
+resolve_keyring_backend() {
+  if (( KEYRING_BACKEND_EXPLICIT == 1 )); then
+    log_info "keyring backend: $KEYRING_BACKEND (from --keyring-backend)"
+    return 0
+  fi
+
+  local home="${HOME_DIR:-$HOME/.lumera}"
+  local client_toml="$home/config/client.toml" v
+  if [[ -f "$client_toml" ]]; then
+    v=$(sed -n 's/^[[:space:]]*keyring-backend[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
+        "$client_toml" | head -n1)
+    if [[ -n "$v" ]]; then
+      KEYRING_BACKEND="$v"
+      log_info "keyring backend: $v (from $client_toml)"
+      return 0
+    fi
+  fi
+
+  local kr="${KEYRING_DIR:-$home}"
+  if [[ -d "$kr/keyring-test" ]]; then
+    KEYRING_BACKEND="test"
+    log_info "keyring backend: test (detected keyring-test/ in $kr)"
+    return 0
+  fi
+  if [[ -d "$kr/keyring-file" ]]; then
+    KEYRING_BACKEND="file"
+    log_info "keyring backend: file (detected keyring-file/ in $kr)"
+    return 0
+  fi
+
+  KEYRING_BACKEND="os"
+  log_info "keyring backend: os (SDK default; no --keyring-backend, client.toml, or keyring dir found)"
 }
 
 # The original v1.20.1 migration CLI accepts --tx-timeout=0s, but still enters

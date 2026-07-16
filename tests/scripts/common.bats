@@ -870,6 +870,27 @@ JSON
   [ "$KEYRING_BACKEND" = "os" ]
 }
 
+@test "resolve_keyring_backend: LUMERA_KEYRING_BACKEND env wins over client.toml" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/config"
+  printf 'keyring-backend = "os"\n' > "$home/config/client.toml"
+  KEYRING_BACKEND=test
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  LUMERA_KEYRING_BACKEND=file resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "file" ]
+}
+
+@test "resolve_keyring_backend: explicit flag wins over LUMERA_KEYRING_BACKEND env" {
+  KEYRING_BACKEND=os
+  KEYRING_BACKEND_EXPLICIT=1
+  HOME_DIR="$(mktemp -d)"
+  KEYRING_DIR=""
+  LUMERA_KEYRING_BACKEND=file resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "os" ]
+}
+
 @test "resolve_keyring_backend: reads value from client.toml" {
   local home; home=$(mktemp -d)
   mkdir -p "$home/config"

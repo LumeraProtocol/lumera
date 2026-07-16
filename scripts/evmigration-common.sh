@@ -158,7 +158,8 @@ Flags:
   --node <url>              RPC endpoint (default \$LUMERA_NODE or tcp://localhost:26657)
                             Mainnet RPC example: https://rpc.lumera.io:443
   --chain-id <id>           Chain ID (${_chain_id_help})
-  --keyring-backend <b>     test|file|os (default test)
+  --keyring-backend <b>     test|file|os (default: \$LUMERA_KEYRING_BACKEND, else
+                            client.toml, else keyring-dir detection, else os)
   --keyring-dir <dir>       Keyring directory (overrides --home for keys)
   --home <dir>              lumerad home directory
   --mnemonic-file <path>    Import both derivations from one mnemonic (mode 0600 or stricter)
@@ -294,15 +295,25 @@ _keyring_prompts_for_passphrase() {
 # Pin the effective keyring backend and log its source, when the user did not
 # pass --keyring-backend. Resolution order (first hit wins):
 #   1. explicit --keyring-backend (KEYRING_BACKEND_EXPLICIT=1)
-#   2. keyring-backend from <home>/config/client.toml (--home selects home;
+#   2. $LUMERA_KEYRING_BACKEND — the same env override lumerad itself honors
+#      (and the script convention shared with $LUMERA_NODE / $LUMERA_CHAIN_ID);
+#      must outrank client.toml/disk because the resolved value is passed to
+#      lumerad as an explicit flag, which would otherwise override the env
+#   3. keyring-backend from <home>/config/client.toml (--home selects home;
 #      --keyring-dir does NOT move client.toml)
-#   3. on-disk detection under --keyring-dir (else --home):
+#   4. on-disk detection under --keyring-dir (else --home):
 #      keyring-test/ -> test, keyring-file/ -> file (os is not on-disk-detectable)
-#   4. os — the Cosmos SDK default
+#   5. os — the Cosmos SDK default
 # Mirrors resolve_chain_id: logs the decision so the operator sees it before signing.
 resolve_keyring_backend() {
   if (( KEYRING_BACKEND_EXPLICIT == 1 )); then
     log_info "keyring backend: $KEYRING_BACKEND (from --keyring-backend)"
+    return 0
+  fi
+
+  if [[ -n "${LUMERA_KEYRING_BACKEND:-}" ]]; then
+    KEYRING_BACKEND="$LUMERA_KEYRING_BACKEND"
+    log_info "keyring backend: $KEYRING_BACKEND (from \$LUMERA_KEYRING_BACKEND)"
     return 0
   fi
 

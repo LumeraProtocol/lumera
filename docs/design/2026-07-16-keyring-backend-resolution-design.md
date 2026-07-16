@@ -35,6 +35,11 @@ appearing to hang. That fix introduced `_keyring_prompts_for_passphrase`
 `resolve_keyring_backend` picks the effective backend, first hit wins:
 
 1. **`--keyring-backend` flag** (explicit) — unchanged behavior.
+1a. **`$LUMERA_KEYRING_BACKEND`** (added post-review, PR #193): the same env
+   override `lumerad` itself honors, and the script convention shared with
+   `$LUMERA_NODE` / `$LUMERA_CHAIN_ID`. Must outrank `client.toml`/disk
+   because the resolved value is passed to `lumerad` as an explicit flag,
+   which would otherwise override the env for the child process.
 2. **`client.toml`** — `keyring-backend = "..."` read from
    `<home>/config/client.toml`. `--home` selects the home; `--keyring-dir`
    does **not** move `client.toml`.

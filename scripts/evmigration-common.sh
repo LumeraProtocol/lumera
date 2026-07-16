@@ -306,7 +306,9 @@ resolve_keyring_backend() {
     return 0
   fi
 
-  local home="${HOME_DIR:-$HOME/.lumera}"
+  # ${HOME:-} — systemd/cron/env -i runs may have no $HOME; under `set -u` a
+  # bare $HOME would abort the script instead of reaching the os fallback.
+  local home="${HOME_DIR:-${HOME:-}/.lumera}"
   local client_toml="$home/config/client.toml" v
   if [[ -f "$client_toml" ]]; then
     v=$(sed -n 's/^[[:space:]]*keyring-backend[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \

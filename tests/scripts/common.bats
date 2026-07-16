@@ -2,8 +2,15 @@
 
 setup() {
   SCRIPTS_DIR="$(cd "$BATS_TEST_DIRNAME/../../scripts" && pwd)"
+  # The lib installs its cleanup EXIT trap at source time, which would replace
+  # bats' own EXIT trap — the one that reports "not ok" lines. Without the
+  # restore below, every FAILING test in this file dies silently ("Executed
+  # N-1 instead of N") instead of printing its TAP diagnostics.
+  local bats_exit_trap
+  bats_exit_trap=$(trap -p EXIT)
   # shellcheck source=../../scripts/evmigration-common.sh
   source "$SCRIPTS_DIR/evmigration-common.sh"
+  eval "${bats_exit_trap:-trap - EXIT}"
 }
 
 @test "log_info writes prefixed message to stderr" {
@@ -940,6 +947,22 @@ JSON
   KEYRING_DIR=""
   resolve_keyring_backend
   [ "$KEYRING_BACKEND" = "os" ]
+}
+
+# Regression: with $HOME unset (systemd/cron/env -i runs), the resolver must
+# fall back to `os`, not crash the script on `set -u`.
+@test "resolve_keyring_backend: survives unset HOME and falls back to os" {
+  run env -u HOME bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    KEYRING_BACKEND=""
+    KEYRING_BACKEND_EXPLICIT=0
+    HOME_DIR=""
+    KEYRING_DIR=""
+    resolve_keyring_backend
+    echo "resolved=$KEYRING_BACKEND"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"resolved=os"* ]]
 }
 
 @test "lumerad_tx announces keyring unlock for a prompting backend" {

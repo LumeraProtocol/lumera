@@ -270,6 +270,22 @@ _read_keyring_flags() {
   mapfile -t _KRF < <(_keyring_flags)
 }
 
+# _keyring_prompts_for_passphrase
+# True (0) when the active backend may write an interactive passphrase prompt
+# to stderr, so callers know to tee stderr back to the terminal instead of
+# capturing it into a file (which hides the prompt and makes the command appear
+# to hang while it silently waits on stdin).
+#
+# Both `file` and `os` prompt: cosmos-sdk's `os` backend config uses the same
+# newRealPrompt as `file` and, crucially, does NOT pin AllowedBackends — so on a
+# headless host with no OS secret service it falls back to the encrypted file
+# store and emits the identical "Enter keyring passphrase (attempt N/3)" prompt.
+# The shell only sees the string "os", so guarding on `== "file"` missed it.
+# Only `test` is silent (its FilePasswordFunc returns a fixed passphrase).
+_keyring_prompts_for_passphrase() {
+  [[ "${KEYRING_BACKEND:-test}" != "test" ]]
+}
+
 # The original v1.20.1 migration CLI accepts --tx-timeout=0s, but still enters
 # the SDK WebSocket wait path. Newer CLIs explicitly document and implement
 # zero as "return after broadcast", allowing these wrappers to confirm over
@@ -402,9 +418,10 @@ lumerad_tx() {
   # Primary: let the chain simulate the exact gas (migration fees are waived, so
   # the resulting limit is free). Capture stdout (the tx JSON) separately from
   # stderr (gas-estimate notes / errors) so callers receive clean JSON to parse.
-  # For file keyrings, tee stderr back to the terminal because passphrase
-  # prompts are written there; hiding them makes the command appear to hang.
-  # Other backends retain capture-only behavior so errors are not duplicated.
+  # For passphrase-backed keyrings (file/os — see _keyring_prompts_for_passphrase),
+  # tee stderr back to the terminal because the passphrase prompt is written
+  # there; hiding it makes the command appear to hang. The silent `test` backend
+  # retains capture-only behavior so errors are not duplicated.
   local err_file out rc=0 tx_cmd
   err_file="$(mktemp)"
   tx_cmd=("$BIN" tx "$@"
@@ -414,8 +431,8 @@ lumerad_tx() {
     "${_MIGRATION_TX_TIMEOUT_FLAGS[@]}"
     --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT"
     --output json)
-  if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
-    log_info "unlocking file keyring to sign and simulate the migration transaction"
+  if _keyring_prompts_for_passphrase; then
+    log_info "unlocking keyring to sign and simulate the migration transaction"
     log_info "enter the keyring passphrase when prompted; input is hidden while typing"
     out="$("${tx_cmd[@]}" 2> >(tee "$err_file" >&2))" || rc=$?
   else
@@ -470,8 +487,8 @@ preview_tx_body() {
   fi
   _read_keyring_flags
   local generated
-  if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
-    log_info "unlocking file keyring to generate the transaction preview"
+  if _keyring_prompts_for_passphrase; then
+    log_info "unlocking keyring to generate the transaction preview"
     log_info "enter the keyring passphrase when prompted; input is hidden while typing"
   else
     log_info "generating transaction preview"
@@ -511,12 +528,12 @@ preview_tx_body() {
 resolve_address() {
   local key_name="$1"
   local addr
-  if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
-    log_info "unlocking file keyring for key $(legacy_value "$key_name") (enter the keyring passphrase when prompted)"
+  if _keyring_prompts_for_passphrase; then
+    log_info "unlocking keyring for key $(legacy_value "$key_name") (enter the keyring passphrase when prompted)"
   else
     log_info "resolving address for key $(legacy_value "$key_name")"
   fi
-  # Do not suppress stderr here. File-backed keyrings write their passphrase
+  # Do not suppress stderr here. Passphrase-backed keyrings (file/os) write their
   # prompt to stderr; redirecting it made the script appear to hang while it
   # was actually waiting for input.
   if ! addr=$(lumerad_keys show "$key_name" -a); then

@@ -2,8 +2,15 @@
 
 setup() {
   SCRIPTS_DIR="$(cd "$BATS_TEST_DIRNAME/../../scripts" && pwd)"
+  # The lib installs its cleanup EXIT trap at source time, which would replace
+  # bats' own EXIT trap — the one that reports "not ok" lines. Without the
+  # restore below, every FAILING test in this file dies silently ("Executed
+  # N-1 instead of N") instead of printing its TAP diagnostics.
+  local bats_exit_trap
+  bats_exit_trap=$(trap -p EXIT)
   # shellcheck source=../../scripts/evmigration-common.sh
   source "$SCRIPTS_DIR/evmigration-common.sh"
+  eval "${bats_exit_trap:-trap - EXIT}"
 }
 
 @test "log_info writes prefixed message to stderr" {
@@ -808,4 +815,201 @@ JSON
   rm -f "$tmp"
   [ "$status" -eq 9 ]
   [[ "$output" == *"chain_id"* ]]
+}
+
+@test "migration_gas_for_records: base with zero records" {
+  [ "$(migration_gas_for_records 0)" = "6000000" ]
+}
+
+@test "migration_gas_for_records: base plus per-record marginal" {
+  [ "$(migration_gas_for_records 1597)" = "2401500000" ]
+  [ "$(migration_gas_for_records 2500)" = "3756000000" ]
+}
+
+@test "gas_exceeds_block_limit: true only when over a positive limit" {
+  run gas_exceeds_block_limit 30000000 25000000
+  [ "$status" -eq 0 ]
+  run gas_exceeds_block_limit 11379000 25000000
+  [ "$status" -eq 1 ]
+  run gas_exceeds_block_limit 99999999 -1
+  [ "$status" -eq 1 ]
+  run gas_exceeds_block_limit 99999999 ""
+  [ "$status" -eq 1 ]
+}
+
+@test "_keyring_prompts_for_passphrase: test backend is silent" {
+  KEYRING_BACKEND=test
+  run _keyring_prompts_for_passphrase
+  [ "$status" -eq 1 ]
+}
+
+@test "_keyring_prompts_for_passphrase: file and os backends prompt" {
+  KEYRING_BACKEND=file
+  run _keyring_prompts_for_passphrase
+  [ "$status" -eq 0 ]
+  KEYRING_BACKEND=os
+  run _keyring_prompts_for_passphrase
+  [ "$status" -eq 0 ]
+}
+
+@test "_keyring_prompts_for_passphrase: unset defaults to silent" {
+  unset KEYRING_BACKEND
+  run _keyring_prompts_for_passphrase
+  [ "$status" -eq 1 ]
+}
+
+@test "resolve_keyring_backend: explicit flag wins over client.toml" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/config"
+  printf 'keyring-backend = "file"\n' > "$home/config/client.toml"
+  KEYRING_BACKEND=os
+  KEYRING_BACKEND_EXPLICIT=1
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "os" ]
+}
+
+@test "resolve_keyring_backend: LUMERA_KEYRING_BACKEND env wins over client.toml" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/config"
+  printf 'keyring-backend = "os"\n' > "$home/config/client.toml"
+  KEYRING_BACKEND=test
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  LUMERA_KEYRING_BACKEND=file resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "file" ]
+}
+
+@test "resolve_keyring_backend: explicit flag wins over LUMERA_KEYRING_BACKEND env" {
+  KEYRING_BACKEND=os
+  KEYRING_BACKEND_EXPLICIT=1
+  HOME_DIR="$(mktemp -d)"
+  KEYRING_DIR=""
+  LUMERA_KEYRING_BACKEND=file resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "os" ]
+}
+
+@test "resolve_keyring_backend: reads value from client.toml" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/config"
+  printf 'chain-id = "x"\nkeyring-backend = "file"\noutput = "text"\n' > "$home/config/client.toml"
+  KEYRING_BACKEND=test
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "file" ]
+}
+
+@test "resolve_keyring_backend: client.toml wins over on-disk keyring-test dir" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/config" "$home/keyring-test"
+  printf 'keyring-backend = "os"\n' > "$home/config/client.toml"
+  KEYRING_BACKEND=test
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "os" ]
+}
+
+@test "resolve_keyring_backend: detects test from keyring-test dir" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/keyring-test"
+  KEYRING_BACKEND=""
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "test" ]
+}
+
+@test "resolve_keyring_backend: detects file from keyring-file dir" {
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/keyring-file"
+  KEYRING_BACKEND=""
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "file" ]
+}
+
+@test "resolve_keyring_backend: uses --keyring-dir for detection" {
+  local home kr; home=$(mktemp -d); kr=$(mktemp -d)
+  mkdir -p "$kr/keyring-file"
+  KEYRING_BACKEND=""
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR="$kr"
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "file" ]
+}
+
+@test "resolve_keyring_backend: client.toml read from --home even when keyring-dir differs" {
+  local home kr; home=$(mktemp -d); kr=$(mktemp -d)
+  mkdir -p "$home/config"
+  printf 'keyring-backend = "file"\n' > "$home/config/client.toml"
+  KEYRING_BACKEND=""
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR="$kr"
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "file" ]
+}
+
+@test "resolve_keyring_backend: empty home falls back to os" {
+  local home; home=$(mktemp -d)
+  KEYRING_BACKEND=""
+  KEYRING_BACKEND_EXPLICIT=0
+  HOME_DIR="$home"
+  KEYRING_DIR=""
+  resolve_keyring_backend
+  [ "$KEYRING_BACKEND" = "os" ]
+}
+
+# Regression: with $HOME unset (systemd/cron/env -i runs), the resolver must
+# fall back to `os`, not crash the script on `set -u`.
+@test "resolve_keyring_backend: survives unset HOME and falls back to os" {
+  run env -u HOME bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    KEYRING_BACKEND=""
+    KEYRING_BACKEND_EXPLICIT=0
+    HOME_DIR=""
+    KEYRING_DIR=""
+    resolve_keyring_backend
+    echo "resolved=$KEYRING_BACKEND"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"resolved=os"* ]]
+}
+
+@test "lumerad_tx announces keyring unlock for a prompting backend" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    NODE="tcp://example:1234"
+    CHAIN_ID="shim-test"
+    KEYRING_BACKEND="os"
+    KEYRING_BACKEND_EXPLICIT=1
+    lumerad_tx evmigration migrate-validator k1 k2 --yes 2>&1 1>/dev/null || true
+  '
+  [[ "$output" == *"unlocking keyring to sign and simulate"* ]]
+}
+
+@test "lumerad_tx stays quiet about unlock for the test backend" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    NODE="tcp://example:1234"
+    CHAIN_ID="shim-test"
+    KEYRING_BACKEND="test"
+    KEYRING_BACKEND_EXPLICIT=1
+    lumerad_tx evmigration migrate-validator k1 k2 --yes 2>&1 1>/dev/null || true
+  '
+  [[ "$output" != *"unlocking keyring to sign and simulate"* ]]
 }

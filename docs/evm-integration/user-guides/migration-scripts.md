@@ -125,13 +125,24 @@ They accept these common flags:
 | -------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
 | `--node <url>`             | `$LUMERA_NODE` or `tcp://localhost:26657`             | RPC endpoint.                                                        |
 | `--chain-id <id>`          | `$LUMERA_CHAIN_ID`, `$CHAIN_ID`, or auto-detected     | Chain ID used for tx generation and broadcast.                       |
-| `--keyring-backend <b>`    | `test`                                                | `test`, `file`, or `os`.                                             |
+| `--keyring-backend <b>`    | auto-resolved (see below)                             | `test`, `file`, or `os`.                                             |
 | `--keyring-dir <dir>`      | unset                                                 | Keyring directory independent of `--home`.                           |
 | `--home <dir>`             | `lumerad` default                                     | Passed through to `lumerad`.                                         |
 | `--mnemonic-file <path>`   | unset                                                 | Optional same-mnemonic import from a file with mode `0600` or stricter. |
 | `--yes`, `-y`              | off                                                   | Skip the normal broadcast confirmation prompt.                       |
 | `--dry-run`                | off                                                   | Run checks and preview, then stop before broadcast.                  |
 | `--binary <path>`          | `lumerad` from `PATH`                                 | Use a specific `lumerad` binary.                                     |
+
+When `--keyring-backend` is omitted, the scripts resolve it automatically
+(first match wins) and log the chosen value and its source before signing:
+
+1. `$LUMERA_KEYRING_BACKEND` — the same environment override `lumerad` honors.
+2. `keyring-backend` from `<home>/config/client.toml` (`--home` selects the
+   home directory; `--keyring-dir` does **not** move `client.toml`).
+3. On-disk detection under `--keyring-dir` (else the home directory):
+   a `keyring-test/` subdirectory selects `test`, a `keyring-file/`
+   subdirectory selects `file`.
+4. `os` — the Cosmos SDK default.
 
 ### Chain ID Resolution
 

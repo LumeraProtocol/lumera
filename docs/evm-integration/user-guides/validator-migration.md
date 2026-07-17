@@ -193,7 +193,15 @@ If instead the validator is still `BOND_STATUS_UNBONDING` (not yet `UNBONDED`), 
 systemctl stop lumerad   # or however you supervise the node — see "Note on systemctl commands" in the Overview
 ```
 
-Stopping before broadcast avoids double-signing risk and prevents the node from producing blocks with the legacy key while migration is in flight.
+**Stopping the node before you broadcast is mandatory, not a formality.** Migration re-keys a live, bonded validator in a single transaction: it rewrites the **operator (staking) key** and the on-chain consensus-address→operator mapping. The **consensus key itself is unchanged** — and that is precisely what makes a running node dangerous here.
+
+Because the consensus key is shared and unchanged across the migration, if the old node instance is still running while you bring up the node under the migrated config, two processes can briefly both hold that same consensus key and sign the same block height. That is **equivocation**, and the chain punishes it with a **tombstone**: the validator is permanently removed from ever validating again, plus a slash of bonded stake. Unlike downtime jailing, a tombstone is **irreversible** — you cannot `unjail` out of it; you must build a brand-new validator with a new consensus key.
+
+This is not a theoretical two-instance mistake. It is a very real risk whenever `lumerad` runs under a process supervisor — systemd (`Restart=always`), Docker (`--restart`), Kubernetes, or cosmovisor: **the supervisor may already have respawned an instance while your manual restart brings up a second one.** A hurried "migrate while it's still running, then restart quickly" is the exact pattern that produces this overlap.
+
+Stopping cleanly first makes the overlap structurally impossible. And note there is no consensus reason to rush the restart at all: the consensus key is untouched, so block signing does not depend on the migration. The post-migration restart ([Step 7](#step-7--restart-the-validator-immediately)) only reloads the new **operator** key for future operator transactions — so do a **deliberate stop-then-start**, never a race.
+
+The trade is deliberately asymmetric: keeping the node up risks an **unrecoverable** tombstone; stopping it costs only **recoverable** missed blocks (and at worst a downtime jail you can `unjail`). When one side of the gamble is permanent, you don't gamble — you stop the node.
 
 > **Downtime warning:** mainnet genesis sets `downtime_jail_duration` to `3600s` (1 hour). Do not let the stop-to-restart migration window exceed this time; if the window approaches 1 hour, restart and catch up before retrying the migration.
 

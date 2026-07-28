@@ -18,7 +18,6 @@ import (
 	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
 	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
-	upgrade_v1_20_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_2"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -44,7 +43,6 @@ import (
 // | v1.12.0 | custom   | none (Everlight in supernode)     | Runs migrations; Everlight logic embedded in x/supernode
 // | v1.20.0 | custom   | non-mainnet: add feemarket, precisebank, vm, erc20 | EVM bring-up; gated to non-mainnet (mainnet runs it via v1.20.1)
 // | v1.20.1 | custom   | state-driven add-only: feemarket, precisebank, vm, erc20 | EVM bring-up when EVM absent (any network, incl. direct 1.12.0->1.20.1); migrations-only hotfix when EVM already present. Add-only store loader mounts only missing keys.
-// | v1.20.2 | standard | none                              | Migrations only; no historical state repair
 // =================================================================================================================================
 
 type UpgradeConfig struct {
@@ -77,7 +75,6 @@ var upgradeNames = []string{
 	upgrade_v1_12_0.UpgradeName,
 	upgrade_v1_20_0.UpgradeName,
 	upgrade_v1_20_1.UpgradeName,
-	upgrade_v1_20_2.UpgradeName,
 }
 
 var NoUpgradeConfig = UpgradeConfig{
@@ -179,10 +176,6 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 		return UpgradeConfig{
 			StoreUpgrade: &upgrade_v1_20_0.StoreUpgrades,
 			Handler:      upgrade_v1_20_1.CreateUpgradeHandler(params),
-		}, true
-	case upgrade_v1_20_2.UpgradeName:
-		return UpgradeConfig{
-			Handler: standardUpgradeHandler(upgrade_v1_20_2.UpgradeName, params),
 		}, true
 
 	// add future upgrades here

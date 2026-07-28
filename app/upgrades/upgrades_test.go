@@ -18,7 +18,6 @@ import (
 	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
 	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
-	upgrade_v1_20_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_2"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -48,7 +47,6 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_12_0.UpgradeName,
 		upgrade_v1_20_0.UpgradeName,
 		upgrade_v1_20_1.UpgradeName,
-		upgrade_v1_20_2.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }
@@ -224,16 +222,6 @@ func TestV1201CarriesEVMBringupOnAllNetworks(t *testing.T) {
 		require.Contains(t, config.StoreUpgrade.Added, precisebanktypes.StoreKey, "v1.20.1 should add precisebank store key on %s", chainID)
 		require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey, "v1.20.1 should add evm store key on %s", chainID)
 		require.Contains(t, config.StoreUpgrade.Added, erc20types.StoreKey, "v1.20.1 should add erc20 store key on %s", chainID)
-	}
-}
-
-func TestV1202IsMigrationOnlyOnAllNetworks(t *testing.T) {
-	for _, chainID := range []string{"lumera-mainnet-1", "lumera-testnet-2", "lumera-devnet-1"} {
-		params := newTestUpgradeParams(chainID)
-		config, found := SetupUpgrades(upgrade_v1_20_2.UpgradeName, params)
-		require.True(t, found)
-		require.NotNil(t, config.Handler, "v1.20.2 must register a handler on %s", chainID)
-		require.Nil(t, config.StoreUpgrade, "v1.20.2 must not alter stores on %s", chainID)
 	}
 }
 

@@ -297,9 +297,9 @@ After the validator migration and restart, also restart the supernode so it pick
 
 Restart the SuperNode through its independently discovered supervisor/workload identity and prove exactly one supervised instance is running, following the operator runbook's matching systemd, Docker, or Kubernetes branch.
 
-See [supernode-migration.md](supernode-migration.md) for the supernode daemon's config-update behavior — it detects the on-chain migration record on the next startup and rewrites `config.yml` automatically.
+See [supernode-migration.md](supernode-migration.md) for the approved manual campaign and supervised local-finalization behavior after the on-chain migration record is verified.
 
-If your validator and supernode are **different entities** (separate addresses), migrate them independently — the supernode uses `MsgClaimLegacyAccount` via its own flow (or the supernode daemon's automatic startup migration).
+If your validator and supernode are **different entities** (separate addresses), migrate them independently. The SuperNode uses the manual one-shot `MsgClaimLegacyAccount` campaign; daemon automatic startup broadcast is not approved by this release.
 
 ---
 
@@ -458,6 +458,6 @@ Migrate the validator first; `MsgMigrateValidator` handles the supernode side as
 
 - [migration.md](migration.md) — chain-level end-user migration guide (Portal + Keplr, shell scripts, raw CLI)
 - [migration-scripts.md](migration-scripts.md) — reference for `migrate-validator.sh` and `migrate-account.sh` (flags, exit codes, troubleshooting, non-interactive / CI usage)
-- [supernode-migration.md](supernode-migration.md) — supernode operator migration (automatic single-sig path, manual multisig path)
+- [supernode-migration.md](supernode-migration.md) — approved manual SuperNode campaign and multisig semantics; automatic startup broadcast is blocked
 - [legacy-migration.md](../evmigration/legacy-migration.md) — `x/evmigration` module architecture, proto shapes, keeper logic, and the full reference for the offline proof flow
 - [node-evm-config-guide.md](node-evm-config-guide.md) — post-upgrade `app.toml` / RPC configuration for full nodes and validators

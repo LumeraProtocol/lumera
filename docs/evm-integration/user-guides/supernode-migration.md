@@ -19,103 +19,25 @@
 
 ---
 
-## Overview
+## Approved campaign path
 
-When Lumera upgraded to an EVM-compatible chain, every supernode's legacy `secp256k1` key (coin-type 118) stopped matching the chain's new address derivation (`eth_secp256k1`, coin-type 60). The supernode daemon performs the migration automatically on startup once you add a new EVM key to its config.
+This release campaign is manual. The SuperNode daemon's automatic startup-broadcast path is **NOT APPROVED by this runbook or release**. It has not completed a separate, exact supervisor-specific rehearsal covering preflight, stopped-state proof, the startup irreversible boundary, and ambiguous-outcome query-before-restart behavior. Do not add `evm_key_name` and restart a legacy SuperNode in order to trigger a migration broadcast, and do not treat daemon idempotence as permission to retry startup after an ambiguous result.
 
-**This is the common case for virtually every supernode operator.** The rest of this document is the main walkthrough for that case.
+The approved single-signature procedure is:
 
-> If your supernode's on-chain operator account is a K-of-N multisig (rare, and only possible if you explicitly set one up), the daemon refuses to migrate and directs you to a manual `lumerad` CLI ceremony. See the [Multisig supernode accounts](#multisig-supernode-accounts) section at the end.
+1. Discover the SuperNode supervisor, service identity, absolute base/config/keyring paths, and exact manifest-pinned SuperNode, `sncli`, chain executable, and account-helper paths through the [Operator Runbook](operator-migration-runbook.md).
+2. Use the manifest-approved PR-2 no-echo operation to pre-stage and prove the coin-type-60 destination key. If that dependency is blocked, stop.
+3. Back up the discovered absolute SuperNode config, stop the workload through its discovered supervisor, and prove no duplicate process/container/pod can use the legacy key.
+4. Run the post-stop dry-run and the live `migrate-account.sh` one-shot exactly once through [Operator Runbook §6](operator-migration-runbook.md#6-re-run-dry-run-verify-destination-broadcast-once). For a validator-bound SuperNode identity, follow [validator-migration.md](validator-migration.md) instead.
+5. Query the migration record before any retry. Only after the record proves the expected destination, update the discovered absolute `config.yml` to the destination identity/key as required by the release, restart exactly one supervised workload for local cleanup, and run the authenticated `sncli` acceptance check in [Operator Runbook §8](operator-migration-runbook.md#8-finalize-restart-and-verify).
 
-Migration is idempotent end-to-end: if anything fails mid-flight, restart the daemon and it resumes from whatever state the chain already has.
+A Portal/Keplr migration may also create the on-chain record, but service finalization still uses the same discovered absolute paths, stopped-state proof, destination-address match, supervised restart, and authenticated verification. It is not an automatic-broadcast branch.
 
----
+## SuperNode-specific configuration contract
 
-## Two ways to migrate (pick one)
+The destination key must be `eth_secp256k1` at coin type 60 under a new name. Preserve the legacy `key_name` and `identity` until the one-shot migration is proven on-chain. After proof, apply the release-matched local finalization to the discovered absolute `config.yml`; never edit `~/.supernode/config.yml` under the interactive user or use a bare SuperNode key command.
 
-Both paths land in the same final state (new EVM key registered as supernode, legacy key deleted, `config.yml` updated). The operator steps are identical — what differs is whether the daemon initiates the on-chain migration or just finalizes one you already submitted.
-
-- **Path A — Supernode daemon migrates for you (recommended default).** You recover a new EVM key into the supernode keyring, add `evm_key_name` to `config.yml`, and restart. The daemon detects the legacy key, dual-signs with both keys, and broadcasts `MsgClaimLegacyAccount` itself. This is the flow the rest of this guide documents in steps 1–4.
-- **Path B — Migrate via Keplr + Portal first, then let the supernode finalize.** You use the Portal's standard [end-user migration](migration.md#method-1-portal--keplr-recommended) (browser + Keplr) to submit the migration transaction yourself. Then on the supernode host, you recover the same EVM key into the supernode's keyring, update `config.yml`, and restart. On startup the daemon sees the on-chain migration record, matches it against your configured `evm_key_name`, skips the broadcast, and performs only local cleanup.
-
-Path B is useful when you want to use Keplr's UX to see each step (the Portal shows balances, delegations, and a pre-migration checklist), when you need to migrate the account's balance urgently for non-supernode reasons, or when your node ops team and your wallet custody team are different people.
-
-> **Terminal alternative for Path B.** Do not use a shortened helper command from this guide. Follow the [Operator Runbook §6](operator-migration-runbook.md#6-re-run-dry-run-verify-destination-broadcast-once) non-validator branch with the manifest-pinned absolute `migrate-account.sh` and `lumerad` paths, discovered service identity, explicit home/keyring backend/keyring location/chain ID/trusted node, and the approved dry-run-before-live sequence. Then continue with Step B3 onward.
-
-**Why both paths work deterministically**: `supernode keys recover` derives keys at HD path `m/44'/60'/0'/0/0` using `eth_secp256k1`. Keplr uses the identical derivation for Lumera's EVM chain definition. Import the chosen destination mnemonic into both tools so they produce the same destination address. That mnemonic may be the legacy mnemonic or a different one.
-
-If you chose Path B, the steps below are the same but in Step 3 the logs will show a *skipped* broadcast (see the **Path B log variant** callout in that section).
-
----
-
-## Prerequisites
-
-Before starting:
-
-- Lumera chain is **EVM-enabled**. The supernode daemon verifies this at boot via `x/upgrade.ModuleVersions(evm)`. If the chain hasn't upgraded yet the daemon fatals with `connected Lumera chain does not have EVM support` — wait for the chain upgrade.
-- You hold the **mnemonic (seed phrase)** for the legacy supernode key.
-- You have access to the host running the supernode daemon and can edit `config.yml`.
-
----
-
-## Step 1 — Generate or recover the EVM destination key
-
-`supernode keys recover` must produce an `eth_secp256k1` key (coin-type 60) under a **new key name** distinct from the legacy key. **Required PR-2 compatibility dependency:** use the release's approved no-echo destination-prestage operation named and hashed in the compatibility manifest. It must read the mnemonic from a hidden TTY or protected input descriptor, never from argv. PR-3 intentionally does not invent a command for an unfinished PR-2 interface. If the manifest reports this dependency as blocked, stop; do not use the legacy `--mnemonic "..."` argv form.
-
-The approved pre-stage operation prints the new EVM address. Verify the resulting public key record using the manifest-pinned absolute `artifacts.supernode_executable.release_path`, the discovered SuperNode service identity/base directory, and the exact keyring backend/location from the operator runbook. Do not copy a bare `supernode keys list` shortcut that falls back to the interactive user's config or keyring.
-
-## Step 2 — Add `evm_key_name` to `config.yml`
-
-Edit `config.yml` (inside your supernode base directory) and add the `evm_key_name` field under `supernode:` alongside the existing `key_name`:
-
-```yaml
-supernode:
-  key_name: supernode-legacy       # existing legacy key (unchanged)
-  evm_key_name: supernode-evm      # new — must match the name you chose in step 1
-  identity: "lumera1...legacyaddr" # existing legacy address — daemon will rewrite on migration
-  # ...
-```
-
-Keep `key_name` and `identity` as-is — the daemon rewrites both after migration succeeds.
-
-## Step 3 — Restart the supernode
-
-The daemon detects the legacy key + `evm_key_name` on boot and runs the migration automatically. Watch the logs:
-
-```text
-INFO  EVM module detected on chain
-WARN  Legacy secp256k1 key detected — EVM account migration required
-INFO  Migration estimate  {"would_succeed": true, "is_validator": false, "is_multisig": false, ...}
-INFO  Migration tx passed CheckTx, waiting for block confirmation  {"tx_hash": "..."}
-INFO  Migration tx confirmed in block
-INFO  New address confirmed as registered supernode
-INFO  EVM migration complete — legacy key removed, config updated
-```
-
-On success, the daemon has:
-
-- Broadcast `MsgClaimLegacyAccount` (or `MsgMigrateValidator` if you're also a validator operator) with both signatures embedded.
-- Waited for block inclusion.
-- Deleted the old legacy key from the keyring.
-- Rewritten `config.yml`: `key_name: supernode-evm`, `identity: lumera1...newEVMaddr`, `evm_key_name` removed.
-
-From here on, the supernode runs on the EVM key with no further intervention.
-
-### Path B log variant — already migrated via Keplr
-
-If you chose Path B and already submitted the migration via the Portal + Keplr flow, the restart supernode logs look like this instead:
-
-```text
-INFO  EVM module detected on chain
-WARN  Legacy secp256k1 key detected — EVM account migration required
-INFO  Account already migrated on-chain, skipping broadcast
-INFO  New address confirmed as registered supernode
-INFO  EVM migration complete — legacy key removed, config updated
-```
-
-The daemon queries `MigrationRecord(legacyAddr)`, sees that the on-chain record's `new_address` matches the address derived from your local `evm_key_name`, sets the internal `alreadyMigrated=true` flag, and skips the broadcast branch. The rest of the cleanup (delete legacy key, rewrite `config.yml`) runs identically to Path A.
-
-If the logs show `migration record exists on-chain but new address mismatch`, the EVM key you recovered into the supernode keyring isn't the one Keplr used during the Portal flow — either use the same mnemonic (the one that signed in the Portal), or investigate whether two different mnemonics got mixed up.
+Expected cleanup logs include an existing migration record, a matching destination address, and local configuration/key cleanup. Any destination mismatch is a hard stop: recover the exact key that controls the record's `new_address` or escalate; never broadcast again.
 
 ## Step 4 — Verify
 
@@ -137,92 +59,16 @@ sudo -u <supernode-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyrin
 Finally, confirm `config.yml` reflects the switch:
 
 ```bash
-grep -E "key_name|identity|evm_key_name" ~/.supernode/config.yml
+grep -E "key_name|identity|evm_key_name" /absolute/discovered/supernode/config.yml
 ```
 
 You should see `key_name: <evm-key-name>`, `identity: <new-evm-address>`, and no `evm_key_name` line.
 
 ---
 
-## Path B — Migrating via Portal + Keplr first
+## Portal-created migration record
 
-Use this section if you chose Path B from the ["Two ways to migrate"](#two-ways-to-migrate-pick-one) choice above. Follow the steps in order — don't interleave with Path A steps.
-
-### Before you start
-
-- Import the chosen destination mnemonic in Keplr and on the supernode host so both control the destination recorded by the migration. It may be the legacy mnemonic or a different mnemonic.
-- Decide *when* you'll run each step. A safe order is: stop the supernode → migrate in Keplr → recover the EVM key → edit config → restart. Leaving the supernode running between the Portal migration and the final restart is not harmful (the legacy account no longer exists on-chain, so the supernode's outgoing txs will fail fast), but it produces alarming-looking errors in the logs until you restart.
-
-### Step B1 — Stop the supernode
-
-```bash
-systemctl stop supernode   # or whatever init system you use
-```
-
-Stopping avoids log noise and ensures no inflight txs from the legacy key race with the migration.
-
-### Step B2 — Migrate the account via the Portal (Keplr)
-
-Follow the standard end-user migration flow in [migration.md → Method 1: Portal + Keplr](migration.md#method-1-portal--keplr-recommended). The supernode account behaves like any other Keplr account in this flow — there's nothing supernode-specific to do in the browser.
-
-Quick summary of what you'll do:
-
-1. Open the Lumera Portal's **Claim** page.
-2. Connect Keplr with the mnemonic that currently controls the legacy supernode account.
-3. The portal auto-detects the legacy account, shows your balance/delegations/supernode status, and offers a "Ready to Migrate" wizard.
-4. Click through Review → Sign & Confirm → Submit. Keplr will pop up twice to sign the legacy proof (ADR-036) and the new proof (Ethereum `personal_sign`).
-5. The portal confirms the transaction and shows the migration record with `new_address`.
-
-After the Portal shows success, verify the on-chain record on the host (or on the Portal's success screen):
-
-```bash
-sudo -u <supernode-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migration-record <legacy-address>
-```
-
-Note the `new_address` — you'll verify that it matches what the supernode derives locally in Step B5.
-
-### Step B3 — Recover the new EVM key into the supernode keyring
-
-Exactly the same operation as Path A's Step 1. **Use the same mnemonic you used in Keplr** — this is the critical piece that makes Path B work. Run the release-manifest-approved PR-2 no-echo destination-prestage operation, then verify the public record through the same manifest-pinned absolute SuperNode executable, service identity/base directory, and explicit keyring context required there; do not use a bare key-list shortcut.
-
-### Step B4 — Add `evm_key_name` to `config.yml`
-
-Exactly the same operation as Path A's Step 2:
-
-```yaml
-supernode:
-  key_name: supernode-legacy       # existing legacy key (unchanged)
-  evm_key_name: supernode-evm      # must match the name you chose in Step B3
-  identity: "lumera1...legacyaddr" # existing legacy address — daemon will rewrite on restart
-  # ...
-```
-
-### Step B5 — Restart the supernode (local cleanup only)
-
-```bash
-systemctl start supernode
-```
-
-On startup the daemon:
-
-1. Detects the legacy key in the keyring (`is_legacy_key=true`).
-2. Queries `MigrationRecord(legacyAddr)` — finds the record you submitted via Keplr.
-3. Compares the record's `new_address` to the address derived from your locally-imported `evm_key_name` — they match (same mnemonic, same HD path, same algorithm).
-4. Sets `alreadyMigrated=true` and **skips the broadcast step entirely**.
-5. Performs only local cleanup: rewrites `config.yml` (`key_name` → evm key name, `identity` → new address, removes `evm_key_name`), deletes the old legacy key from the keyring.
-
-Expected logs — see the [Path B log variant](#path-b-log-variant--already-migrated-via-keplr) callout in Step 3 for the exact sequence. The key line is `INFO  Account already migrated on-chain, skipping broadcast`.
-
-### Step B6 — Verify
-
-Same as Path A's [Step 4 — Verify](#step-4--verify). Three queries — migration record, supernode registration at the new address, and `config.yml` state — all should reflect the new EVM address.
-
-### Path B gotchas
-
-- **Different mnemonic on supernode host**: if the mnemonic you recover with `supernode keys recover` is *not* the one you used in Keplr, the derived bech32 addresses differ, and the daemon logs `migration record exists on-chain but new address mismatch` and exits. Recover with the Keplr mnemonic and retry.
-- **Picked the wrong Keplr account**: if Keplr held multiple accounts and you migrated the wrong one, the on-chain migration record points to the wrong legacy address. Check the Portal's success page for the legacy address it migrated from — it must match your supernode's current `identity`.
-- **Supernode never stopped**: if the supernode kept running between Step B2 and Step B5, its outbound txs will have been erroring with "account not found" for the duration. This is cosmetic — the final restart clears the state. But stop-first is cleaner.
-- **Multisig legacy account**: Path B does not apply to multisig supernode accounts — Keplr can't drive a K-of-N ceremony. See the [Multisig supernode accounts](#multisig-supernode-accounts) section.
+If Portal/Keplr creates the migration record, use [migration.md → Method 1](migration.md#method-1-portal--keplr-recommended) for the wallet flow, but use this guide's approved campaign path for the service. Prove the SuperNode stopped through its discovered supervisor, verify the record with the manifest-pinned chain executable, pre-stage the exact destination key through PR-2, and confirm its address matches the record. Then apply local finalization to the discovered absolute config and restart through the supervisor **only for cleanup**. A mismatch or ambiguous record is a hard stop.
 
 ---
 
@@ -230,7 +76,7 @@ Same as Path A's [Step 4 — Verify](#step-4--verify). Three queries — migrati
 
 ### `evm_key_name "<name>" is not an eth_secp256k1 key`
 
-You created or recovered the EVM-named key with the wrong algorithm. Delete it and re-run `supernode keys recover` (which always produces `eth_secp256k1`).
+The destination key has the wrong algorithm. Remove it only through the manifest-approved key operation and repeat the approved PR-2 no-echo prestage with `eth_secp256k1`; do not use a bare recovery shortcut.
 
 ### `simulation failed: rpc error: ... invalid length: tx parse error`
 
@@ -261,7 +107,7 @@ No. The migration re-keys the on-chain record: your supernode registration, evid
 No — a single `MsgMigrateValidator` re-keys both the validator operator record and the supernode record bound to it. See [validator-migration.md](validator-migration.md) for the validator-specific walkthrough (including the maintenance window and the `max_validator_delegations` check); the supernode side happens as a side-effect of that tx.
 
 **Q: Can I roll back if the migration fails mid-flight?**
-No rollback is needed — the daemon is idempotent. If the broadcast fails, restart; if the broadcast succeeded but local cleanup failed, restart. Each restart resumes from the current chain state.
+No. Before broadcast, correct inputs and repeat the dry-run. After a tx hash or ambiguous failure, query the tx and migration record and escalate before any retry. Restart only after the record proves the expected destination, and only for supervised local cleanup; never restart to retry automatic broadcast.
 
 ---
 

@@ -40,11 +40,12 @@
     "artifacts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["chain_executable", "supernode_executable", "sncli_executable", "container_image", "bound_files"],
+      "required": ["chain_executable", "supernode_executable", "sncli_executable", "relayer_executable", "container_image", "bound_files"],
       "properties": {
         "chain_executable": { "$ref": "#/$defs/executable" },
         "supernode_executable": { "$ref": "#/$defs/executable" },
         "sncli_executable": { "$ref": "#/$defs/executable" },
+        "relayer_executable": { "$ref": "#/$defs/executable" },
         "container_image": { "$ref": "#/$defs/container_image" },
         "bound_files": {
           "type": "object",
@@ -158,6 +159,7 @@
         }
       },
       "then": {
+        "not": { "required": ["_signing_blocker"] },
         "properties": {
           "release": {
             "properties": {
@@ -206,6 +208,9 @@
               "release_owner_approved": { "const": true },
               "detached_signature": { "$ref": "#/$defs/approved_signature" }
             }
+          },
+          "_verification": {
+            "items": { "$ref": "#/$defs/non_placeholder" }
           }
         }
       }
@@ -228,8 +233,9 @@
     "file": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sha256", "source"],
+      "required": ["release_path", "sha256", "source"],
       "properties": {
+        "release_path": { "type": "string", "minLength": 1 },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "source": { "type": "string", "minLength": 1 }
       }
@@ -237,6 +243,7 @@
     "approved_file": {
       "type": "object",
       "properties": {
+        "release_path": { "$ref": "#/$defs/non_placeholder" },
         "sha256": { "$ref": "#/$defs/sha256" },
         "source": { "$ref": "#/$defs/non_placeholder" }
       }
@@ -341,6 +348,7 @@
         "chain_executable": { "$ref": "#/$defs/approved_executable" },
         "supernode_executable": { "$ref": "#/$defs/approved_executable" },
         "sncli_executable": { "$ref": "#/$defs/approved_executable" },
+        "relayer_executable": { "$ref": "#/$defs/approved_executable" },
         "container_image": { "$ref": "#/$defs/approved_container_image" },
         "bound_files": {
           "properties": {

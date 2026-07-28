@@ -39,6 +39,15 @@
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "source": "REPLACE_WITH_SNCLI_RELEASE_ASSET_URL"
     },
+    "relayer_executable": {
+      "name": "hermes",
+      "release_path": "REPLACE_WITH_TARBALL_PATH_TO_HERMES",
+      "version": "REPLACE_WITH_HERMES_VERSION",
+      "tag": "REPLACE_WITH_HERMES_RELEASE_TAG",
+      "commit": "0000000000000000000000000000000000000000",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source": "REPLACE_WITH_HERMES_RELEASE_ASSET_URL"
+    },
     "container_image": {
       "artifact": "REPLACE_WITH_CONTAINER_IMAGE_REPOSITORY_AND_TAG",
       "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
@@ -46,50 +55,62 @@
     },
     "bound_files": {
       "scripts/evmigration-common.sh": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_scripts/evmigration-common.sh",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/evmigration-common.sh"
       },
       "scripts/migrate-account.sh": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-account.sh",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-account.sh"
       },
       "scripts/migrate-validator.sh": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-validator.sh",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-validator.sh"
       },
       "scripts/migrate-multisig.sh": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-multisig.sh",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-multisig.sh"
       },
       "scripts/migrate-batch.sh": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-batch.sh",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-batch.sh"
       },
       "docs/evm-integration/user-guides/operator-migration-runbook.md": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/operator-migration-runbook.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/operator-migration-runbook.md"
       },
       "docs/evm-integration/user-guides/migration.md": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/migration.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/migration.md"
       },
       "docs/evm-integration/user-guides/migration-scripts.md": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/migration-scripts.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/migration-scripts.md"
       },
       "docs/evm-integration/user-guides/validator-migration.md": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/validator-migration.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/validator-migration.md"
       },
       "docs/evm-integration/user-guides/supernode-migration.md": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/supernode-migration.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/supernode-migration.md"
       },
       "docs/evm-integration/user-guides/relayer-migration.md": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/relayer-migration.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/relayer-migration.md"
       },
       "docs/evm-integration/evmigration/legacy-migration.md": {
+        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/evmigration/legacy-migration.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/evmigration/legacy-migration.md"
       }
@@ -151,7 +172,7 @@
   },
   "_verification": [
     "Release owner: replace every REPLACE_WITH value and every all-zero commit/hash; approval.status=approved is schema-invalid while any remain.",
-    "Extract each release asset into a new mode-0700 directory. Verify the chain, SuperNode, and sncli executable release path, tag, commit, version, source, and SHA-256; verify the container image artifact, registry source, and immutable digest; then verify every artifacts.bound_files entry individually with sha256sum.",
+    "Extract each release asset into a new mode-0700 directory. Verify the chain, SuperNode, sncli, and Hermes executable release path, tag, commit, version, source, and SHA-256; verify the container image artifact, registry source, and immutable digest; then verify every artifacts.bound_files release_path individually with sha256sum.",
     "Require operator_contracts.destination_prestage_no_echo.status=verified and bind its implementation name, tag, commit, SHA-256, source, and exact no-echo contract. Do not approve an unfinished or narrative-only PR-2 dependency.",
     "Run every validation command and attach sanitized evidence. Every validation status, including owned_testnet and portal_live, must be pass before approval is schema-valid.",
     "Validate the schema under draft 2020-12, validate this manifest against it, and confirm a copy changed to approval.status=approved while retaining any blocked/postponed/placeholder field is rejected.",

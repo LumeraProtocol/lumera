@@ -51,14 +51,21 @@ Identify `runAsUser`, command/args, PVC/config/secret mounts, base directory, an
 
 ## 2. Pin binary, home, and keyring provenance
 
-Use the exact release executables and explicit flags. The helpers resolve `--binary` once to an absolute canonical path, then print that path, the actual `version --long` version, SHA-256, and source before doing key work. They print keyring backend and keyring location separately, with each source. Independently verify all three executable records in the manifest: `artifacts.chain_executable`, `artifacts.supernode_executable`, and `artifacts.sncli_executable`, including each exact `release_path`, version, tag, commit, SHA-256, and source. For container procedures, also pull and inspect the exact `artifacts.container_image.artifact@artifacts.container_image.digest` from `artifacts.container_image.source`; a mutable tag alone is not approved.
+Use the exact release executables and explicit flags. The helpers resolve `--binary` once to an absolute canonical path, then print that path, the actual `version --long` version, SHA-256, and source before doing key work. They print keyring backend and keyring location separately, with each source. Independently verify all four executable records in the manifest: `artifacts.chain_executable`, `artifacts.supernode_executable`, `artifacts.sncli_executable`, and `artifacts.relayer_executable`, including each exact `release_path`, version, tag, commit, SHA-256, and source. Every `artifacts.bound_files` record also binds its exact runtime `release_path`; approval is deployment-specific, so those paths must be the paths this procedure actually executes. For container procedures, also pull and inspect the exact `artifacts.container_image.artifact@artifacts.container_image.digest` from `artifacts.container_image.source`; a mutable tag alone is not approved.
 
 ```bash
-LUMERAD=/absolute/path/to/approved/lumerad
+MANIFEST=/absolute/path/to/approved/compatibility-manifest.json
+LUMERAD=$(jq -er '.artifacts.chain_executable.release_path' "$MANIFEST")
+MIGRATE_VALIDATOR=$(jq -er '.artifacts.bound_files["scripts/migrate-validator.sh"].release_path' "$MANIFEST")
+test "${LUMERAD#/}" != "$LUMERAD" && test "${MIGRATE_VALIDATOR#/}" != "$MIGRATE_VALIDATOR"
+printf '%s  %s\n' \
+  "$(jq -er '.artifacts.chain_executable.sha256' "$MANIFEST")" "$LUMERAD" \
+  "$(jq -er '.artifacts.bound_files["scripts/migrate-validator.sh"].sha256' "$MANIFEST")" "$MIGRATE_VALIDATOR" \
+  | sha256sum -c -
 "$LUMERAD" version --long | tee "$EVIDENCE_DIR/lumerad-version.txt"
 sha256sum "$LUMERAD" | tee "$EVIDENCE_DIR/lumerad.sha256"
 
-sudo -u <service-user> ./scripts/migrate-validator.sh \
+sudo -u <service-user> "$MIGRATE_VALIDATOR" \
   <legacy-key-name> <destination-key-name> \
   --binary "$LUMERAD" \
   --home /absolute/lumera/home \
@@ -148,7 +155,7 @@ The irreversible boundary is the first live helper invocation. Choose the branch
 ### systemd / secured operator host
 
 ```bash
-sudo -u <service-user> ./scripts/migrate-validator.sh \
+sudo -u <service-user> "$MIGRATE_VALIDATOR" \
   <legacy-key-name> <destination-key-name> \
   --binary "$LUMERAD" \
   --home /absolute/lumera/home \
@@ -166,12 +173,22 @@ Do not apply the systemd command to a container deployment. Keep the original wo
 ```bash
 # The workload container remains stopped for both invocations.
 test "$(docker inspect -f '{{.State.Running}}' <stopped-container>)" = false
-APPROVED_IMAGE='<artifacts.container_image.artifact>@<artifacts.container_image.digest>'
+APPROVED_IMAGE="$(jq -er '.artifacts.container_image.artifact' "$MANIFEST")@$(jq -er '.artifacts.container_image.digest' "$MANIFEST")"
 SERVICE_UID_GID='<uid>:<gid>'
-MIGRATION_HELPER='<manifest-pinned-helper-release_path-in-image>'
-LUMERAD_IN_IMAGE='<artifacts.chain_executable.release_path-in-image>'
+MIGRATION_HELPER=$(jq -er '.artifacts.bound_files["scripts/migrate-validator.sh"].release_path' "$MANIFEST")
+LUMERAD_IN_IMAGE=$(jq -er '.artifacts.chain_executable.release_path' "$MANIFEST")
+MIGRATION_HELPER_SHA256=$(jq -er '.artifacts.bound_files["scripts/migrate-validator.sh"].sha256' "$MANIFEST")
+LUMERAD_SHA256=$(jq -er '.artifacts.chain_executable.sha256' "$MANIFEST")
 CONTAINER_HOME='<original-home-mount-destination-from-docker-inspect>'
 CONTAINER_KEYRING_DIR='<original-keyring-mount-destination-from-docker-inspect>'
+test "${MIGRATION_HELPER#/}" != "$MIGRATION_HELPER" && test "${LUMERAD_IN_IMAGE#/}" != "$LUMERAD_IN_IMAGE"
+
+# Verify the exact in-image paths before either invocation.
+docker run --rm --user "$SERVICE_UID_GID" \
+  --entrypoint /bin/sh \
+  -e MIGRATION_HELPER -e MIGRATION_HELPER_SHA256 -e LUMERAD_IN_IMAGE -e LUMERAD_SHA256 \
+  "$APPROVED_IMAGE" -ec \
+  'printf "%s  %s\n%s  %s\n" "$MIGRATION_HELPER_SHA256" "$MIGRATION_HELPER" "$LUMERAD_SHA256" "$LUMERAD_IN_IMAGE" | sha256sum -c -'
 
 run_migration() {
   docker run --rm -it --name evmigration-once \
@@ -198,7 +215,7 @@ run_migration
 
 ### Kubernetes one-shot pod
 
-Keep the StatefulSet at zero replicas. Apply a dedicated Pod using the workload's exact `serviceAccountName`, `runAsUser`/`runAsGroup`, PVC, config/keyring mount paths, manifest-pinned image digest, helper, binary, and trusted RPC. Do not mount a validator PVC read-write into any other pod concurrently.
+Keep the StatefulSet at zero replicas. Apply a dedicated Pod using the workload's exact `serviceAccountName`, `runAsUser`/`runAsGroup`, PVC, config/keyring mount paths, manifest-pinned image digest, helper, binary, and trusted RPC. Before applying, render each `<exact ...>` value below directly from the named manifest field; do not substitute a conventional `/release/...` path. The init container verifies those exact paths and the migration container executes the exact helper path. Do not mount a validator PVC read-write into any other pod concurrently.
 
 ```yaml
 apiVersion: v1
@@ -213,16 +230,27 @@ spec:
     runAsUser: <same-runAsUser>
     runAsGroup: <same-runAsGroup>
     fsGroup: <same-fsGroup>
+  initContainers:
+    - name: verify-release
+      image: <exact artifacts.container_image.artifact>@<exact artifacts.container_image.digest>
+      command: ["/bin/sh", "-ec"]
+      args:
+        - >-
+          printf '%s  %s\n%s  %s\n'
+          '<exact artifacts.bound_files["scripts/migrate-validator.sh"].sha256>'
+          '<exact artifacts.bound_files["scripts/migrate-validator.sh"].release_path>'
+          '<exact artifacts.chain_executable.sha256>'
+          '<exact artifacts.chain_executable.release_path>' | sha256sum -c -
   containers:
     - name: migrate
-      image: <registry>/<image>@sha256:<manifest-image-digest>
+      image: <exact artifacts.container_image.artifact>@<exact artifacts.container_image.digest>
       imagePullPolicy: IfNotPresent
-      command: ["/release/scripts/migrate-validator.sh"]
+      command: ['<exact artifacts.bound_files["scripts/migrate-validator.sh"].release_path>']
       args:
         - <legacy-key-name>
         - <destination-key-name>
         - --binary
-        - /release/bin/lumerad
+        - '<exact artifacts.chain_executable.release_path>'
         - --home
         - /mounted/lumera/home
         - --keyring-backend
@@ -313,12 +341,15 @@ This check has the same exact PR-2 compatibility dependency as destination prest
 
 ```bash
 umask 077
-SNCLI=/absolute/path/to/manifest-pinned/sncli
+SNCLI=$(jq -er '.artifacts.sncli_executable.release_path' "$MANIFEST")
+SNCLI_SHA256=$(jq -er '.artifacts.sncli_executable.sha256' "$MANIFEST")
 SNCLI_CONFIG=/absolute/supernode/basedir/sncli-config.toml
+test "${SNCLI#/}" != "$SNCLI"
 chmod 0600 "$SNCLI_CONFIG"
 # If passphrase_file is configured, its existing platform-secret mount must also be mode 0600:
 chmod 0600 /absolute/secret/mount/sncli-keyring-passphrase
-sha256sum "$SNCLI" | tee "$EVIDENCE_DIR/sncli.sha256"
+printf '%s  %s\n' "$SNCLI_SHA256" "$SNCLI" | sha256sum -c - \
+  | tee "$EVIDENCE_DIR/sncli.sha256"
 
 sudo -u <supernode-service-user> "$SNCLI" \
   --config "$SNCLI_CONFIG" \

@@ -227,6 +227,11 @@
       "minLength": 3,
       "pattern": "^(?!.*(?:[Pp][Ll][Aa][Cc][Ee][Hh][Oo][Ll][Dd][Ee][Rr]|[Tt][Oo][Dd][Oo]|[Tt][Bb][Dd]|[Uu][Nn][Kk][Nn][Oo][Ww][Nn]|[Rr][Ee][Pp][Ll][Aa][Cc][Ee])(?:[^A-Za-z]|$))(?!.*<[^>]+>).+\\S$"
     },
+    "non_placeholder_argv": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!.*(?:[Pp][Ll][Aa][Cc][Ee][Hh][Oo][Ll][Dd][Ee][Rr]|[Tt][Oo][Dd][Oo]|[Tt][Bb][Dd]|[Uu][Nn][Kk][Nn][Oo][Ww][Nn]|[Rr][Ee][Pp][Ll][Aa][Cc][Ee])(?:[^A-Za-z]|$))(?!.*<[^>]+>)\\S(?:.*\\S)?$"
+    },
     "sha256": {
       "type": "string",
       "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
@@ -300,9 +305,16 @@
     "pr2_implementation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "tag", "commit", "sha256", "source", "no_echo_contract"],
+      "required": ["name", "release_path", "argv", "tag", "commit", "sha256", "source", "no_echo_contract"],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
+        "release_path": { "$ref": "#/$defs/absolute_path" },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "prefixItems": [{ "$ref": "#/$defs/absolute_path" }],
+          "items": { "type": "string", "minLength": 1 }
+        },
         "tag": { "type": "string", "minLength": 1 },
         "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
@@ -316,6 +328,23 @@
         {
           "properties": {
             "name": { "$ref": "#/$defs/non_placeholder" },
+            "release_path": {
+              "allOf": [
+                { "$ref": "#/$defs/absolute_path" },
+                { "$ref": "#/$defs/non_placeholder" }
+              ]
+            },
+            "argv": {
+              "type": "array",
+              "minItems": 1,
+              "prefixItems": [{
+                "allOf": [
+                  { "$ref": "#/$defs/absolute_path" },
+                  { "$ref": "#/$defs/non_placeholder" }
+                ]
+              }],
+              "items": { "$ref": "#/$defs/non_placeholder_argv" }
+            },
             "tag": { "$ref": "#/$defs/non_placeholder" },
             "commit": { "$ref": "#/$defs/commit" },
             "sha256": { "$ref": "#/$defs/sha256" },

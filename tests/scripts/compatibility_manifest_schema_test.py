@@ -64,6 +64,14 @@ def approved_manifest(template):
         "status": "verified",
         "implementation": {
             "name": "destination-prestage",
+            "release_path": "/opt/lumera/bin/destination-prestage",
+            "argv": [
+                "/opt/lumera/bin/destination-prestage",
+                "--home",
+                "/var/lib/lumera",
+                "--protected-fd",
+                "3",
+            ],
             "tag": "v1.20.0",
             "commit": "6" * 40,
             "sha256": "7" * 64,
@@ -131,6 +139,44 @@ class CompatibilityManifestSchemaTest(unittest.TestCase):
             "release_path"
         ] = "scripts/migrate-validator.sh"
         self.assert_invalid(unsafe)
+
+    def test_approved_prestage_requires_absolute_runtime_binding(self):
+        missing_path = copy.deepcopy(self.approved)
+        del missing_path["operator_contracts"]["destination_prestage_no_echo"][
+            "implementation"
+        ]["release_path"]
+        self.assert_invalid(missing_path)
+
+        relative_path = copy.deepcopy(self.approved)
+        relative_path["operator_contracts"]["destination_prestage_no_echo"][
+            "implementation"
+        ]["release_path"] = "bin/destination-prestage"
+        self.assert_invalid(relative_path)
+
+        placeholder_path = copy.deepcopy(self.approved)
+        placeholder_path["operator_contracts"]["destination_prestage_no_echo"][
+            "implementation"
+        ]["release_path"] = "/REPLACE_WITH_DESTINATION_PRESTAGE"
+        self.assert_invalid(placeholder_path)
+
+    def test_approved_prestage_requires_exact_non_placeholder_argv(self):
+        missing_argv = copy.deepcopy(self.approved)
+        del missing_argv["operator_contracts"]["destination_prestage_no_echo"][
+            "implementation"
+        ]["argv"]
+        self.assert_invalid(missing_argv)
+
+        relative_executable = copy.deepcopy(self.approved)
+        relative_executable["operator_contracts"]["destination_prestage_no_echo"][
+            "implementation"
+        ]["argv"][0] = "bin/destination-prestage"
+        self.assert_invalid(relative_executable)
+
+        placeholder_argument = copy.deepcopy(self.approved)
+        placeholder_argument["operator_contracts"]["destination_prestage_no_echo"][
+            "implementation"
+        ]["argv"][2] = "REPLACE_WITH_HOME"
+        self.assert_invalid(placeholder_argument)
 
     def test_url_sources_are_not_constrained_as_runtime_paths(self):
         manifest = copy.deepcopy(self.approved)

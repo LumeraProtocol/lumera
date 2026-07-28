@@ -99,6 +99,24 @@ For a supernode or Hermes relayer, use the discovered config path in place of th
 
 **Required PR-2 compatibility dependency:** use only the release's approved destination pre-stage operation that implements the PR-2 no-echo contract. That operation must read the mnemonic from a hidden TTY or protected input file descriptor, never from argv, never echo it, never enable shell tracing, and print only non-secret key metadata. This PR-3 runbook does not claim that an unfinished PR-2 command exists in the current binary; if the release compatibility manifest does not name and hash an implementation of this contract, stop.
 
+The approved manifest must bind both the executable and its full argv. Verify the executable hash, require `argv[0]` to equal the approved absolute path, and execute the array without `eval` or operator substitutions:
+
+```bash
+PRESTAGE_IMPL=$(jq -er '.operator_contracts.destination_prestage_no_echo.implementation.release_path' "$MANIFEST")
+PRESTAGE_SHA256=$(jq -er '.operator_contracts.destination_prestage_no_echo.implementation.sha256' "$MANIFEST")
+mapfile -t PRESTAGE_ARGV < <(jq -er '.operator_contracts.destination_prestage_no_echo.implementation.argv[]' "$MANIFEST")
+test "${PRESTAGE_IMPL#/}" != "$PRESTAGE_IMPL"
+test "${#PRESTAGE_ARGV[@]}" -gt 0
+test "${PRESTAGE_ARGV[0]}" = "$PRESTAGE_IMPL"
+printf '%s  %s\n' "$PRESTAGE_SHA256" "$PRESTAGE_IMPL" | sha256sum -c -
+
+# The implementation itself must obtain the mnemonic through its manifest-approved
+# hidden-TTY or protected-FD contract. Never append mnemonic material to this argv.
+sudo -u <service-user> -- "${PRESTAGE_ARGV[@]}"
+```
+
+Record the exact argv and sanitized public result in approval evidence. If the release's protected-FD form requires input redirection, use only the separately approved custody procedure; redirection must not alter argv or expose the mnemonic.
+
 After PR-2 pre-staging, verify the destination locally using the same binary/home/backend/location:
 
 ```bash

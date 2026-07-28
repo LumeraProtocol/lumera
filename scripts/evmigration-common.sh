@@ -114,6 +114,34 @@ _role_color() { printf '%s%s%s' "$1" "$2" "$_C_RESET"; }
 legacy_value() { _role_color "$_C_LEGACY" "$1"; }
 new_value() { _role_color "$_C_NEW" "$1"; }
 
+# Parse `hermes keys list` output and fail closed unless exactly one named key
+# derives the expected address. Hermes v1.13 has no JSON output for this command.
+# Usage: hermes keys list ... | require_hermes_key_address <key-name> <expected-address>
+require_hermes_key_address() {
+  if (( $# != 2 )) || [[ -z "$1" || -z "$2" ]]; then
+    log_error "require_hermes_key_address requires key name and expected address"
+    return 1
+  fi
+
+  local key_name="$1" expected_address="$2" matches
+  matches=$(awk -v key="$key_name" '
+    $1 == "-" && $2 == key && NF == 3 && $3 ~ /^\([^()]+\)$/ {
+      print substr($3, 2, length($3) - 2)
+    }
+  ')
+
+  if [[ -z "$matches" || "$matches" == *$'\n'* ]]; then
+    log_error "expected exactly one Hermes key named $key_name"
+    return 1
+  fi
+  if [[ "$matches" != "$expected_address" ]]; then
+    log_error "Hermes key $key_name derives $matches, which does not match expected destination $expected_address"
+    return 1
+  fi
+
+  printf '%s\n' "$matches"
+}
+
 # ---- Flag parsing -----------------------------------------------------------
 
 # _require_value <flag-name> <arg-count> <next-arg-or-empty>

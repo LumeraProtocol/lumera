@@ -16,14 +16,18 @@
 > LUMERAD_SHA256=$(jq -er '.artifacts.chain_executable.sha256' "$MANIFEST")
 > MIGRATE_ACCOUNT=$(jq -er '.artifacts.bound_files["scripts/migrate-account.sh"].release_path' "$MANIFEST")
 > MIGRATE_ACCOUNT_SHA256=$(jq -er '.artifacts.bound_files["scripts/migrate-account.sh"].sha256' "$MANIFEST")
+> EVMIGRATION_COMMON=$(jq -er '.artifacts.bound_files["scripts/evmigration-common.sh"].release_path' "$MANIFEST")
+> EVMIGRATION_COMMON_SHA256=$(jq -er '.artifacts.bound_files["scripts/evmigration-common.sh"].sha256' "$MANIFEST")
 > HERMES_HOME=/absolute/discovered/hermes/home
 > HERMES_CONFIG="$HERMES_HOME/config.toml"
 > test "${HERMES#/}" != "$HERMES" && test "${LUMERAD#/}" != "$LUMERAD"
-> test "${MIGRATE_ACCOUNT#/}" != "$MIGRATE_ACCOUNT" && test "${HERMES_HOME#/}" != "$HERMES_HOME"
-> printf '%s  %s\n%s  %s\n%s  %s\n' \
+> test "${MIGRATE_ACCOUNT#/}" != "$MIGRATE_ACCOUNT" && test "${EVMIGRATION_COMMON#/}" != "$EVMIGRATION_COMMON"
+> test "${HERMES_HOME#/}" != "$HERMES_HOME"
+> printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
 >   "$HERMES_SHA256" "$HERMES" \
 >   "$LUMERAD_SHA256" "$LUMERAD" \
->   "$MIGRATE_ACCOUNT_SHA256" "$MIGRATE_ACCOUNT" | sha256sum -c -
+>   "$MIGRATE_ACCOUNT_SHA256" "$MIGRATE_ACCOUNT" \
+>   "$EVMIGRATION_COMMON_SHA256" "$EVMIGRATION_COMMON" | sha256sum -c -
 > test -f "$HERMES_CONFIG"
 > ```
 
@@ -119,8 +123,15 @@ sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys add \
   --mnemonic-file /run/secrets/relayer-evm.mnemonic \
   --hd-path "m/44'/60'/0'/0/0"
 
-sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys list --chain lumera-mainnet-1 | grep relayer-evm-gate
-# the printed address MUST equal $NEWADDR. If it does not, STOP — do not migrate.
+if ! HERMES_GATE_ADDR=$(
+  sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys list --chain lumera-mainnet-1 |
+    EVMIGRATION_COMMON="$EVMIGRATION_COMMON" EXPECTED_ADDR="$NEWADDR" bash -c \
+      'source "$EVMIGRATION_COMMON"; require_hermes_key_address relayer-evm-gate "$EXPECTED_ADDR"'
+); then
+  echo 'Hermes destination-address gate failed; do not migrate' >&2
+  exit 1
+fi
+test "$HERMES_GATE_ADDR" = "$NEWADDR"
 sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys delete --chain lumera-mainnet-1 --key-name relayer-evm-gate
 ```
 
@@ -166,7 +177,15 @@ sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys add \
   --mnemonic-file /run/secrets/relayer-evm.mnemonic \
   --hd-path "m/44'/60'/0'/0/0"
 
-sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys list --chain lumera-mainnet-1 | grep ' relayer '   # MUST show $NEWADDR
+if ! HERMES_ACTIVE_ADDR=$(
+  sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys list --chain lumera-mainnet-1 |
+    EVMIGRATION_COMMON="$EVMIGRATION_COMMON" EXPECTED_ADDR="$NEWADDR" bash -c \
+      'source "$EVMIGRATION_COMMON"; require_hermes_key_address relayer "$EXPECTED_ADDR"'
+); then
+  echo 'Active Hermes key does not control the migrated destination; keep relayer stopped' >&2
+  exit 1
+fi
+test "$HERMES_ACTIVE_ADDR" = "$NEWADDR"
 ```
 
 ### Step 6 — Restart and verify

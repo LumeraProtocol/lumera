@@ -172,6 +172,7 @@
   },
   "_verification": [
     "Release owner: replace every REPLACE_WITH value and every all-zero commit/hash; approval.status=approved is schema-invalid while any remain.",
+    "For destination_prestage_no_echo, bind implementation.release_path and the full implementation.argv. Require argv[0] to equal release_path, verify implementation.sha256 immediately before execution, and execute the argv array without eval or secret material in argv.",
     "Extract each release asset into a new mode-0700 directory. Verify the chain, SuperNode, sncli, and Hermes executable release path, tag, commit, version, source, and SHA-256; verify the container image artifact, registry source, and immutable digest; then verify every artifacts.bound_files release_path individually with sha256sum.",
     "Require operator_contracts.destination_prestage_no_echo.status=verified and bind its implementation name, tag, commit, SHA-256, source, and exact no-echo contract. Do not approve an unfinished or narrative-only PR-2 dependency.",
     "Run every validation command and attach sanitized evidence. Every validation status, including owned_testnet and portal_live, must be pass before approval is schema-valid.",

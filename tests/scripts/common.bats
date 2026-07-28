@@ -1134,3 +1134,27 @@ JSON
   [[ "$output" == *"Keyring location: $kr (explicit --keyring-dir)"* ]]
   [[ "$output" != *"test (default)"* ]]
 }
+
+@test "require_hermes_key_address accepts one exact address match" {
+  run bash -c 'source '"$SCRIPTS_DIR"'/evmigration-common.sh; printf "%s\n" "SUCCESS" "- relayer-evm-gate (lumera1expected)" | require_hermes_key_address relayer-evm-gate lumera1expected'
+  [ "$status" -eq 0 ]
+  [ "$output" = "lumera1expected" ]
+}
+
+@test "require_hermes_key_address rejects an address mismatch" {
+  run bash -c 'source '"$SCRIPTS_DIR"'/evmigration-common.sh; printf "%s\n" "- relayer-evm-gate (lumera1wrong)" | require_hermes_key_address relayer-evm-gate lumera1expected'
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"does not match expected destination"* ]]
+}
+
+@test "require_hermes_key_address rejects a missing key" {
+  run bash -c 'source '"$SCRIPTS_DIR"'/evmigration-common.sh; printf "%s\n" "- other-key (lumera1expected)" | require_hermes_key_address relayer-evm-gate lumera1expected'
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"exactly one Hermes key"* ]]
+}
+
+@test "require_hermes_key_address rejects duplicate key rows" {
+  run bash -c 'source '"$SCRIPTS_DIR"'/evmigration-common.sh; printf "%s\n" "- relayer-evm-gate (lumera1expected)" "- relayer-evm-gate (lumera1expected)" | require_hermes_key_address relayer-evm-gate lumera1expected'
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"exactly one Hermes key"* ]]
+}

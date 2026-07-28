@@ -20,14 +20,8 @@ func (k Keeper) MigrateSupernode(ctx sdk.Context, legacyAddr, newAddr sdk.AccAdd
 	// Update the supernode account field to new address.
 	sn.SupernodeAccount = newAddr.String()
 
-	// Update legacy address references in existing history entries.
-	legacyAddrStr := legacyAddr.String()
-	for i := range sn.PrevSupernodeAccounts {
-		if sn.PrevSupernodeAccounts[i].Account == legacyAddrStr {
-			sn.PrevSupernodeAccounts[i].Account = newAddr.String()
-		}
-	}
-
+	// Preserve the existing account timeline verbatim. Migration changes the
+	// effective account, so append exactly one transition at this block height.
 	// Record the migration as a new account-history entry.
 	sn.PrevSupernodeAccounts = append(sn.PrevSupernodeAccounts, &sntypes.SupernodeAccountHistory{
 		Account: newAddr.String(),

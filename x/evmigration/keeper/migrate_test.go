@@ -1108,8 +1108,8 @@ func TestMigrateFeegrant_NoAllowances(t *testing.T) {
 
 // --- MigrateSupernode tests ---
 
-// TestMigrateSupernode_Found verifies that the supernode account field is updated
-// from legacy to new address and PrevSupernodeAccounts history is maintained.
+// TestMigrateSupernode_Found verifies that migration preserves the complete
+// existing account timeline and appends the new effective account once.
 func TestMigrateSupernode_Found(t *testing.T) {
 	f := initMockFixture(t)
 	legacy := testAccAddr()
@@ -1119,20 +1119,23 @@ func TestMigrateSupernode_Found(t *testing.T) {
 		SupernodeAccount: legacy.String(),
 		ValidatorAddress: sdk.ValAddress(legacy).String(),
 		PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
-			{Account: legacy.String(), Height: 1},
+			{Account: testAccAddr().String(), Height: 1},
+			{Account: legacy.String(), Height: 7},
 		},
+	}
+	originalHistory := []*sntypes.SupernodeAccountHistory{
+		{Account: sn.PrevSupernodeAccounts[0].Account, Height: sn.PrevSupernodeAccounts[0].Height},
+		{Account: sn.PrevSupernodeAccounts[1].Account, Height: sn.PrevSupernodeAccounts[1].Height},
 	}
 
 	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
-			// Existing legacy entry should be rewritten to new address.
-			require.Len(t, updated.PrevSupernodeAccounts, 2)
-			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[0].Account)
-			require.Equal(t, int64(1), updated.PrevSupernodeAccounts[0].Height)
-			// New migration entry appended.
-			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[1].Account)
+			require.Len(t, updated.PrevSupernodeAccounts, len(originalHistory)+1)
+			require.Equal(t, originalHistory, updated.PrevSupernodeAccounts[:len(originalHistory)])
+			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[2].Account)
+			require.Equal(t, f.ctx.BlockHeight(), updated.PrevSupernodeAccounts[2].Height)
 			return nil
 		})
 
@@ -2660,9 +2663,9 @@ func TestMigrateValidatorSupernode_EvidenceAddressMigrated(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMigrateValidatorSupernode_AccountHistoryMigrated verifies that
-// PrevSupernodeAccounts entries matching the old account are updated.
-func TestMigrateValidatorSupernode_AccountHistoryMigrated(t *testing.T) {
+// TestMigrateValidatorSupernode_AccountHistoryPreserved verifies that existing
+// timeline entries remain exact and the new effective account is appended once.
+func TestMigrateValidatorSupernode_AccountHistoryPreserved(t *testing.T) {
 	f := initMockFixture(t)
 	oldValAddr := sdk.ValAddress(testAccAddr())
 	newValAddr := sdk.ValAddress(testAccAddr())
@@ -2674,9 +2677,13 @@ func TestMigrateValidatorSupernode_AccountHistoryMigrated(t *testing.T) {
 		ValidatorAddress: oldValAddr.String(),
 		SupernodeAccount: oldAccountStr,
 		PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
-			{Account: oldAccountStr, Height: 100},
 			{Account: otherAccount, Height: 50},
+			{Account: oldAccountStr, Height: 100},
 		},
+	}
+	originalHistory := []*sntypes.SupernodeAccountHistory{
+		{Account: otherAccount, Height: 50},
+		{Account: oldAccountStr, Height: 100},
 	}
 
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
@@ -2685,11 +2692,7 @@ func TestMigrateValidatorSupernode_AccountHistoryMigrated(t *testing.T) {
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Len(t, updated.PrevSupernodeAccounts, 3)
-			// Entry matching old account should be updated.
-			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[0].Account)
-			// Entry for a different account should be unchanged.
-			require.Equal(t, otherAccount, updated.PrevSupernodeAccounts[1].Account)
-			// New migration entry appended with new address and current height.
+			require.Equal(t, originalHistory, updated.PrevSupernodeAccounts[:2])
 			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[2].Account)
 			require.Equal(t, f.ctx.BlockHeight(), updated.PrevSupernodeAccounts[2].Height)
 			return nil

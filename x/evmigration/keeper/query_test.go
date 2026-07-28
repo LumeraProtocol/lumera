@@ -1,6 +1,7 @@
 package keeper_test
 
 import (
+	"errors"
 	"testing"
 
 	"cosmossdk.io/math"
@@ -250,9 +251,15 @@ func TestQueryMigrationEstimate_NonValidator(t *testing.T) {
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(
 		sdk.NewCoins(sdk.NewCoin("ulume", math.NewInt(5000000000))),
 	)
-	// No supernode.
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), sdk.ValAddress(addr)).Return(
-		sntypes.SuperNode{}, false,
+	// The legacy account owns a SuperNode registered under a different validator
+	// operator address. Execution resolves ownership by SupernodeAccount, so the
+	// estimate must do the same rather than casting the account to ValAddress.
+	separateValidator := sdk.ValAddress(testAccAddr())
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(
+		sntypes.SuperNode{
+			ValidatorAddress: separateValidator.String(),
+			SupernodeAccount: addr.String(),
+		}, true, nil,
 	)
 	// No account stored → multisig preflight skipped.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
@@ -267,7 +274,24 @@ func TestQueryMigrationEstimate_NonValidator(t *testing.T) {
 	require.Equal(t, uint64(2), resp.ActionCount)
 	require.Equal(t, uint64(4), resp.TotalTouched)
 	require.Equal(t, "5000000000ulume", resp.BalanceSummary)
-	require.False(t, resp.HasSupernode)
+	require.True(t, resp.HasSupernode)
+}
+
+func TestQueryMigrationEstimate_StrictSupernodeOwnershipError(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+	addr := testAccAddr()
+
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(
+		sntypes.SuperNode{}, false, errors.New("corrupt supernode ownership state"),
+	)
+
+	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: addr.String(),
+	})
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "resolve supernode ownership")
+	require.ErrorContains(t, err, "corrupt supernode ownership state")
 }
 
 // TestQueryMigrationEstimate_AlreadyMigrated verifies that already-migrated addresses
@@ -296,8 +320,8 @@ func TestQueryMigrationEstimate_AlreadyMigrated(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), sdk.ValAddress(addr)).Return(
-		sntypes.SuperNode{}, false,
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(
+		sntypes.SuperNode{}, false, nil,
 	)
 	// No account stored → multisig preflight skipped.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
@@ -378,7 +402,7 @@ func TestQueryMigrationEstimate_ValidatorUsesScopedRedelegationIndexesForLimit(t
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -429,7 +453,7 @@ func TestMigrationEstimate_ValidatorUnbondedNotJailed_WouldSucceed(t *testing.T)
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -480,7 +504,7 @@ func TestMigrationEstimate_ValidatorUnbonding_WouldFail(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -812,7 +836,7 @@ func TestMigrationEstimate_Multisig_Supported(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -851,7 +875,7 @@ func TestMigrationEstimate_Multisig_TooManySubKeys(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -887,7 +911,7 @@ func TestMigrationEstimate_Multisig_NonSecp256k1SubKey(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -928,7 +952,7 @@ func TestMigrationEstimate_Multisig_DuplicateSubKey(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{

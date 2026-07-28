@@ -300,13 +300,8 @@ func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAdd
 	if sn.SupernodeAccount == legacyAddrStr {
 		sn.SupernodeAccount = newAddr.String()
 
-		// Rewrite existing history entries that reference the legacy address.
-		for i := range sn.PrevSupernodeAccounts {
-			if sn.PrevSupernodeAccounts[i].Account == legacyAddrStr {
-				sn.PrevSupernodeAccounts[i].Account = newAddr.String()
-			}
-		}
-
+		// Preserve the existing account timeline verbatim. Migration changes the
+		// effective account, so append exactly one transition at this block height.
 		// Record the migration as a new account-history entry.
 		sn.PrevSupernodeAccounts = append(sn.PrevSupernodeAccounts, &sntypes.SupernodeAccountHistory{
 			Account: newAddr.String(),

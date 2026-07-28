@@ -731,13 +731,13 @@ func verifySupernodeMigration(
 			return fmt.Errorf("PrevSupernodeAccounts last entry account mismatch: expected %s got %s",
 				newAddr, lastEntry.Account)
 		}
-		// Existing history entries matching old account should now reference new account.
+		// Every existing history entry is immutable; migration only appends the
+		// newly effective account marker.
 		for i, preHist := range preSN.PrevSupernodeAccounts {
-			if preHist.Account == legacyAddr {
-				if postSN.PrevSupernodeAccounts[i].Account != newAddr {
-					return fmt.Errorf("PrevSupernodeAccounts[%d] account not migrated: expected %s got %s",
-						i, newAddr, postSN.PrevSupernodeAccounts[i].Account)
-				}
+			postHist := postSN.PrevSupernodeAccounts[i]
+			if postHist.Account != preHist.Account || postHist.Height != preHist.Height {
+				return fmt.Errorf("PrevSupernodeAccounts[%d] changed: expected account=%s height=%d got account=%s height=%d",
+					i, preHist.Account, preHist.Height, postHist.Account, postHist.Height)
 			}
 		}
 		log.Printf("  supernode account history: %d entries (including migration entry)", len(postSN.PrevSupernodeAccounts))

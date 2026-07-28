@@ -1207,6 +1207,22 @@ func (mr *MockSupernodeKeeperMockRecorder) SetSuperNode(ctx, supernode any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSuperNode", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetSuperNode), ctx, supernode)
 }
 
+// StrictGetSuperNodeByAccount mocks base method.
+func (m *MockSupernodeKeeper) StrictGetSuperNodeByAccount(ctx types1.Context, supernodeAccount string) (types0.SuperNode, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StrictGetSuperNodeByAccount", ctx, supernodeAccount)
+	ret0, _ := ret[0].(types0.SuperNode)
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// StrictGetSuperNodeByAccount indicates an expected call of StrictGetSuperNodeByAccount.
+func (mr *MockSupernodeKeeperMockRecorder) StrictGetSuperNodeByAccount(ctx, supernodeAccount any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StrictGetSuperNodeByAccount", reflect.TypeOf((*MockSupernodeKeeper)(nil).StrictGetSuperNodeByAccount), ctx, supernodeAccount)
+}
+
 // MockActionKeeper is a mock of ActionKeeper interface.
 type MockActionKeeper struct {
 	ctrl     *gomock.Controller

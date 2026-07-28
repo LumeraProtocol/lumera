@@ -121,6 +121,7 @@ type FeegrantKeeper interface {
 // SupernodeKeeper defines the expected interface for the x/supernode module.
 type SupernodeKeeper interface {
 	GetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) (sntypes.SuperNode, bool, error)
+	StrictGetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) (sntypes.SuperNode, bool, error)
 	QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn sntypes.SuperNode, exists bool)
 	SetSuperNode(ctx sdk.Context, supernode sntypes.SuperNode) error
 	DeleteSuperNode(ctx sdk.Context, valAddr sdk.ValAddress)

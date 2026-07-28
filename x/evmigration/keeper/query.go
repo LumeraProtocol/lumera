@@ -167,6 +167,15 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 		return nil, fmt.Errorf("load params for migration estimate: %w", err)
 	}
 
+	// Execution resolves SuperNode ownership by SupernodeAccount, which is
+	// independent of the validator operator address. Use the strict lookup so
+	// corrupt or incomplete primary/index state cannot be reported as absence.
+	_, hasSupernode, err := qs.k.supernodeKeeper.StrictGetSuperNodeByAccount(ctx, req.LegacyAddress)
+	if err != nil {
+		return nil, fmt.Errorf("resolve supernode ownership for migration estimate: %w", err)
+	}
+	resp.HasSupernode = hasSupernode
+
 	// Check if validator.
 	valAddr := sdk.ValAddress(addr)
 	val, valErr := qs.k.stakingKeeper.GetValidator(ctx, valAddr)
@@ -285,11 +294,6 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 	balances := qs.k.bankKeeper.GetAllBalances(ctx, addr)
 	if !balances.IsZero() {
 		resp.BalanceSummary = balances.String()
-	}
-
-	// Check supernode registration.
-	if _, found := qs.k.supernodeKeeper.QuerySuperNode(ctx, sdk.ValAddress(addr)); found {
-		resp.HasSupernode = true
 	}
 
 	resp.TotalTouched = resp.DelegationCount + resp.UnbondingCount + resp.RedelegationCount +

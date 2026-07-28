@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 
 	corestore "cosmossdk.io/core/store"
@@ -2705,6 +2706,37 @@ func TestMigrateValidatorSupernode_AccountHistoryPreserved(t *testing.T) {
 
 	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
 	require.NoError(t, err)
+}
+
+func TestMigrateValidatorSupernode_AlternateEncodingSelfOwnedMigratesOnce(t *testing.T) {
+	f := initMockFixture(t)
+	legacyAddr := testAccAddr()
+	newAddr := testAccAddr()
+	oldValAddr := sdk.ValAddress(legacyAddr)
+	newValAddr := sdk.ValAddress(newAddr)
+	sn := sntypes.SuperNode{
+		ValidatorAddress: strings.ToUpper(oldValAddr.String()),
+		SupernodeAccount: strings.ToUpper(legacyAddr.String()),
+		PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
+			{Account: strings.ToUpper(legacyAddr.String()), Height: 100},
+		},
+	}
+
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(sn, true, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr).Times(1)
+	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
+	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, updated sntypes.SuperNode) error {
+			require.Equal(t, newValAddr.String(), updated.ValidatorAddress)
+			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
+			require.Len(t, updated.PrevSupernodeAccounts, 2)
+			require.Equal(t, strings.ToUpper(legacyAddr.String()), updated.PrevSupernodeAccounts[0].Account)
+			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[1].Account)
+			return nil
+		}).Times(1)
+
+	require.NoError(t, f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, legacyAddr, newAddr))
 }
 
 // TestMigrateValidatorSupernode_IndependentAccountPreserved verifies that when

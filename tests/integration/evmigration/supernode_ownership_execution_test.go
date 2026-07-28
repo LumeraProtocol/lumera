@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
@@ -181,6 +182,39 @@ func (s *MigrationIntegrationSuite) TestMigrateValidatorSupernode_TwoDistinctRec
 	s.Require().NoError(err)
 	s.Require().True(found)
 	s.Require().Equal(newValAddr.String(), byIndependentOwner.ValidatorAddress)
+}
+
+func (s *MigrationIntegrationSuite) TestMigrateValidatorSupernode_AlternateEncodingSelfOwnedRealStore() {
+	legacyAddr := sdk.AccAddress(testAddressBytes("alternate-owner"))
+	newAddr := sdk.AccAddress(testAddressBytes("alternate-new"))
+	oldValAddr := sdk.ValAddress(legacyAddr)
+	newValAddr := sdk.ValAddress(newAddr)
+	sn := validMigrationSupernode(oldValAddr, legacyAddr)
+	sn.ValidatorAddress = strings.ToUpper(sn.ValidatorAddress)
+	sn.SupernodeAccount = strings.ToUpper(sn.SupernodeAccount)
+	sn.PrevSupernodeAccounts = []*sntypes.SupernodeAccountHistory{{Account: sn.SupernodeAccount, Height: 7}}
+	s.putSupernodePrimary(oldValAddr, sn)
+	store := s.ctx.KVStore(s.app.GetKey(sntypes.StoreKey))
+	store.Set(append(bytes.Clone(sntypes.SuperNodeByAccountKey), []byte(sn.SupernodeAccount)...), oldValAddr)
+
+	s.Require().NoError(s.keeper.MigrateValidatorSupernode(s.ctx, oldValAddr, newValAddr, legacyAddr, newAddr))
+
+	_, found := s.app.SupernodeKeeper.QuerySuperNode(s.ctx, oldValAddr)
+	s.Require().False(found)
+	migrated, found := s.app.SupernodeKeeper.QuerySuperNode(s.ctx, newValAddr)
+	s.Require().True(found)
+	s.Require().Equal(newAddr.String(), migrated.SupernodeAccount)
+	s.Require().Len(migrated.PrevSupernodeAccounts, 2)
+	s.Require().Equal(sn.SupernodeAccount, migrated.PrevSupernodeAccounts[0].Account)
+	s.Require().Equal(newAddr.String(), migrated.PrevSupernodeAccounts[1].Account)
+
+	_, found, err := s.app.SupernodeKeeper.GetSuperNodeByAccount(s.ctx, legacyAddr.String())
+	s.Require().NoError(err)
+	s.Require().False(found, "legacy owner must not be restored under canonical encoding")
+	byNewOwner, found, err := s.app.SupernodeKeeper.GetSuperNodeByAccount(s.ctx, newAddr.String())
+	s.Require().NoError(err)
+	s.Require().True(found)
+	s.Require().Equal(newValAddr.String(), byNewOwner.ValidatorAddress)
 }
 
 func (s *MigrationIntegrationSuite) TestMigrationEstimate_ValidatorPrimaryOnlyHasSupernodeParity() {

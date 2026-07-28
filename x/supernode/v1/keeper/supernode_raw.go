@@ -2,10 +2,10 @@ package keeper
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"reflect"
 
-	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 	db "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -19,25 +19,24 @@ import (
 // to prove absence and detect duplicate claims while retaining only the records
 // relevant to the requested account and its secondary-index entry.
 func (k Keeper) StrictGetSuperNodeByAccount(ctx sdk.Context, account string) (types.SuperNode, bool, error) {
-	if _, err := sdk.AccAddressFromBech32(account); err != nil {
+	requestedAccount, err := sdk.AccAddressFromBech32(account)
+	if err != nil {
 		return types.SuperNode{}, false, fmt.Errorf("invalid requested supernode account %q: %w", account, err)
 	}
 
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	indexStore := prefix.NewStore(storeAdapter, types.SuperNodeByAccountKey)
-	indexKey := indexStore.Get([]byte(account))
-	indexFound := indexKey != nil
-	if indexFound {
-		indexKey = bytes.Clone(indexKey)
-		if err := sdk.VerifyAddressFormat(indexKey); err != nil {
-			return types.SuperNode{}, false, fmt.Errorf("invalid validator key in account index for %s: %w", account, err)
-		}
+	indexIterator := storeAdapter.Iterator(types.SuperNodeByAccountKey, storetypes.PrefixEndBytes(types.SuperNodeByAccountKey))
+	indexKey, indexCount, err := scanStrictSuperNodeAccountIndexes(indexIterator, requestedAccount)
+	if err != nil {
+		return types.SuperNode{}, false, err
 	}
+	if indexCount > 1 {
+		return types.SuperNode{}, false, fmt.Errorf("multiple account index entries claim supernode account %s", account)
+	}
+	indexFound := indexCount == 1
 
-	iterator := storeAdapter.Iterator(types.SuperNodeKey, storetypes.PrefixEndBytes(types.SuperNodeKey))
-	defer func() { _ = iterator.Close() }()
-
-	matching, matchingCount, indexed, indexedFound, err := k.scanStrictSuperNodes(iterator, account, indexKey, indexFound)
+	primaryIterator := storeAdapter.Iterator(types.SuperNodeKey, storetypes.PrefixEndBytes(types.SuperNodeKey))
+	matching, matchingCount, indexed, indexedFound, err := k.scanStrictSuperNodes(primaryIterator, requestedAccount, indexKey, indexFound)
 	if err != nil {
 		return types.SuperNode{}, false, err
 	}
@@ -49,7 +48,11 @@ func (k Keeper) StrictGetSuperNodeByAccount(ctx sdk.Context, account string) (ty
 		if !indexedFound {
 			return types.SuperNode{}, false, fmt.Errorf("account index for %s does not resolve to a primary record", account)
 		}
-		if indexed.SupernodeAccount != account {
+		indexedAccount, err := sdk.AccAddressFromBech32(indexed.SupernodeAccount)
+		if err != nil {
+			return types.SuperNode{}, false, fmt.Errorf("invalid indexed supernode account %q: %w", indexed.SupernodeAccount, err)
+		}
+		if !indexedAccount.Equals(requestedAccount) {
 			return types.SuperNode{}, false, fmt.Errorf("account mismatch for index %s: primary record owns %s", account, indexed.SupernodeAccount)
 		}
 		return indexed, true, nil
@@ -60,12 +63,47 @@ func (k Keeper) StrictGetSuperNodeByAccount(ctx sdk.Context, account string) (ty
 	return types.SuperNode{}, false, nil
 }
 
+func scanStrictSuperNodeAccountIndexes(
+	iterator db.Iterator,
+	requestedAccount sdk.AccAddress,
+) (indexKey []byte, matchingCount int, err error) {
+	defer closeStrictIterator(iterator, &err, "close supernode account-index iterator")
+
+	for ; iterator.Valid(); iterator.Next() {
+		storeKey := iterator.Key()
+		if !bytes.HasPrefix(storeKey, types.SuperNodeByAccountKey) {
+			return indexKey, matchingCount, fmt.Errorf("supernode account-index iterator returned key outside prefix: %X", storeKey)
+		}
+		accountText := storeKey[len(types.SuperNodeByAccountKey):]
+		indexedAccount, err := sdk.AccAddressFromBech32(string(accountText))
+		if err != nil {
+			return indexKey, matchingCount, fmt.Errorf("invalid supernode account-index key %q: %w", accountText, err)
+		}
+		if !indexedAccount.Equals(requestedAccount) {
+			continue
+		}
+
+		validatorKey := iterator.Value()
+		if err := sdk.VerifyAddressFormat(validatorKey); err != nil {
+			return indexKey, matchingCount, fmt.Errorf("invalid validator key in account index for %s: %w", requestedAccount, err)
+		}
+		indexKey = bytes.Clone(validatorKey)
+		matchingCount++
+	}
+	if err := strictIteratorTerminalError(iterator); err != nil {
+		return indexKey, matchingCount, fmt.Errorf("iterate supernode account-index records: %w", err)
+	}
+	return indexKey, matchingCount, nil
+}
+
 func (k Keeper) scanStrictSuperNodes(
 	iterator db.Iterator,
-	account string,
+	requestedAccount sdk.AccAddress,
 	indexKey []byte,
 	indexFound bool,
 ) (matching types.SuperNode, matchingCount int, indexed types.SuperNode, indexedFound bool, err error) {
+	defer closeStrictIterator(iterator, &err, "close supernode primary iterator")
+
 	for ; iterator.Valid(); iterator.Next() {
 		storeKey := iterator.Key()
 		if !bytes.HasPrefix(storeKey, types.SuperNodeKey) {
@@ -88,11 +126,12 @@ func (k Keeper) scanStrictSuperNodes(
 		if !bytes.Equal(primaryKey, validatorAddress) {
 			return matching, matchingCount, indexed, indexedFound, fmt.Errorf("supernode validator mismatch at primary key %X: embedded validator is %s", primaryKey, sn.ValidatorAddress)
 		}
-		if _, err := sdk.AccAddressFromBech32(sn.SupernodeAccount); err != nil {
+		supernodeAccount, err := sdk.AccAddressFromBech32(sn.SupernodeAccount)
+		if err != nil {
 			return matching, matchingCount, indexed, indexedFound, fmt.Errorf("invalid embedded supernode account at primary key %X: %w", primaryKey, err)
 		}
 
-		if sn.SupernodeAccount == account {
+		if supernodeAccount.Equals(requestedAccount) {
 			matching = sn
 			matchingCount++
 		}
@@ -105,6 +144,12 @@ func (k Keeper) scanStrictSuperNodes(
 		return matching, matchingCount, indexed, indexedFound, fmt.Errorf("iterate supernode primary records: %w", err)
 	}
 	return matching, matchingCount, indexed, indexedFound, nil
+}
+
+func closeStrictIterator(iterator db.Iterator, scanErr *error, operation string) {
+	if closeErr := iterator.Close(); closeErr != nil {
+		*scanErr = errors.Join(*scanErr, fmt.Errorf("%s: %w", operation, closeErr))
+	}
 }
 
 func strictIteratorTerminalError(iterator db.Iterator) error {

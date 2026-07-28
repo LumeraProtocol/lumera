@@ -3,6 +3,7 @@ package keeper
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"testing"
 
 	"cosmossdk.io/store/prefix"
@@ -15,7 +16,8 @@ import (
 )
 
 type terminalErrorIterator struct {
-	err error
+	err      error
+	closeErr error
 }
 
 var _ db.Iterator = (*terminalErrorIterator)(nil)
@@ -26,7 +28,7 @@ func (*terminalErrorIterator) Next()                    { panic("invalid iterato
 func (*terminalErrorIterator) Key() []byte              { panic("invalid iterator") }
 func (*terminalErrorIterator) Value() []byte            { panic("invalid iterator") }
 func (it *terminalErrorIterator) Error() error          { return it.err }
-func (*terminalErrorIterator) Close() error             { return nil }
+func (it *terminalErrorIterator) Close() error          { return it.closeErr }
 
 func rawTestSuperNode(val sdk.ValAddress, account string) types.SuperNode {
 	return types.SuperNode{
@@ -68,6 +70,53 @@ func TestKeeper_StrictGetSuperNodeByAccount(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, found)
 		require.Equal(t, sn, got)
+	})
+
+	t.Run("alternate account encoding resolves canonical identity", func(t *testing.T) {
+		k, ctx := setupKeeperForInternalTest(t)
+		storedAccount := strings.ToUpper(account)
+		sn := rawTestSuperNode(val1, storedAccount)
+		primary, index := rawSuperNodeStores(k, ctx)
+		primary.Set(val1, marshalRawSuperNode(t, k, sn))
+		index.Set([]byte(storedAccount), val1)
+
+		got, found, err := k.StrictGetSuperNodeByAccount(ctx, account)
+		require.NoError(t, err)
+		require.True(t, found)
+		require.Equal(t, sn, got)
+	})
+
+	t.Run("duplicate alternate account index encodings fail closed", func(t *testing.T) {
+		k, ctx := setupKeeperForInternalTest(t)
+		primary, index := rawSuperNodeStores(k, ctx)
+		primary.Set(val1, marshalRawSuperNode(t, k, rawTestSuperNode(val1, account)))
+		index.Set([]byte(account), val1)
+		index.Set([]byte(strings.ToUpper(account)), val1)
+
+		_, found, err := k.StrictGetSuperNodeByAccount(ctx, account)
+		require.ErrorContains(t, err, "multiple account index entries")
+		require.False(t, found)
+	})
+
+	t.Run("alternate account index pointing to missing primary fails closed", func(t *testing.T) {
+		k, ctx := setupKeeperForInternalTest(t)
+		primary, index := rawSuperNodeStores(k, ctx)
+		primary.Set(val1, marshalRawSuperNode(t, k, rawTestSuperNode(val1, strings.ToUpper(account))))
+		index.Set([]byte(strings.ToUpper(account)), val2)
+
+		_, found, err := k.StrictGetSuperNodeByAccount(ctx, account)
+		require.ErrorContains(t, err, "does not resolve to a primary record")
+		require.False(t, found)
+	})
+
+	t.Run("malformed account index key fails closed", func(t *testing.T) {
+		k, ctx := setupKeeperForInternalTest(t)
+		_, index := rawSuperNodeStores(k, ctx)
+		index.Set([]byte("not-bech32"), val1)
+
+		_, found, err := k.StrictGetSuperNodeByAccount(ctx, account)
+		require.ErrorContains(t, err, "invalid supernode account-index key")
+		require.False(t, found)
 	})
 
 	t.Run("true absence after complete scan", func(t *testing.T) {
@@ -199,7 +248,7 @@ func TestKeeper_ScanStrictSuperNodes_TerminalIteratorErrorFailsClosed(t *testing
 
 	_, _, _, _, err := k.scanStrictSuperNodes(
 		&terminalErrorIterator{err: wantErr},
-		sdk.AccAddress(bytes.Repeat([]byte{0x0d}, 20)).String(),
+		sdk.AccAddress(bytes.Repeat([]byte{0x0d}, 20)),
 		nil,
 		false,
 	)
@@ -212,9 +261,42 @@ func TestKeeper_ScanStrictSuperNodes_DoesNotSwallowLookalikeTerminalError(t *tes
 
 	_, _, _, _, err := k.scanStrictSuperNodes(
 		&terminalErrorIterator{err: wantErr},
-		sdk.AccAddress(bytes.Repeat([]byte{0x0e}, 20)).String(),
+		sdk.AccAddress(bytes.Repeat([]byte{0x0e}, 20)),
 		nil,
 		false,
+	)
+	require.ErrorIs(t, err, wantErr)
+}
+
+func TestKeeper_ScanStrictSuperNodes_CloseErrorFailsClosed(t *testing.T) {
+	k, _ := setupKeeperForInternalTest(t)
+	wantErr := errors.New("close iterator failure")
+
+	_, _, _, _, err := k.scanStrictSuperNodes(
+		&terminalErrorIterator{closeErr: wantErr},
+		sdk.AccAddress(bytes.Repeat([]byte{0x0f}, 20)),
+		nil,
+		false,
+	)
+	require.ErrorIs(t, err, wantErr)
+}
+
+func TestScanStrictSuperNodeAccountIndexes_TerminalIteratorErrorFailsClosed(t *testing.T) {
+	wantErr := errors.New("account-index terminal failure")
+
+	_, _, err := scanStrictSuperNodeAccountIndexes(
+		&terminalErrorIterator{err: wantErr},
+		sdk.AccAddress(bytes.Repeat([]byte{0x10}, 20)),
+	)
+	require.ErrorIs(t, err, wantErr)
+}
+
+func TestScanStrictSuperNodeAccountIndexes_CloseErrorFailsClosed(t *testing.T) {
+	wantErr := errors.New("account-index close failure")
+
+	_, _, err := scanStrictSuperNodeAccountIndexes(
+		&terminalErrorIterator{closeErr: wantErr},
+		sdk.AccAddress(bytes.Repeat([]byte{0x11}, 20)),
 	)
 	require.ErrorIs(t, err, wantErr)
 }

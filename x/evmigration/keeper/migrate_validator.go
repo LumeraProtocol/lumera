@@ -307,12 +307,13 @@ func (k Keeper) validateValidatorSupernodeOwnership(
 		return plan, fmt.Errorf("resolve source supernode ownership: %w", err)
 	}
 	if sourceFound {
-		if _, err := sdk.ValAddressFromBech32(sourceSN.ValidatorAddress); err != nil {
+		sourceValAddr, err := sdk.ValAddressFromBech32(sourceSN.ValidatorAddress)
+		if err != nil {
 			return plan, fmt.Errorf("invalid source supernode validator address %q: %w", sourceSN.ValidatorAddress, err)
 		}
 		plan.accountOwned = sourceSN
 		plan.hasAccountOwned = true
-		plan.accountOwnedIsValidatorSN = sourceSN.ValidatorAddress == oldValAddr.String()
+		plan.accountOwnedIsValidatorSN = sourceValAddr.Equals(oldValAddr)
 	}
 
 	validatorSN, validatorFound := k.supernodeKeeper.QuerySuperNode(ctx, oldValAddr)
@@ -384,6 +385,12 @@ func (k Keeper) migrateValidatedValidatorSupernode(
 		return nil
 	}
 
+	supernodeAccount, err := sdk.AccAddressFromBech32(sn.SupernodeAccount)
+	if err != nil {
+		return fmt.Errorf("invalid supernode account %q: %w", sn.SupernodeAccount, err)
+	}
+	selfOwned := supernodeAccount.Equals(legacyAddr)
+
 	// Remove the old primary record and secondary account index before writing
 	// the re-keyed record under the new valoper. This avoids a false collision
 	// when the supernode account was already migrated independently.
@@ -397,8 +404,7 @@ func (k Keeper) migrateValidatedValidatorSupernode(
 	// account. A supernode account that belongs to a different entity (or was
 	// already migrated independently via ClaimLegacyAccount / supernode-setup)
 	// is preserved, and its history is not touched.
-	legacyAddrStr := legacyAddr.String()
-	if sn.SupernodeAccount == legacyAddrStr {
+	if selfOwned {
 		sn.SupernodeAccount = newAddr.String()
 
 		// Preserve the existing account timeline verbatim. Migration changes the

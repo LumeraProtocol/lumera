@@ -1140,6 +1140,7 @@ func TestMigrateValidator_FailAtValidatorSupernode(t *testing.T) {
 				SupernodeAccount: legacyAddr.String(),
 			}
 			f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(sn, true, nil)
+			f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
 		},
 	)
 

@@ -8,6 +8,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
+	evmigrationkeeper "github.com/LumeraProtocol/lumera/x/evmigration/keeper"
+	evmigrationtypes "github.com/LumeraProtocol/lumera/x/evmigration/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -134,6 +136,75 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_RejectsSourceOwnershipC
 	s.Require().Equal(beforeValidator, afterValidator, "ownership corruption must be rejected before validator mutation")
 	_, newValidatorErr := s.app.StakingKeeper.GetValidator(s.ctx, sdk.ValAddress(newAddr))
 	s.Require().Error(newValidatorErr)
+}
+
+func (s *MigrationIntegrationSuite) TestMigrateValidatorSupernode_TwoDistinctRecordsRealStore() {
+	legacyAddr := sdk.AccAddress(testAddressBytes("legacy-owner"))
+	newAddr := sdk.AccAddress(testAddressBytes("new-owner"))
+	oldValAddr := sdk.ValAddress(legacyAddr)
+	newValAddr := sdk.ValAddress(newAddr)
+	accountOwnedVal := sdk.ValAddress(testAddressBytes("account-owned-val"))
+	independentAccount := sdk.AccAddress(testAddressBytes("independent-owner"))
+
+	accountOwned := validMigrationSupernode(accountOwnedVal, legacyAddr)
+	accountOwned.PrevSupernodeAccounts = []*sntypes.SupernodeAccountHistory{{Account: legacyAddr.String(), Height: 7}}
+	validatorAssociated := validMigrationSupernode(oldValAddr, independentAccount)
+	validatorAssociated.PrevSupernodeAccounts = []*sntypes.SupernodeAccountHistory{{Account: independentAccount.String(), Height: 9}}
+
+	s.Require().NoError(s.app.SupernodeKeeper.SetSuperNode(s.ctx, accountOwned))
+	s.Require().NoError(s.app.SupernodeKeeper.SetSuperNode(s.ctx, validatorAssociated))
+	s.Require().NoError(s.keeper.MigrateValidatorSupernode(s.ctx, oldValAddr, newValAddr, legacyAddr, newAddr))
+
+	migratedOwned, found := s.app.SupernodeKeeper.QuerySuperNode(s.ctx, accountOwnedVal)
+	s.Require().True(found)
+	s.Require().Equal(newAddr.String(), migratedOwned.SupernodeAccount)
+	s.Require().Len(migratedOwned.PrevSupernodeAccounts, 2)
+	s.Require().Equal(legacyAddr.String(), migratedOwned.PrevSupernodeAccounts[0].Account)
+	s.Require().Equal(newAddr.String(), migratedOwned.PrevSupernodeAccounts[1].Account)
+
+	_, found = s.app.SupernodeKeeper.QuerySuperNode(s.ctx, oldValAddr)
+	s.Require().False(found)
+	migratedValidator, found := s.app.SupernodeKeeper.QuerySuperNode(s.ctx, newValAddr)
+	s.Require().True(found)
+	s.Require().Equal(independentAccount.String(), migratedValidator.SupernodeAccount)
+	s.Require().Equal(validatorAssociated.PrevSupernodeAccounts, migratedValidator.PrevSupernodeAccounts)
+
+	byOldOwner, found, err := s.app.SupernodeKeeper.GetSuperNodeByAccount(s.ctx, legacyAddr.String())
+	s.Require().NoError(err)
+	s.Require().False(found)
+	s.Require().Empty(byOldOwner.ValidatorAddress)
+	byNewOwner, found, err := s.app.SupernodeKeeper.GetSuperNodeByAccount(s.ctx, newAddr.String())
+	s.Require().NoError(err)
+	s.Require().True(found)
+	s.Require().Equal(accountOwnedVal.String(), byNewOwner.ValidatorAddress)
+	byIndependentOwner, found, err := s.app.SupernodeKeeper.GetSuperNodeByAccount(s.ctx, independentAccount.String())
+	s.Require().NoError(err)
+	s.Require().True(found)
+	s.Require().Equal(newValAddr.String(), byIndependentOwner.ValidatorAddress)
+}
+
+func (s *MigrationIntegrationSuite) TestMigrationEstimate_ValidatorPrimaryOnlyHasSupernodeParity() {
+	s.enableMigration()
+	_, legacyAddr := s.createFundedLegacyAccount(sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000)))
+	oldValAddr, _ := s.createTestValidator(legacyAddr, sdkmath.NewInt(1_000_000))
+	independentAccount := sdk.AccAddress(testAddressBytes("estimate-independent"))
+	s.Require().NoError(s.app.SupernodeKeeper.SetSuperNode(s.ctx, validMigrationSupernode(oldValAddr, independentAccount)))
+
+	queryServer := evmigrationkeeper.NewQueryServerImpl(s.keeper)
+	estimate, err := queryServer.MigrationEstimate(s.ctx, &evmigrationtypes.QueryMigrationEstimateRequest{
+		LegacyAddress: legacyAddr.String(),
+	})
+	s.Require().NoError(err)
+	s.Require().True(estimate.IsValidator)
+	s.Require().True(estimate.HasSupernode, "B-only validator primary must be visible to estimate just as it is to execution")
+
+	_, newAddr := createNewEVMAddress(s.T())
+	s.Require().NoError(s.keeper.MigrateValidatorSupernode(s.ctx, oldValAddr, sdk.ValAddress(newAddr), legacyAddr, newAddr))
+	_, found := s.app.SupernodeKeeper.QuerySuperNode(s.ctx, oldValAddr)
+	s.Require().False(found)
+	migrated, found := s.app.SupernodeKeeper.QuerySuperNode(s.ctx, sdk.ValAddress(newAddr))
+	s.Require().True(found)
+	s.Require().Equal(independentAccount.String(), migrated.SupernodeAccount)
 }
 
 func testAddressBytes(seed string) []byte {

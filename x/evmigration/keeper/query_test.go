@@ -282,6 +282,9 @@ func TestQueryMigrationEstimate_StrictSupernodeOwnershipError(t *testing.T) {
 	qs := keeper.NewQueryServerImpl(f.keeper)
 	addr := testAccAddr()
 
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(addr)).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(
 		sntypes.SuperNode{}, false, errors.New("corrupt supernode ownership state"),
 	)
@@ -403,6 +406,7 @@ func TestQueryMigrationEstimate_ValidatorUsesScopedRedelegationIndexesForLimit(t
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -454,6 +458,7 @@ func TestMigrationEstimate_ValidatorUnbondedNotJailed_WouldSucceed(t *testing.T)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -505,6 +510,7 @@ func TestMigrationEstimate_ValidatorUnbonding_WouldFail(t *testing.T) {
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{

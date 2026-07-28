@@ -143,7 +143,7 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	// Validate source-account ownership and any validator-keyed SuperNode record
 	// against the pristine pre-migration store. V1 and V2 mutate distribution and
 	// staking state, so this must remain immediately before the first write.
-	validatorSupernode, hasValidatorSupernode, err := ms.validateValidatorSupernodeOwnership(ctx, oldValAddr, legacyAddr)
+	validatorSupernodePlan, err := ms.validateValidatorSupernodeOwnership(ctx, oldValAddr, legacyAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -209,9 +209,9 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		return nil, fmt.Errorf("migrate validator delegations: %w", err)
 	}
 
-	// --- Step V5: Re-key the prevalidated supernode record ---
-	if err := ms.migrateValidatedValidatorSupernode(
-		ctx, oldValAddr, newValAddr, legacyAddr, newAddr, validatorSupernode, hasValidatorSupernode,
+	// --- Step V5: Mutate both prevalidated SuperNode ownership dimensions ---
+	if err := ms.migrateValidatedValidatorSupernodes(
+		ctx, oldValAddr, newValAddr, legacyAddr, newAddr, validatorSupernodePlan,
 	); err != nil {
 		return nil, fmt.Errorf("migrate validator supernode: %w", err)
 	}

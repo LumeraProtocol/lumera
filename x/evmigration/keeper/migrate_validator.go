@@ -274,17 +274,22 @@ func (k Keeper) MigrateValidatorDistribution(ctx sdk.Context, oldValAddr, newVal
 	return nil
 }
 
-// MigrateValidatorSupernode re-keys the supernode record from oldValAddr to newValAddr.
-// The supernode's account field is only updated when it matches the validator's
-// legacy address (i.e. the validator was its own supernode account). If the
-// supernode account is a separate entity (possibly already migrated independently),
-// it is left unchanged.
+// MigrateValidatorSupernode migrates every validated SuperNode dimension affected
+// by a validator operator migration.
 func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAddr sdk.ValAddress, legacyAddr, newAddr sdk.AccAddress) error {
-	sn, found, err := k.validateValidatorSupernodeOwnership(ctx, oldValAddr, legacyAddr)
+	plan, err := k.validateValidatorSupernodeOwnership(ctx, oldValAddr, legacyAddr)
 	if err != nil {
 		return err
 	}
-	return k.migrateValidatedValidatorSupernode(ctx, oldValAddr, newValAddr, legacyAddr, newAddr, sn, found)
+	return k.migrateValidatedValidatorSupernodes(ctx, oldValAddr, newValAddr, legacyAddr, newAddr, plan)
+}
+
+type validatorSupernodeMigrationPlan struct {
+	accountOwned              sntypes.SuperNode
+	hasAccountOwned           bool
+	validatorAssociated       sntypes.SuperNode
+	hasValidatorAssociated    bool
+	accountOwnedIsValidatorSN bool
 }
 
 // validateValidatorSupernodeOwnership validates both ownership dimensions used
@@ -294,48 +299,78 @@ func (k Keeper) validateValidatorSupernodeOwnership(
 	ctx sdk.Context,
 	oldValAddr sdk.ValAddress,
 	legacyAddr sdk.AccAddress,
-) (sntypes.SuperNode, bool, error) {
+) (validatorSupernodeMigrationPlan, error) {
+	var plan validatorSupernodeMigrationPlan
+
 	sourceSN, sourceFound, err := k.supernodeKeeper.StrictGetSuperNodeByAccount(ctx, legacyAddr.String())
 	if err != nil {
-		return sntypes.SuperNode{}, false, fmt.Errorf("resolve source supernode ownership: %w", err)
+		return plan, fmt.Errorf("resolve source supernode ownership: %w", err)
 	}
 	if sourceFound {
-		sourceValAddr, err := sdk.ValAddressFromBech32(sourceSN.ValidatorAddress)
-		if err != nil {
-			return sntypes.SuperNode{}, false, fmt.Errorf("invalid source supernode validator address %q: %w", sourceSN.ValidatorAddress, err)
+		if _, err := sdk.ValAddressFromBech32(sourceSN.ValidatorAddress); err != nil {
+			return plan, fmt.Errorf("invalid source supernode validator address %q: %w", sourceSN.ValidatorAddress, err)
 		}
-		if sourceValAddr.Equals(oldValAddr) {
-			// The source account owns the validator-keyed SuperNode. The strict
-			// lookup already validated its primary key and account index, so carry
-			// that exact record into the mutation stage without another lookup.
-			return sourceSN, true, nil
-		}
+		plan.accountOwned = sourceSN
+		plan.hasAccountOwned = true
+		plan.accountOwnedIsValidatorSN = sourceSN.ValidatorAddress == oldValAddr.String()
 	}
 
-	// The validator may use an independent SuperNode account. Locate its primary,
-	// then validate that account's index before carrying the strict result forward.
-	sn, found := k.supernodeKeeper.QuerySuperNode(ctx, oldValAddr)
-	if !found {
-		return sntypes.SuperNode{}, false, nil
+	validatorSN, validatorFound := k.supernodeKeeper.QuerySuperNode(ctx, oldValAddr)
+	if !validatorFound {
+		if plan.accountOwnedIsValidatorSN {
+			return plan, fmt.Errorf("source-owned supernode %s is missing its validator primary", oldValAddr)
+		}
+		return plan, nil
 	}
-	indexed, indexedFound, err := k.supernodeKeeper.StrictGetSuperNodeByAccount(ctx, sn.SupernodeAccount)
+
+	if plan.accountOwnedIsValidatorSN {
+		plan.validatorAssociated = plan.accountOwned
+		plan.hasValidatorAssociated = true
+		return plan, nil
+	}
+
+	indexed, indexedFound, err := k.supernodeKeeper.StrictGetSuperNodeByAccount(ctx, validatorSN.SupernodeAccount)
 	if err != nil {
-		return sntypes.SuperNode{}, false, fmt.Errorf("validate validator supernode ownership: %w", err)
+		return plan, fmt.Errorf("validate validator supernode ownership: %w", err)
 	}
 	if !indexedFound {
-		return sntypes.SuperNode{}, false, fmt.Errorf("validator supernode account %s has no ownership index", sn.SupernodeAccount)
+		return plan, fmt.Errorf("validator supernode account %s has no ownership index", validatorSN.SupernodeAccount)
 	}
 	indexedValAddr, err := sdk.ValAddressFromBech32(indexed.ValidatorAddress)
 	if err != nil {
-		return sntypes.SuperNode{}, false, fmt.Errorf("invalid indexed validator address %q: %w", indexed.ValidatorAddress, err)
+		return plan, fmt.Errorf("invalid indexed validator address %q: %w", indexed.ValidatorAddress, err)
 	}
 	if !indexedValAddr.Equals(oldValAddr) {
-		return sntypes.SuperNode{}, false, fmt.Errorf(
+		return plan, fmt.Errorf(
 			"validator supernode account %s resolves to %s instead of %s",
-			sn.SupernodeAccount, indexed.ValidatorAddress, oldValAddr,
+			validatorSN.SupernodeAccount, indexed.ValidatorAddress, oldValAddr,
 		)
 	}
-	return indexed, true, nil
+	plan.validatorAssociated = indexed
+	plan.hasValidatorAssociated = true
+	return plan, nil
+}
+
+func (k Keeper) migrateValidatedValidatorSupernodes(
+	ctx sdk.Context,
+	oldValAddr, newValAddr sdk.ValAddress,
+	legacyAddr, newAddr sdk.AccAddress,
+	plan validatorSupernodeMigrationPlan,
+) error {
+	if plan.hasAccountOwned && !plan.accountOwnedIsValidatorSN {
+		if err := k.migrateValidatedSupernode(ctx, newAddr, plan.accountOwned, true); err != nil {
+			return err
+		}
+	}
+	return k.migrateValidatedValidatorSupernode(
+		ctx,
+		oldValAddr,
+		newValAddr,
+		legacyAddr,
+		newAddr,
+		plan.validatorAssociated,
+		plan.hasValidatorAssociated,
+	)
 }
 
 func (k Keeper) migrateValidatedValidatorSupernode(

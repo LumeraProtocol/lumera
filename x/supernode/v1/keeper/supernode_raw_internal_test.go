@@ -2,15 +2,31 @@ package keeper
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"cosmossdk.io/store/prefix"
+	db "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
+
+type terminalErrorIterator struct {
+	err error
+}
+
+var _ db.Iterator = (*terminalErrorIterator)(nil)
+
+func (*terminalErrorIterator) Domain() ([]byte, []byte) { return nil, nil }
+func (*terminalErrorIterator) Valid() bool              { return false }
+func (*terminalErrorIterator) Next()                    { panic("invalid iterator") }
+func (*terminalErrorIterator) Key() []byte              { panic("invalid iterator") }
+func (*terminalErrorIterator) Value() []byte            { panic("invalid iterator") }
+func (it *terminalErrorIterator) Error() error          { return it.err }
+func (*terminalErrorIterator) Close() error             { return nil }
 
 func rawTestSuperNode(val sdk.ValAddress, account string) types.SuperNode {
 	return types.SuperNode{
@@ -175,4 +191,30 @@ func TestKeeper_StrictGetSuperNodeByAccount_DoesNotMutateState(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, found)
 	require.Equal(t, before, snapshotSuperNodeStore(t, k, ctx))
+}
+
+func TestKeeper_ScanStrictSuperNodes_TerminalIteratorErrorFailsClosed(t *testing.T) {
+	k, _ := setupKeeperForInternalTest(t)
+	wantErr := errors.New("terminal iterator failure")
+
+	_, _, _, _, err := k.scanStrictSuperNodes(
+		&terminalErrorIterator{err: wantErr},
+		sdk.AccAddress(bytes.Repeat([]byte{0x0d}, 20)).String(),
+		nil,
+		false,
+	)
+	require.ErrorIs(t, err, wantErr)
+}
+
+func TestKeeper_ScanStrictSuperNodes_DoesNotSwallowLookalikeTerminalError(t *testing.T) {
+	k, _ := setupKeeperForInternalTest(t)
+	wantErr := errors.New("invalid cacheMergeIterator")
+
+	_, _, _, _, err := k.scanStrictSuperNodes(
+		&terminalErrorIterator{err: wantErr},
+		sdk.AccAddress(bytes.Repeat([]byte{0x0e}, 20)).String(),
+		nil,
+		false,
+	)
+	require.ErrorIs(t, err, wantErr)
 }

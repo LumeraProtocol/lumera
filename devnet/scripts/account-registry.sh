@@ -5,6 +5,7 @@
 
 ACCOUNTS_DISPLAY_DENOM_DEFAULT="${ACCOUNTS_DISPLAY_DENOM_DEFAULT:-lume}"
 ACCOUNTS_DISPLAY_EXPONENT_DEFAULT="${ACCOUNTS_DISPLAY_EXPONENT_DEFAULT:-6}"
+ACCOUNTS_FILE_MODE="${ACCOUNTS_FILE_MODE:-600}"
 
 accounts_registry_init() {
 	local node_status_dir="$1"
@@ -28,7 +29,7 @@ ensure_accounts_registry() {
 	if [[ ! -f "${ACCOUNTS_FILE}" ]]; then
 		printf '[]\n' >"${ACCOUNTS_FILE}"
 	fi
-	chmod 644 "${ACCOUNTS_FILE}"
+	chmod "${ACCOUNTS_FILE_MODE}" "${ACCOUNTS_FILE}"
 }
 
 accounts_registry_parse_coin() {
@@ -148,9 +149,9 @@ accounts_registry_upsert() {
 		}]
 		| sort_by(.name)
 		' "${ACCOUNTS_FILE}" >"${tmp_file}"
-	chmod 644 "${tmp_file}"
+	chmod "${ACCOUNTS_FILE_MODE}" "${tmp_file}"
 	mv "${tmp_file}" "${ACCOUNTS_FILE}"
-	chmod 644 "${ACCOUNTS_FILE}"
+	chmod "${ACCOUNTS_FILE_MODE}" "${ACCOUNTS_FILE}"
 }
 
 accounts_registry_get_field() {

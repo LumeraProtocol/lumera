@@ -3,6 +3,7 @@ package common
 import (
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -17,6 +18,24 @@ func runUpgradeProposalScriptScenario(t *testing.T, testScript string) {
 	cmd := exec.Command("bash", "-c", testScript, "upgrade-proposal-test", scriptPath)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("proposal key recovery scenario failed: %v\n%s", err, out)
+	}
+}
+
+func TestUpgradeProposalComposePathIsIndependentOfWorkingDirectory(t *testing.T) {
+	scriptPath, err := filepath.Abs("../../scripts/submit-upgrade-proposal.sh")
+	if err != nil {
+		t.Fatalf("resolve proposal script path: %v", err)
+	}
+	expected := filepath.Clean(filepath.Join(filepath.Dir(scriptPath), "..", "docker-compose.yml"))
+
+	cmd := exec.Command("bash", "-c", `source "$1"; printf '%s\n' "$COMPOSE_FILE"`, "upgrade-proposal-path-test", scriptPath)
+	cmd.Dir = t.TempDir()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("source proposal script: %v\n%s", err, out)
+	}
+	if got := strings.TrimSpace(string(out)); got != expected {
+		t.Fatalf("compose path must be script-relative: got %q, want %q", got, expected)
 	}
 }
 

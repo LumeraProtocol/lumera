@@ -13,13 +13,15 @@
 # Configuration
 VERSION="$1"
 UPGRADE_HEIGHT="$2"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEVNET_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CHAIN_ID="lumera-devnet-1"
 SERVICE="supernova_validator_1" # primary validator
 LUMERA_SHARED="/tmp/${CHAIN_ID}/shared"
 KEYRING="test"
 HOST_PROPOSAL_FILE="${LUMERA_SHARED}/upgrade_${VERSION}.json"
 CONTAINER_PROPOSAL_FILE="/shared/upgrade_${VERSION}.json"
-COMPOSE_FILE="../docker-compose.yml"
+COMPOSE_FILE="${DEVNET_ROOT}/docker-compose.yml"
 STATUS_DIR="${LUMERA_SHARED}/status"
 ACCOUNT_REGISTRY_FILE="${STATUS_DIR}/${SERVICE}/accounts.json"
 

@@ -1128,7 +1128,7 @@ func TestMigrateSupernode_Found(t *testing.T) {
 		{Account: sn.PrevSupernodeAccounts[1].Account, Height: sn.PrevSupernodeAccounts[1].Height},
 	}
 
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sn, true, nil)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
@@ -1149,7 +1149,7 @@ func TestMigrateSupernode_NotFound(t *testing.T) {
 	legacy := testAccAddr()
 	newAddr := testAccAddr()
 
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sntypes.SuperNode{}, false, nil)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sntypes.SuperNode{}, false, nil)
 
 	err := f.keeper.MigrateSupernode(f.ctx, legacy, newAddr)
 	require.NoError(t, err)
@@ -2568,7 +2568,7 @@ func TestMigrateValidatorSupernode_WithMetrics(t *testing.T) {
 		ValidatorAddress: oldValAddr.String(),
 	}
 
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(metrics, true)
 	f.supernodeKeeper.EXPECT().SetMetricsState(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -2603,7 +2603,7 @@ func TestMigrateValidatorSupernode_MetricsWriteFails(t *testing.T) {
 		ValidatorAddress: oldValAddr.String(),
 	}
 
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(metrics, true)
 	f.supernodeKeeper.EXPECT().SetMetricsState(gomock.Any(), gomock.Any()).Return(
@@ -2622,6 +2622,7 @@ func TestMigrateValidatorSupernode_NotFound(t *testing.T) {
 	newValAddr := sdk.ValAddress(testAccAddr())
 	newAddr := sdk.AccAddress(newValAddr)
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
 
 	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
@@ -2646,7 +2647,7 @@ func TestMigrateValidatorSupernode_EvidenceAddressMigrated(t *testing.T) {
 		},
 	}
 
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -2686,7 +2687,7 @@ func TestMigrateValidatorSupernode_AccountHistoryPreserved(t *testing.T) {
 		{Account: oldAccountStr, Height: 100},
 	}
 
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -2722,7 +2723,9 @@ func TestMigrateValidatorSupernode_IndependentAccountPreserved(t *testing.T) {
 		},
 	}
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), independentSNAccount).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(

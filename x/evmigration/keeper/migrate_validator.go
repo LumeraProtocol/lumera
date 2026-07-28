@@ -1,6 +1,8 @@
 package keeper
 
 import (
+	"fmt"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -278,7 +280,71 @@ func (k Keeper) MigrateValidatorDistribution(ctx sdk.Context, oldValAddr, newVal
 // supernode account is a separate entity (possibly already migrated independently),
 // it is left unchanged.
 func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAddr sdk.ValAddress, legacyAddr, newAddr sdk.AccAddress) error {
+	sn, found, err := k.validateValidatorSupernodeOwnership(ctx, oldValAddr, legacyAddr)
+	if err != nil {
+		return err
+	}
+	return k.migrateValidatedValidatorSupernode(ctx, oldValAddr, newValAddr, legacyAddr, newAddr, sn, found)
+}
+
+// validateValidatorSupernodeOwnership validates both ownership dimensions used
+// by validator migration before any state mutation: ownership by the source
+// account, and (when present) the SuperNode primary keyed by the old valoper.
+func (k Keeper) validateValidatorSupernodeOwnership(
+	ctx sdk.Context,
+	oldValAddr sdk.ValAddress,
+	legacyAddr sdk.AccAddress,
+) (sntypes.SuperNode, bool, error) {
+	sourceSN, sourceFound, err := k.supernodeKeeper.StrictGetSuperNodeByAccount(ctx, legacyAddr.String())
+	if err != nil {
+		return sntypes.SuperNode{}, false, fmt.Errorf("resolve source supernode ownership: %w", err)
+	}
+	if sourceFound {
+		sourceValAddr, err := sdk.ValAddressFromBech32(sourceSN.ValidatorAddress)
+		if err != nil {
+			return sntypes.SuperNode{}, false, fmt.Errorf("invalid source supernode validator address %q: %w", sourceSN.ValidatorAddress, err)
+		}
+		if sourceValAddr.Equals(oldValAddr) {
+			// The source account owns the validator-keyed SuperNode. The strict
+			// lookup already validated its primary key and account index, so carry
+			// that exact record into the mutation stage without another lookup.
+			return sourceSN, true, nil
+		}
+	}
+
+	// The validator may use an independent SuperNode account. Locate its primary,
+	// then validate that account's index before carrying the strict result forward.
 	sn, found := k.supernodeKeeper.QuerySuperNode(ctx, oldValAddr)
+	if !found {
+		return sntypes.SuperNode{}, false, nil
+	}
+	indexed, indexedFound, err := k.supernodeKeeper.StrictGetSuperNodeByAccount(ctx, sn.SupernodeAccount)
+	if err != nil {
+		return sntypes.SuperNode{}, false, fmt.Errorf("validate validator supernode ownership: %w", err)
+	}
+	if !indexedFound {
+		return sntypes.SuperNode{}, false, fmt.Errorf("validator supernode account %s has no ownership index", sn.SupernodeAccount)
+	}
+	indexedValAddr, err := sdk.ValAddressFromBech32(indexed.ValidatorAddress)
+	if err != nil {
+		return sntypes.SuperNode{}, false, fmt.Errorf("invalid indexed validator address %q: %w", indexed.ValidatorAddress, err)
+	}
+	if !indexedValAddr.Equals(oldValAddr) {
+		return sntypes.SuperNode{}, false, fmt.Errorf(
+			"validator supernode account %s resolves to %s instead of %s",
+			sn.SupernodeAccount, indexed.ValidatorAddress, oldValAddr,
+		)
+	}
+	return indexed, true, nil
+}
+
+func (k Keeper) migrateValidatedValidatorSupernode(
+	ctx sdk.Context,
+	oldValAddr, newValAddr sdk.ValAddress,
+	legacyAddr, newAddr sdk.AccAddress,
+	sn sntypes.SuperNode,
+	found bool,
+) error {
 	if !found {
 		return nil
 	}

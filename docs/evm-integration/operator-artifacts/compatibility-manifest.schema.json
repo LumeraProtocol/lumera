@@ -1,0 +1,342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumera.io/schemas/evmigration-compatibility-manifest-v1.json",
+  "title": "Lumera EVM migration compatibility manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "release",
+    "chain",
+    "artifacts",
+    "operator_contracts",
+    "validation",
+    "approval"
+  ],
+  "properties": {
+    "$schema": { "const": "./compatibility-manifest.schema.json" },
+    "schema_version": { "const": "1.0.0" },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag", "commit", "release_url"],
+      "properties": {
+        "tag": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "release_url": { "type": "string", "minLength": 1 }
+      }
+    },
+    "chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chain_id", "evm_chain_id", "minimum_upgrade"],
+      "properties": {
+        "chain_id": { "type": "string", "minLength": 1 },
+        "evm_chain_id": { "type": ["integer", "string"] },
+        "minimum_upgrade": { "type": "string", "minLength": 1 }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chain_executable", "supernode_executable", "bound_files"],
+      "properties": {
+        "chain_executable": { "$ref": "#/$defs/executable" },
+        "supernode_executable": { "$ref": "#/$defs/executable" },
+        "bound_files": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scripts/evmigration-common.sh",
+            "scripts/migrate-account.sh",
+            "scripts/migrate-validator.sh",
+            "scripts/migrate-multisig.sh",
+            "scripts/migrate-batch.sh",
+            "docs/evm-integration/user-guides/operator-migration-runbook.md",
+            "docs/evm-integration/user-guides/migration.md",
+            "docs/evm-integration/user-guides/migration-scripts.md",
+            "docs/evm-integration/user-guides/validator-migration.md",
+            "docs/evm-integration/user-guides/supernode-migration.md",
+            "docs/evm-integration/user-guides/relayer-migration.md",
+            "docs/evm-integration/evmigration/legacy-migration.md"
+          ],
+          "properties": {
+            "scripts/evmigration-common.sh": { "$ref": "#/$defs/file" },
+            "scripts/migrate-account.sh": { "$ref": "#/$defs/file" },
+            "scripts/migrate-validator.sh": { "$ref": "#/$defs/file" },
+            "scripts/migrate-multisig.sh": { "$ref": "#/$defs/file" },
+            "scripts/migrate-batch.sh": { "$ref": "#/$defs/file" },
+            "docs/evm-integration/user-guides/operator-migration-runbook.md": { "$ref": "#/$defs/file" },
+            "docs/evm-integration/user-guides/migration.md": { "$ref": "#/$defs/file" },
+            "docs/evm-integration/user-guides/migration-scripts.md": { "$ref": "#/$defs/file" },
+            "docs/evm-integration/user-guides/validator-migration.md": { "$ref": "#/$defs/file" },
+            "docs/evm-integration/user-guides/supernode-migration.md": { "$ref": "#/$defs/file" },
+            "docs/evm-integration/user-guides/relayer-migration.md": { "$ref": "#/$defs/file" },
+            "docs/evm-integration/evmigration/legacy-migration.md": { "$ref": "#/$defs/file" }
+          }
+        }
+      }
+    },
+    "operator_contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["binary_provenance", "keyring_provenance", "destination_prestage_no_echo", "single_broadcast"],
+      "properties": {
+        "binary_provenance": { "const": "absolute-path+version+sha256" },
+        "keyring_provenance": { "const": "backend-and-location-separated" },
+        "destination_prestage_no_echo": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "implementation"],
+          "properties": {
+            "status": { "enum": ["verified", "blocked"] },
+            "implementation": {
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "#/$defs/pr2_implementation" }
+              ]
+            }
+          }
+        },
+        "single_broadcast": { "const": true }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bats", "shellcheck", "cli_help", "schema", "json_parse", "docs_links", "owned_testnet", "portal_live"],
+      "properties": {
+        "bats": { "$ref": "#/$defs/check" },
+        "shellcheck": { "$ref": "#/$defs/check" },
+        "cli_help": { "$ref": "#/$defs/check" },
+        "schema": { "$ref": "#/$defs/check" },
+        "json_parse": { "$ref": "#/$defs/check" },
+        "docs_links": { "$ref": "#/$defs/check" },
+        "owned_testnet": { "$ref": "#/$defs/check" },
+        "portal_live": { "$ref": "#/$defs/check" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "release_owner_approved", "canonicalization", "detached_signature"],
+      "properties": {
+        "status": { "enum": ["approved", "blocked"] },
+        "release_owner_approved": { "type": "boolean" },
+        "canonicalization": { "const": "RFC8785-JCS" },
+        "detached_signature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["format", "bundle", "certificate_identity", "certificate_oidc_issuer"],
+          "properties": {
+            "format": { "const": "sigstore-bundle" },
+            "bundle": { "const": "compatibility-manifest.sigstore.json" },
+            "certificate_identity": { "type": ["string", "null"] },
+            "certificate_oidc_issuer": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "_verification": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "_signing_blocker": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "approval": {
+            "required": ["status"],
+            "properties": { "status": { "const": "approved" } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "release": {
+            "properties": {
+              "tag": { "$ref": "#/$defs/non_placeholder" },
+              "commit": { "$ref": "#/$defs/commit" },
+              "release_url": { "$ref": "#/$defs/non_placeholder" }
+            }
+          },
+          "chain": {
+            "properties": {
+              "chain_id": { "$ref": "#/$defs/non_placeholder" },
+              "evm_chain_id": {
+                "oneOf": [
+                  { "type": "integer", "minimum": 1 },
+                  { "$ref": "#/$defs/non_placeholder" }
+                ]
+              },
+              "minimum_upgrade": { "$ref": "#/$defs/non_placeholder" }
+            }
+          },
+          "artifacts": { "$ref": "#/$defs/approved_artifacts" },
+          "operator_contracts": {
+            "properties": {
+              "destination_prestage_no_echo": {
+                "properties": {
+                  "status": { "const": "verified" },
+                  "implementation": { "$ref": "#/$defs/approved_pr2_implementation" }
+                }
+              }
+            }
+          },
+          "validation": {
+            "properties": {
+              "bats": { "$ref": "#/$defs/passing_check" },
+              "shellcheck": { "$ref": "#/$defs/passing_check" },
+              "cli_help": { "$ref": "#/$defs/passing_check" },
+              "schema": { "$ref": "#/$defs/passing_check" },
+              "json_parse": { "$ref": "#/$defs/passing_check" },
+              "docs_links": { "$ref": "#/$defs/passing_check" },
+              "owned_testnet": { "$ref": "#/$defs/passing_check" },
+              "portal_live": { "$ref": "#/$defs/passing_check" }
+            }
+          },
+          "approval": {
+            "properties": {
+              "release_owner_approved": { "const": true },
+              "detached_signature": { "$ref": "#/$defs/approved_signature" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "non_placeholder": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^(?!REPLACE(?:_|$))(?!.*<[^>]+>)(?!PLACEHOLDER$)(?!TBD$)(?!TODO$)(?!UNKNOWN$).+\\S$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[0-9a-f]{40}$"
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "source"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "approved_file": {
+      "type": "object",
+      "properties": {
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "source": { "$ref": "#/$defs/non_placeholder" }
+      }
+    },
+    "executable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "release_path", "version", "tag", "commit", "sha256", "source"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "release_path": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "approved_executable": {
+      "type": "object",
+      "properties": {
+        "name": { "$ref": "#/$defs/non_placeholder" },
+        "release_path": { "$ref": "#/$defs/non_placeholder" },
+        "version": { "$ref": "#/$defs/non_placeholder" },
+        "tag": { "$ref": "#/$defs/non_placeholder" },
+        "commit": { "$ref": "#/$defs/commit" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "source": { "$ref": "#/$defs/non_placeholder" }
+      }
+    },
+    "pr2_implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "tag", "commit", "sha256", "source", "no_echo_contract"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "source": { "type": "string", "minLength": 1 },
+        "no_echo_contract": { "const": "hidden-tty-or-protected-fd;never-argv;never-echo;no-xtrace" }
+      }
+    },
+    "approved_pr2_implementation": {
+      "allOf": [
+        { "$ref": "#/$defs/pr2_implementation" },
+        {
+          "properties": {
+            "name": { "$ref": "#/$defs/non_placeholder" },
+            "tag": { "$ref": "#/$defs/non_placeholder" },
+            "commit": { "$ref": "#/$defs/commit" },
+            "sha256": { "$ref": "#/$defs/sha256" },
+            "source": { "$ref": "#/$defs/non_placeholder" }
+          }
+        }
+      ]
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "evidence"],
+      "properties": {
+        "status": { "enum": ["pass", "fail", "postponed"] },
+        "evidence": { "type": "string" }
+      }
+    },
+    "passing_check": {
+      "type": "object",
+      "properties": {
+        "status": { "const": "pass" },
+        "evidence": { "$ref": "#/$defs/non_placeholder" }
+      }
+    },
+    "approved_signature": {
+      "type": "object",
+      "properties": {
+        "certificate_identity": { "$ref": "#/$defs/non_placeholder" },
+        "certificate_oidc_issuer": { "$ref": "#/$defs/non_placeholder" }
+      }
+    },
+    "approved_artifacts": {
+      "type": "object",
+      "properties": {
+        "chain_executable": { "$ref": "#/$defs/approved_executable" },
+        "supernode_executable": { "$ref": "#/$defs/approved_executable" },
+        "bound_files": {
+          "properties": {
+            "scripts/evmigration-common.sh": { "$ref": "#/$defs/approved_file" },
+            "scripts/migrate-account.sh": { "$ref": "#/$defs/approved_file" },
+            "scripts/migrate-validator.sh": { "$ref": "#/$defs/approved_file" },
+            "scripts/migrate-multisig.sh": { "$ref": "#/$defs/approved_file" },
+            "scripts/migrate-batch.sh": { "$ref": "#/$defs/approved_file" },
+            "docs/evm-integration/user-guides/operator-migration-runbook.md": { "$ref": "#/$defs/approved_file" },
+            "docs/evm-integration/user-guides/migration.md": { "$ref": "#/$defs/approved_file" },
+            "docs/evm-integration/user-guides/migration-scripts.md": { "$ref": "#/$defs/approved_file" },
+            "docs/evm-integration/user-guides/validator-migration.md": { "$ref": "#/$defs/approved_file" },
+            "docs/evm-integration/user-guides/supernode-migration.md": { "$ref": "#/$defs/approved_file" },
+            "docs/evm-integration/user-guides/relayer-migration.md": { "$ref": "#/$defs/approved_file" },
+            "docs/evm-integration/evmigration/legacy-migration.md": { "$ref": "#/$defs/approved_file" }
+          }
+        }
+      }
+    }
+  }
+}

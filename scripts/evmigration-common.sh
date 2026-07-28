@@ -45,6 +45,14 @@ YES=0
 DRY_RUN=0
 # shellcheck disable=SC2034
 BIN="lumerad"
+# Immutable executable identity populated once by require_binary.
+BIN_VERSION=""
+BIN_SHA256=""
+BIN_SOURCE="unresolved"
+_BINARY_RESOLVED=0
+KEYRING_BACKEND_SOURCE="unresolved"
+KEYRING_LOCATION=""
+KEYRING_LOCATION_SOURCE="unresolved"
 # shellcheck disable=SC2034
 LEGACY_KEY=""
 # shellcheck disable=SC2034
@@ -84,14 +92,18 @@ log_error() { printf '%sERROR%s %s\n' "$_C_ERR"  "$_C_RESET" "$*" >&2; }
 
 # Print a concise orientation block before work begins. Never prints secrets.
 log_run_summary() {
-  local operation="$1" mode="LIVE (will ask before broadcast)" keyring_location="default"
+  local operation="$1" mode="LIVE (will ask before broadcast)"
   (( ${DRY_RUN:-0} == 1 )) && mode="DRY RUN (no broadcast)"
-  [[ -n "${KEYRING_DIR:-}" ]] && keyring_location="$KEYRING_DIR"
   {
     printf '\n==== %s ====\n' "$operation"
     printf '  Mode:     %s\n' "$mode"
     printf '  RPC:      %s\n' "${NODE:-<not set>}"
-    printf '  Keyring:  %s (%s)\n' "${KEYRING_BACKEND:-test}" "$keyring_location"
+    printf '  Binary:          %s\n' "${BIN:-<not resolved>}"
+    printf '  Binary version:  %s\n' "${BIN_VERSION:-<not resolved>}"
+    printf '  Binary SHA-256:  %s\n' "${BIN_SHA256:-<not resolved>}"
+    printf '  Binary source:   %s\n' "${BIN_SOURCE:-unresolved}"
+    printf '  Keyring backend:  %s (%s)\n' "${KEYRING_BACKEND:-test}" "${KEYRING_BACKEND_SOURCE:-unresolved}"
+    printf '  Keyring location: %s (%s)\n' "${KEYRING_LOCATION:-<not resolved>}" "${KEYRING_LOCATION_SOURCE:-unresolved}"
     printf '  Legacy:   %s\n' "${LEGACY_KEY:-<from input file>}"
     printf '  New key:  %s\n' "${NEW_KEY:-<from input file>}"
     printf '==============================\n\n'
@@ -194,6 +206,10 @@ parse_common_flags() {
   YES=0
   DRY_RUN=0
   BIN="lumerad"
+  BIN_VERSION=""
+  BIN_SHA256=""
+  BIN_SOURCE="unresolved"
+  _BINARY_RESOLVED=0
   LEGACY_KEY=""
   NEW_KEY=""
 
@@ -238,10 +254,51 @@ require_jq() {
 }
 
 require_binary() {
-  if ! command -v "$BIN" >/dev/null 2>&1 && [[ ! -x "$BIN" ]]; then
-    log_error "lumerad binary not found: $BIN"
+  (( ${_BINARY_RESOLVED:-0} == 1 )) && return 0
+
+  local requested="$BIN" located version_output
+  if ! located=$(command -v -- "$requested" 2>/dev/null); then
+    log_error "lumerad binary not found: $requested"
     exit 2
   fi
+  if [[ ! -x "$located" ]]; then
+    log_error "lumerad binary is not executable: $located"
+    exit 2
+  fi
+  BIN=$(readlink -f -- "$located" 2>/dev/null || true)
+  if [[ -z "$BIN" || "$BIN" != /* || ! -x "$BIN" ]]; then
+    log_error "could not resolve lumerad to an absolute executable path: $located"
+    exit 2
+  fi
+  if [[ "$requested" == */* ]]; then
+    BIN_SOURCE="explicit --binary/path ($requested)"
+  else
+    BIN_SOURCE="PATH ($requested -> $located)"
+  fi
+
+  if ! version_output=$("$BIN" version --long 2>&1) || [[ -z "${version_output//[[:space:]]/}" ]]; then
+    log_error "could not determine lumerad version from $BIN"
+    [[ -n "$version_output" ]] && log_error "  $version_output"
+    exit 2
+  fi
+  BIN_VERSION=$(printf '%s\n' "$version_output" | sed -n 's/^[[:space:]]*version:[[:space:]]*//p' | head -n1)
+  [[ -z "$BIN_VERSION" ]] && BIN_VERSION=$(printf '%s\n' "$version_output" | sed -n '/[^[:space:]]/{p;q;}')
+  if [[ -z "$BIN_VERSION" ]]; then
+    log_error "could not determine lumerad version from $BIN"
+    exit 2
+  fi
+  if [[ -n "${LUMERA_EXPECTED_BINARY_VERSION:-}" && "$BIN_VERSION" != "$LUMERA_EXPECTED_BINARY_VERSION" ]]; then
+    log_error "lumerad version mismatch: expected $LUMERA_EXPECTED_BINARY_VERSION, got $BIN_VERSION ($BIN)"
+    exit 2
+  fi
+  BIN_SHA256=$(sha256sum -- "$BIN" | cut -d' ' -f1)
+  readonly BIN BIN_VERSION BIN_SHA256 BIN_SOURCE
+  _BINARY_RESOLVED=1
+  log_info "binary path: $BIN"
+  log_info "binary version: $BIN_VERSION"
+  log_info "binary SHA-256: $BIN_SHA256"
+  log_info "binary source: $BIN_SOURCE"
+
   # Entry scripts set `IFS=$'\n\t'` to harden against paths with spaces, but
   # that disables exactly the space-based word-splitting we rely on below to
   # turn each "$probe" into multiple args (e.g., "query evmigration" → two
@@ -306,13 +363,26 @@ _keyring_prompts_for_passphrase() {
 #   5. os — the Cosmos SDK default
 # Mirrors resolve_chain_id: logs the decision so the operator sees it before signing.
 resolve_keyring_backend() {
+  local default_home="${HOME:-}/.lumera"
+  if [[ -n "${KEYRING_DIR:-}" ]]; then
+    KEYRING_LOCATION="$KEYRING_DIR"
+    KEYRING_LOCATION_SOURCE="explicit --keyring-dir"
+  elif [[ -n "${HOME_DIR:-}" ]]; then
+    KEYRING_LOCATION="$HOME_DIR"
+    KEYRING_LOCATION_SOURCE="explicit --home"
+  else
+    KEYRING_LOCATION="$default_home"
+    KEYRING_LOCATION_SOURCE="SDK default home"
+  fi
   if (( KEYRING_BACKEND_EXPLICIT == 1 )); then
+    KEYRING_BACKEND_SOURCE="explicit --keyring-backend"
     log_info "keyring backend: $KEYRING_BACKEND (from --keyring-backend)"
     return 0
   fi
 
   if [[ -n "${LUMERA_KEYRING_BACKEND:-}" ]]; then
     KEYRING_BACKEND="$LUMERA_KEYRING_BACKEND"
+    KEYRING_BACKEND_SOURCE="environment LUMERA_KEYRING_BACKEND"
     log_info "keyring backend: $KEYRING_BACKEND (from \$LUMERA_KEYRING_BACKEND)"
     return 0
   fi
@@ -326,6 +396,7 @@ resolve_keyring_backend() {
         "$client_toml" | head -n1)
     if [[ -n "$v" ]]; then
       KEYRING_BACKEND="$v"
+      KEYRING_BACKEND_SOURCE="config $client_toml"
       log_info "keyring backend: $v (from $client_toml)"
       return 0
     fi
@@ -334,16 +405,19 @@ resolve_keyring_backend() {
   local kr="${KEYRING_DIR:-$home}"
   if [[ -d "$kr/keyring-test" ]]; then
     KEYRING_BACKEND="test"
+    KEYRING_BACKEND_SOURCE="detected $kr/keyring-test"
     log_info "keyring backend: test (detected keyring-test/ in $kr)"
     return 0
   fi
   if [[ -d "$kr/keyring-file" ]]; then
     KEYRING_BACKEND="file"
+    KEYRING_BACKEND_SOURCE="detected $kr/keyring-file"
     log_info "keyring backend: file (detected keyring-file/ in $kr)"
     return 0
   fi
 
   KEYRING_BACKEND="os"
+  KEYRING_BACKEND_SOURCE="SDK default"
   log_info "keyring backend: os (SDK default; no --keyring-backend, client.toml, or keyring dir found)"
 }
 
@@ -598,7 +672,9 @@ resolve_address() {
   # prompt to stderr; redirecting it made the script appear to hang while it
   # was actually waiting for input.
   if ! addr=$(lumerad_keys show "$key_name" -a); then
-    log_error "key not found in keyring: $key_name"
+    # Preserve lumerad's typed/exit diagnostic. Do not infer key absence from
+    # arbitrary stderr: decode, backend, permission, and unlock failures share
+    # the same non-zero process contract on supported CLI versions.
     exit 1
   fi
   printf '%s\n' "$addr"

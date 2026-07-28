@@ -1,0 +1,151 @@
+{
+  "$schema": "./compatibility-manifest.schema.json",
+  "schema_version": "1.0.0",
+  "release": {
+    "tag": "REPLACE_WITH_RELEASE_TAG",
+    "commit": "0000000000000000000000000000000000000000",
+    "release_url": "REPLACE_WITH_RELEASE_URL"
+  },
+  "chain": {
+    "chain_id": "REPLACE_WITH_CHAIN_ID",
+    "evm_chain_id": "REPLACE_WITH_EVM_CHAIN_ID",
+    "minimum_upgrade": "REPLACE_WITH_UPGRADE_NAME"
+  },
+  "artifacts": {
+    "chain_executable": {
+      "name": "lumerad",
+      "release_path": "REPLACE_WITH_TARBALL_PATH_TO_LUMERAD",
+      "version": "REPLACE_WITH_LUMERAD_VERSION_LONG",
+      "tag": "REPLACE_WITH_CHAIN_RELEASE_TAG",
+      "commit": "0000000000000000000000000000000000000000",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET_URL"
+    },
+    "supernode_executable": {
+      "name": "supernode",
+      "release_path": "REPLACE_WITH_TARBALL_PATH_TO_SUPERNODE",
+      "version": "REPLACE_WITH_SUPERNODE_VERSION",
+      "tag": "REPLACE_WITH_SUPERNODE_RELEASE_TAG",
+      "commit": "0000000000000000000000000000000000000000",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source": "REPLACE_WITH_SUPERNODE_RELEASE_ASSET_URL"
+    },
+    "bound_files": {
+      "scripts/evmigration-common.sh": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/evmigration-common.sh"
+      },
+      "scripts/migrate-account.sh": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-account.sh"
+      },
+      "scripts/migrate-validator.sh": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-validator.sh"
+      },
+      "scripts/migrate-multisig.sh": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-multisig.sh"
+      },
+      "scripts/migrate-batch.sh": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-batch.sh"
+      },
+      "docs/evm-integration/user-guides/operator-migration-runbook.md": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/operator-migration-runbook.md"
+      },
+      "docs/evm-integration/user-guides/migration.md": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/migration.md"
+      },
+      "docs/evm-integration/user-guides/migration-scripts.md": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/migration-scripts.md"
+      },
+      "docs/evm-integration/user-guides/validator-migration.md": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/validator-migration.md"
+      },
+      "docs/evm-integration/user-guides/supernode-migration.md": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/supernode-migration.md"
+      },
+      "docs/evm-integration/user-guides/relayer-migration.md": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/relayer-migration.md"
+      },
+      "docs/evm-integration/evmigration/legacy-migration.md": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/evmigration/legacy-migration.md"
+      }
+    }
+  },
+  "operator_contracts": {
+    "binary_provenance": "absolute-path+version+sha256",
+    "keyring_provenance": "backend-and-location-separated",
+    "destination_prestage_no_echo": {
+      "status": "blocked",
+      "implementation": null
+    },
+    "single_broadcast": true
+  },
+  "validation": {
+    "bats": {
+      "status": "postponed",
+      "evidence": "REPLACE_WITH_COMMAND_AND_SANITIZED_RESULT"
+    },
+    "shellcheck": {
+      "status": "postponed",
+      "evidence": "REPLACE_WITH_COMMAND_AND_SANITIZED_RESULT"
+    },
+    "cli_help": {
+      "status": "postponed",
+      "evidence": "REPLACE_WITH_HELP_COMMANDS_AND_BINARY_HASHES"
+    },
+    "schema": {
+      "status": "postponed",
+      "evidence": "REPLACE_WITH_SCHEMA_TEMPLATE_AND_UNSAFE_APPROVAL_RESULTS"
+    },
+    "json_parse": {
+      "status": "postponed",
+      "evidence": "REPLACE_WITH_JSON_PARSE_RESULT"
+    },
+    "docs_links": {
+      "status": "postponed",
+      "evidence": "REPLACE_WITH_LINK_CHECK_RESULT"
+    },
+    "owned_testnet": {
+      "status": "postponed",
+      "evidence": "owned-testnet-baseline.template.json"
+    },
+    "portal_live": {
+      "status": "postponed",
+      "evidence": "REPLACE_WITH_REDACTED_LIVE_BROWSER_EVIDENCE_BUNDLE"
+    }
+  },
+  "approval": {
+    "status": "blocked",
+    "release_owner_approved": false,
+    "canonicalization": "RFC8785-JCS",
+    "detached_signature": {
+      "format": "sigstore-bundle",
+      "bundle": "compatibility-manifest.sigstore.json",
+      "certificate_identity": null,
+      "certificate_oidc_issuer": null
+    }
+  },
+  "_verification": [
+    "Release owner: replace every REPLACE_WITH value and every all-zero commit/hash; approval.status=approved is schema-invalid while any remain.",
+    "Extract each release asset into a new mode-0700 directory. Verify the chain and SuperNode executable tag, commit, version, source, and SHA-256, then verify every artifacts.bound_files entry individually with sha256sum.",
+    "Require operator_contracts.destination_prestage_no_echo.status=verified and bind its implementation name, tag, commit, SHA-256, source, and exact no-echo contract. Do not approve an unfinished or narrative-only PR-2 dependency.",
+    "Run every validation command and attach sanitized evidence. Every validation status, including owned_testnet and portal_live, must be pass before approval is schema-valid.",
+    "Validate the schema under draft 2020-12, validate this manifest against it, and confirm a copy changed to approval.status=approved while retaining any blocked/postponed/placeholder field is rejected.",
+    "Before canonicalization, the release owner MUST set approval.release_owner_approved=true, approval.status=approved, and replace approval.detached_signature certificate_identity/certificate_oidc_issuer with the trusted release identity and issuer. Revalidate the completed draft against the schema; do not edit approval or signature metadata after canonicalization.",
+    "Create the final immutable manifest bytes with RFC 8785 JCS, for example: python3 -c 'import json,sys,rfc8785; sys.stdout.buffer.write(rfc8785.dumps(json.load(sys.stdin)))' < compatibility-manifest.draft.json > compatibility-manifest.json. Do not edit compatibility-manifest.json after canonicalization or signing.",
+    "Use keyless Sigstore signing (no long-lived signing secret): cosign sign-blob --yes --bundle compatibility-manifest.sigstore.json compatibility-manifest.json",
+    "Verify without modifying either file, using the same trusted identity and issuer already embedded before canonicalization: cosign verify-blob --bundle compatibility-manifest.sigstore.json --certificate-identity 'RELEASE_OWNER_MUST_REPLACE_CERTIFICATE_IDENTITY' --certificate-oidc-issuer 'RELEASE_OWNER_MUST_REPLACE_OIDC_ISSUER' compatibility-manifest.json",
+    "Publish compatibility-manifest.json and compatibility-manifest.sigstore.json together. Approval is effective only when schema validation passes and the detached bundle verifies against the release-owner-approved identity and issuer."
+  ],
+  "_signing_blocker": "No release-owner trusted Sigstore certificate identity/OIDC issuer is currently supplied. Keep approval blocked until the release owner supplies them, all external gates pass, the final canonical manifest is signed, and the detached bundle verifies."
+}

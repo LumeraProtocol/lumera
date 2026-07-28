@@ -1013,3 +1013,124 @@ JSON
   '
   [[ "$output" != *"unlocking keyring to sign and simulate"* ]]
 }
+
+# ---- PR-3 executable and keyring provenance regressions ---------------------
+
+@test "require_binary pins a PATH symlink to one absolute canonical path with spaces" {
+  local tmp real link SHIM_BIN="$BATS_TEST_DIRNAME/fixtures/lumerad-shim.sh"
+  tmp=$(mktemp -d)
+  mkdir -p "$tmp/bin with spaces" "$tmp/path"
+  real="$tmp/bin with spaces/lumerad-real"
+  link="$tmp/path/lumerad"
+  cp "$SHIM_BIN" "$real"
+  ln -s "$real" "$link"
+  run env PATH="$tmp/path:$PATH" bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN=lumerad
+    require_binary
+    printf "BIN=%s\n" "$BIN"
+  '
+  rm -rf "$tmp"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BIN=$real"* ]]
+  [[ "$output" == *"binary source: PATH"* ]]
+}
+
+@test "require_binary honors explicit binary instead of stale PATH" {
+  local tmp approved stale SHIM_BIN="$BATS_TEST_DIRNAME/fixtures/lumerad-shim.sh"
+  tmp=$(mktemp -d)
+  mkdir -p "$tmp/approved dir" "$tmp/stale"
+  approved="$tmp/approved dir/lumerad"
+  stale="$tmp/stale/lumerad"
+  cp "$SHIM_BIN" "$approved"
+  cp "$SHIM_BIN" "$stale"
+  run env PATH="$tmp/stale:$PATH" SHIM_VERSION=v1.20.1 APPROVED="$approved" bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN="$APPROVED"
+    require_binary
+    printf "BIN=%s VERSION=%s\n" "$BIN" "$BIN_VERSION"
+  '
+  rm -rf "$tmp"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BIN=$approved VERSION=v1.20.1"* ]]
+  [[ "$output" != *"$stale"* ]]
+}
+
+@test "require_binary rejects an approved-version mismatch" {
+  setup_shim
+  run env SHIM_VERSION=v1.6.1 LUMERA_EXPECTED_BINARY_VERSION=v1.20.1 bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    require_binary
+  '
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"version mismatch"*"expected v1.20.1"*"got v1.6.1"* ]]
+}
+
+@test "require_binary rejects unknown version output" {
+  local tmp
+  tmp=$(mktemp -d)
+  printf '%s\n' '#!/usr/bin/env bash' 'case "$*" in "version --long") exit 0 ;; *"--help") exit 0 ;; esac' >"$tmp/lumerad"
+  chmod +x "$tmp/lumerad"
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$tmp"'/lumerad
+    require_binary
+  '
+  rm -rf "$tmp"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"could not determine lumerad version"* ]]
+}
+
+@test "resolve_address preserves backend failure without relabeling" {
+  setup_shim
+  run env SHIM_KEYS_ERROR="failed to decrypt keyring: permission denied" bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; KEYRING_BACKEND=test
+    resolve_address private-key-name
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"failed to decrypt keyring: permission denied"* ]]
+  [[ "$output" != *"key not found in keyring"* ]]
+}
+
+@test "resolve_address preserves malformed key decode failure without relabeling" {
+  setup_shim
+  run env SHIM_KEYS_ERROR="failed to decode keyring record: malformed armor" bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; KEYRING_BACKEND=test
+    resolve_address malformed-key
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"failed to decode keyring record: malformed armor"* ]]
+  [[ "$output" != *"key not found in keyring"* ]]
+}
+
+@test "resolve_address preserves CLI key absence contract" {
+  setup_shim
+  run env SHIM_KEYS_MISSING=absent bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; KEYRING_BACKEND=test
+    resolve_address absent
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"key not found: absent"* ]]
+  [[ "$output" != *"key not found in keyring"* ]]
+}
+
+@test "keyring backend and location provenance render separately" {
+  local home kr
+  home=$(mktemp -d); kr=$(mktemp -d)
+  KEYRING_BACKEND=test
+  KEYRING_BACKEND_EXPLICIT=1
+  HOME_DIR="$home"
+  KEYRING_DIR="$kr"
+  DRY_RUN=1 NODE=tcp://local:1 LEGACY_KEY=legacy NEW_KEY=new
+  resolve_keyring_backend
+  run log_run_summary "test migration"
+  rm -rf "$home" "$kr"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Keyring backend:  test (explicit --keyring-backend)"* ]]
+  [[ "$output" == *"Keyring location: $kr (explicit --keyring-dir)"* ]]
+  [[ "$output" != *"test (default)"* ]]
+}

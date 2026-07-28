@@ -3,6 +3,8 @@
 **Last updated**: 2026-06-24
 **Applies to**: Lumera chain with `x/evmigration` module enabled (post-EVM upgrade)
 
+> **Operator/custody gate:** Before any terminal or service migration, follow the canonical [EVM Migration Operator Runbook](operator-migration-runbook.md). It pins executable and keyring provenance, places destination proof before the irreversible boundary, defines stop/restart evidence for systemd/Docker/Kubernetes, and fails closed when release signing or the required PR-2 no-echo destination-prestage dependency is unresolved.
+
 ---
 
 ## Why Migration Is Needed

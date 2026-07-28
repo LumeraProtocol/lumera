@@ -42,9 +42,9 @@ _USAGE_EXAMPLES="  # Standard migration — both keys already in the keyring:
 main() {
   parse_common_flags "$@"
   resolve_keyring_backend
+  require_binary
   log_run_summary "Lumera account migration"
   log_info "[1/7] validating local prerequisites"
-  require_binary
   require_jq
   log_info "[2/7] resolving chain ID from RPC endpoint $NODE"
   resolve_chain_id

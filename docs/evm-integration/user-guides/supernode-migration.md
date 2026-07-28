@@ -4,6 +4,8 @@
 **Applies to**: operators running a Lumera supernode against an EVM-enabled chain (post-EVM upgrade)
 **Prerequisite reading**: [migration.md](migration.md) for the chain-level mechanics of legacy → EVM account migration
 
+> **Mandatory operations gate:** Use the [EVM Migration Operator Runbook](operator-migration-runbook.md) for executable/keyring provenance, no-echo destination staging, config backup, concrete systemd/Docker/Kubernetes stop/restart evidence, the irreversible/retry boundary, and sanitized evidence requirements. This guide supplies the supernode-specific finalization steps.
+
 ---
 
 ## Overview
@@ -54,17 +56,7 @@ Before starting:
 
 ## Step 1 — Generate or recover the EVM destination key
 
-`supernode keys recover` always produces `eth_secp256k1` keys (coin-type 60). Run it with a **new key name** distinct from your legacy one:
-
-```bash
-supernode keys recover <evm-key-name> --mnemonic "twelve or twenty four mnemonic words ..."
-```
-
-Example:
-
-```bash
-`supernode keys recover supernode-evm --mnemonic "inspire words ... about"
-```
+`supernode keys recover` must produce an `eth_secp256k1` key (coin-type 60) under a **new key name** distinct from the legacy key. **Required PR-2 compatibility dependency:** use the release's approved no-echo destination-prestage operation named and hashed in the compatibility manifest. It must read the mnemonic from a hidden TTY or protected input descriptor, never from argv. PR-3 intentionally does not invent a command for an unfinished PR-2 interface. If the manifest reports this dependency as blocked, stop; do not use the legacy `--mnemonic "..."` argv form.
 
 The output prints the new EVM address derived at coin type 60 from the chosen destination mnemonic. Verify:
 
@@ -193,10 +185,9 @@ Note the `new_address` — you'll verify that it matches what the supernode deri
 
 ### Step B3 — Recover the new EVM key into the supernode keyring
 
-Exactly the same operation as Path A's Step 1. **Use the same mnemonic you used in Keplr** — this is the critical piece that makes Path B work:
+Exactly the same operation as Path A's Step 1. **Use the same mnemonic you used in Keplr** — this is the critical piece that makes Path B work. Run the release-manifest-approved PR-2 no-echo destination-prestage operation, then run:
 
 ```bash
-supernode keys recover <evm-key-name> --mnemonic "twelve or twenty four mnemonic words ..."
 supernode keys list
 ```
 

@@ -6,6 +6,8 @@
 #   SHIM_COMBINE_EXIT=<n> force exit code for tx evmigration combine-proof only
 #   SHIM_FIXTURE=<name>   force a specific fixture name (without .json)
 #   SHIM_STDERR=<msg>     emit this to stderr before exiting
+#   SHIM_VERSION=<value>  version reported by `version --long`
+#   SHIM_KEYS_ERROR=<msg> make `keys show` fail with this exact diagnostic
 #
 # Per-command overrides let a single test change just one endpoint:
 #   SHIM_ESTIMATE_FIXTURE, SHIM_RECORD_FIXTURE, SHIM_PARAMS_FIXTURE,
@@ -100,6 +102,7 @@ fi
 # Route on argv. Per-command env vars let a single test override just one
 # endpoint without affecting the others.
 case "$*" in
+  "version --long")                                          printf 'version: %s\n' "${SHIM_VERSION:-v1.20.1-test}" ;;
   "query evmigration migration-estimate "*)               emit "${SHIM_ESTIMATE_FIXTURE:-estimate-ok}" ;;
   "query evmigration migration-record "*)
     if [[ -n "${SHIM_STATE_FILE:-}" && -f "$(pending_file)" ]]; then
@@ -163,6 +166,10 @@ case "$*" in
     emit "${SHIM_TX_FIXTURE:-tx-success}"
     ;;
   "keys show "*)
+    if [[ -n "${SHIM_KEYS_ERROR:-}" ]]; then
+      printf '%s\n' "$SHIM_KEYS_ERROR" >&2
+      exit "${SHIM_KEYS_EXIT:-1}"
+    fi
     # Route on the key name (second word after "show") and presence of --output json.
     # If --output json: emit a keys-show-<name>.json fixture; fall back to a generic one.
     # If -a (or default): emit the stub address like before.

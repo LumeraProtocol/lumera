@@ -4,6 +4,8 @@
 **Applies to**: validator operators running a Lumera validator against an EVM-enabled chain (post-EVM upgrade)
 **Prerequisite reading**: [migration.md](migration.md) for the chain-level mechanics of legacy → EVM account migration
 
+> **Mandatory operations gate:** Run the [EVM Migration Operator Runbook](operator-migration-runbook.md) before this validator procedure. It requires supervisor/user/base-dir/config/keyring discovery, a mode-0600 config backup, verified destination identity, proof that every instance using the consensus key is stopped, one broadcast, and public-address/gRPC/log verification.
+
 ---
 
 ## Overview
@@ -77,29 +79,24 @@ lumerad query evmigration params
 
 If `enable_migration: false`, migration is disabled chain-wide and you must wait for governance to enable it.
 
-## Step 2 — Prepare the EVM destination key
+## Step 2 — Pre-stage the EVM destination key
+
+Use the compatibility manifest's verified, named, and hashed PR-2 no-echo destination-prestage implementation to place `val-new` in the exact validator-operator keyring discovered by the operator runbook. It must create/recover coin type 60 / `eth_secp256k1` under a new key name, accept the mnemonic only through hidden TTY or protected input descriptor, and never emit it or place it in argv. If the PR-2 dependency is blocked, stop.
+
+The legacy key is normally already present. Do not recover it again under a second name: a keyring rejects the duplicate address. Pass the existing legacy key name to the manifest-pinned helper.
+
+The destination requirements are coin type `60`, key type `eth_secp256k1`, a fresh on-chain address, and proven custody. **Do not fund or use it before migrating.** The chain and helper reject a destination with existing account state.
+
+Verify both public key records using the exact approved binary/home/backend/location:
 
 ```bash
-# Legacy key (coin-type 118 / secp256k1) — the one currently registered on-chain
-lumerad keys add val-legacy --recover --coin-type 118 --key-type secp256k1 --keyring-backend file
-
-# New EVM key (coin type 60 / eth_secp256k1) — generate a mnemonic
-lumerad keys add val-new --coin-type 60 --key-type eth_secp256k1 --keyring-backend file
+sudo -u <validator-service-user> /absolute/approved/lumerad keys list \
+  --home /absolute/lumera/home \
+  --keyring-backend <backend> \
+  --keyring-dir /absolute/keyring/location
 ```
 
-> **Legacy key already in the keyring?** If the operator's legacy (coin-type 118) key is already present — which is the common case, since it's the key you've been running the validator with — `keys add val-legacy --recover` fails with **`duplicated address created`**. That's expected: the recovered key derives the *same* bech32 address as the one already stored, and a keyring can't hold the same address under two names. **Skip this `keys add` step and pass the existing key's name as the legacy argument** to the migration command (Step 4) or to `migrate-validator.sh`. You only need to recover the new EVM key (`val-new`).
-
-Alternatively, add `--recover` to derive `val-new` from an existing mnemonic, including the legacy mnemonic. Same or different mnemonics are both valid. The destination requirements are coin type `60`, key type `eth_secp256k1`, a fresh on-chain address, and control of the key.
-
-> **The new EVM address must be fresh — do not fund or use it before migrating.** The migration moves all balances and state to the destination atomically and **refuses to run if the destination already exists on-chain** (the chain and `migrate-validator.sh` both check this). It's tempting to send "a little gas" to the new address first; don't. If the destination already has account state, derive a different coin-type 60 key, or complete the migration first and fund it afterward. The pre-flight will surface this as a destination-freshness failure (`new address ... already exists on-chain`).
-
-Verify both are present:
-
-```bash
-lumerad keys list --keyring-backend file
-```
-
-You should see `val-legacy` with pubkey type `/cosmos.crypto.secp256k1.PubKey` and `val-new` with pubkey type `/cosmos.evm.crypto.v1.ethsecp256k1.PubKey`.
+You should see the existing legacy key with pubkey type `/cosmos.crypto.secp256k1.PubKey` and `val-new` with pubkey type `/cosmos.evm.crypto.v1.ethsecp256k1.PubKey`.
 
 ## Step 3 — Run the pre-flight estimate
 
@@ -189,9 +186,7 @@ If instead the validator is still `BOND_STATUS_UNBONDING` (not yet `UNBONDED`), 
 
 ## Step 4 — Stop the validator
 
-```bash
-systemctl stop lumerad   # or however you supervise the node — see "Note on systemctl commands" in the Overview
-```
+Use the operator runbook's exact systemd, Docker, or Kubernetes branch to stop **and prove stopped** every instance that can access the consensus key. Record the evidence and keep container orchestrator reconciliation paused. A bare `systemctl stop` is not a valid substitute for containerized deployments.
 
 **Stopping the node before you broadcast is mandatory, not a formality.** Migration re-keys a live, bonded validator in a single transaction: it rewrites the **operator (staking) key** and the on-chain consensus-address→operator mapping. The **consensus key itself is unchanged** — and that is precisely what makes a running node dangerous here.
 

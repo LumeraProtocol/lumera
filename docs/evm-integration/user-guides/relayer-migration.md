@@ -4,6 +4,8 @@
 **Applies to**: operators running a Hermes IBC relayer whose Lumera signing account is a legacy (coin-type 118 `secp256k1`) account, against an EVM-enabled Lumera chain (post-EVM upgrade)
 **Prerequisite reading**: [migration.md](migration.md) for the chain-level mechanics of legacy → EVM account migration
 
+> **Mandatory operations gate:** Use the [EVM Migration Operator Runbook](operator-migration-runbook.md) before this relayer procedure. The runbook adds release/binary/keyring provenance, mode-0600 config backup, no-echo destination staging, verified stop/restart alternatives, a one-broadcast rule, and secret-redacted evidence; this guide remains authoritative for Hermes' pinned HD path and key replacement.
+
 ---
 
 ## Overview
@@ -76,46 +78,57 @@ Validate:
 hermes config validate    # must print: SUCCESS configuration is valid
 ```
 
-### Step 2 — Create the EVM destination key in lumerad
+### Step 2 — Pre-stage the EVM destination key in lumerad
 
-The migration's destination key must live in the **lumerad** keyring (alongside the legacy relayer key, so `claim-legacy-account` can sign). Create it and note its address:
+Use only the compatibility manifest's **verified, named, and hashed PR-2 no-echo implementation** to create/recover `relayer-evm` as coin type 60 / `eth_secp256k1` in the exact lumerad keyring discovered by the operator runbook. The implementation must accept a hidden TTY or protected file descriptor and must not place the mnemonic in argv, a shell variable, shell history, or logs. If that manifest dependency is blocked, stop.
+
+Record only the public destination address:
 
 ```bash
-lumerad keys add relayer-evm --coin-type 60 --algo eth_secp256k1 --keyring-backend test
-NEWADDR=$(lumerad keys show relayer-evm -a --keyring-backend test)
-echo "$NEWADDR"
+NEWADDR=$(sudo -u <relayer-service-user> /absolute/approved/lumerad keys show relayer-evm -a \
+  --home /absolute/lumera/home \
+  --keyring-backend <backend> \
+  --keyring-dir /absolute/keyring/location)
+printf '%s\n' "$NEWADDR"
 ```
 
-Capture the mnemonic printed at creation — you need it for Hermes in Step 5. (Alternatively, generate the key inside Hermes in Step 3 and recover it into lumerad; either way the same mnemonic must end up in both keyrings.)
+The destination mnemonic is transferred to Hermes only through the same protected custody channel used by PR-2. The following steps refer to a temporary operator-owned mode-`0600` file at `/run/secrets/relayer-evm.mnemonic`; never place its contents in a shell variable or shared path, and securely remove it after Step 6.
 
 ### Step 3 — GATE: prove Hermes derives the same address
 
 Before the irreversible migration, confirm Hermes derives **exactly** `$NEWADDR` from the relayer mnemonic with the pinned path:
 
 ```bash
-# pipe the mnemonic in; never write it to a shared path
-printf '%s\n' "$RELAYER_EVM_MNEMONIC" | \
-  hermes keys add --chain lumera-mainnet-1 --key-name relayer-evm-gate \
-    --mnemonic-file /dev/stdin --hd-path "m/44'/60'/0'/0/0"
+umask 077
+test "$(stat -c '%a' /run/secrets/relayer-evm.mnemonic)" = 600
+sudo -u <relayer-service-user> hermes keys add \
+  --chain lumera-mainnet-1 --key-name relayer-evm-gate \
+  --mnemonic-file /run/secrets/relayer-evm.mnemonic \
+  --hd-path "m/44'/60'/0'/0/0"
 
-hermes keys list --chain lumera-mainnet-1 | grep relayer-evm-gate
+sudo -u <relayer-service-user> hermes keys list --chain lumera-mainnet-1 | grep relayer-evm-gate
 # the printed address MUST equal $NEWADDR. If it does not, STOP — do not migrate.
-hermes keys delete --chain lumera-mainnet-1 --key-name relayer-evm-gate
+sudo -u <relayer-service-user> hermes keys delete --chain lumera-mainnet-1 --key-name relayer-evm-gate
 ```
 
 If the addresses differ, re-check Step 1 (`address_type`) and the `--hd-path`. **Do not proceed past this gate on a mismatch** — you would migrate funds to an account Hermes cannot sign for.
 
 ### Step 4 — Pause relaying and migrate the account
 
-Stop the relayer so it does not sign with an account that is about to be blocked, then migrate. (`migrate-account.sh` is the bundled helper — see [migration-scripts.md](migration-scripts.md). Both keys must be in the same lumerad keyring.)
+Stop and prove stopped using the relayer's actual supervisor branch in the operator runbook. Then run the manifest-pinned helper as the discovered service user, with the exact approved binary/home/backend/keyring and trusted external RPC. The successful post-stop dry-run and destination-address match are mandatory; the following live command is run once only:
 
 ```bash
-# stop the hermes process/container (resumes after Step 6)
-./scripts/migrate-account.sh relayer-legacy relayer-evm \
-  --chain-id lumera-mainnet-1 --node tcp://localhost:26657 --yes
+sudo -u <relayer-service-user> /absolute/approved/scripts/migrate-account.sh \
+  relayer-legacy relayer-evm \
+  --binary /absolute/approved/lumerad \
+  --home /absolute/lumera/home \
+  --keyring-backend <backend> \
+  --keyring-dir /absolute/keyring/location \
+  --chain-id lumera-mainnet-1 \
+  --node <trusted-rpc>
 ```
 
-`relayer-legacy` is the legacy relayer key in your lumerad keyring. Migration is fee-free; the full balance moves to `$NEWADDR`. Verify:
+For Docker/Kubernetes, use the runbook's one-shot container/Pod form with these account-helper arguments; do not run this host/systemd form against container storage. `relayer-legacy` is the legacy relayer key in the same lumerad keyring. Migration is fee-free; the full balance moves to `$NEWADDR`. On a tx hash or ambiguous transport failure, apply the runbook's query-before-retry rule. Verify:
 
 ```bash
 lumerad query evmigration migration-record <legacy-addr> --output json | jq '.record.new_address'  # == $NEWADDR
@@ -124,17 +137,23 @@ lumerad query bank balances "$NEWADDR" --output json | jq '.balances'           
 
 ### Step 5 — Replace the Hermes relayer key with the EVM key
 
-Back up and remove the old key, then import the EVM key under the relayer's `key_name`, **with the pinned path**:
+Back up and remove the old key, then import the EVM key under the relayer's `key_name`, **with the pinned path**. Keep the backup on an encrypted operator-controlled volume, never in a shared `/tmp` path:
 
 ```bash
-cp ~/.hermes/keys/lumera-mainnet-1/keyring-test/relayer.json /tmp/relayer.json.bak
-hermes keys delete --chain lumera-mainnet-1 --key-name relayer
+umask 077
+RELAYER_BACKUP_DIR=/absolute/encrypted/operator-backup/relayer-$(date -u +%Y%m%dT%H%M%SZ)
+install -d -m 0700 "$RELAYER_BACKUP_DIR"
+install -m 0600 ~/.hermes/keys/lumera-mainnet-1/keyring-test/relayer.json \
+  "$RELAYER_BACKUP_DIR/relayer.json.bak"
+stat -c '%a %n' "$RELAYER_BACKUP_DIR/relayer.json.bak"  # must be 600
 
-printf '%s\n' "$RELAYER_EVM_MNEMONIC" | \
-  hermes keys add --chain lumera-mainnet-1 --key-name relayer \
-    --mnemonic-file /dev/stdin --hd-path "m/44'/60'/0'/0/0"
+sudo -u <relayer-service-user> hermes keys delete --chain lumera-mainnet-1 --key-name relayer
+sudo -u <relayer-service-user> hermes keys add \
+  --chain lumera-mainnet-1 --key-name relayer \
+  --mnemonic-file /run/secrets/relayer-evm.mnemonic \
+  --hd-path "m/44'/60'/0'/0/0"
 
-hermes keys list --chain lumera-mainnet-1 | grep ' relayer '   # MUST show $NEWADDR
+sudo -u <relayer-service-user> hermes keys list --chain lumera-mainnet-1 | grep ' relayer '   # MUST show $NEWADDR
 ```
 
 ### Step 6 — Restart and verify
@@ -151,10 +170,10 @@ Watch the logs for a few packets to confirm it signs and broadcasts cleanly. IBC
 
 ## Rollback / abort
 
-- **Before Step 4 (migration):** fully reversible. Restore `address_type` removal in `config.toml`, restore `relayer.json` from backup if you touched it, delete `relayer-evm*` keys. Nothing on-chain changed.
+- **Before Step 4 (migration):** fully reversible. Restore `address_type` removal in `config.toml`, restore the mode-`0600` `relayer.json` from the encrypted backup if you touched it, and delete `relayer-evm*` keys. Nothing on-chain changed.
 - **After Step 4:** the legacy address is permanently blocked; there is no rollback. The only recovery is forward — ensure Hermes holds the EVM key (Step 5) and is funded.
 
-Keep `/tmp/relayer.json.bak` only until Step 6 verifies; it is the now-blocked legacy key and a stray `.json` left in the `keyring-test/` directory can confuse Hermes' key loader — delete it once relaying is confirmed.
+Keep the encrypted `relayer.json.bak` only until Step 6 verifies; a stray `.json` left in the live `keyring-test/` directory can confuse Hermes' key loader. After relaying is confirmed, securely remove both the backup and `/run/secrets/relayer-evm.mnemonic` according to the custody platform's deletion procedure.
 
 ---
 

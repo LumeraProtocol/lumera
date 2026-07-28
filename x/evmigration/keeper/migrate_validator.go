@@ -352,6 +352,17 @@ func (k Keeper) validateValidatorSupernodeOwnership(
 	return plan, nil
 }
 
+func (k Keeper) validateDestinationSupernodeOwnership(ctx sdk.Context, newAddr sdk.AccAddress) error {
+	_, destinationFound, err := k.supernodeKeeper.StrictGetSuperNodeByAccount(ctx, newAddr.String())
+	if err != nil {
+		return fmt.Errorf("resolve destination supernode ownership: %w", err)
+	}
+	if destinationFound {
+		return fmt.Errorf("destination supernode account %s is already owned", newAddr)
+	}
+	return nil
+}
+
 func (k Keeper) migrateValidatedValidatorSupernodes(
 	ctx sdk.Context,
 	oldValAddr, newValAddr sdk.ValAddress,

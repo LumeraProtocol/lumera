@@ -147,6 +147,11 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	if err != nil {
 		return nil, err
 	}
+	if validatorSupernodePlan.hasAccountOwned {
+		if err := ms.validateDestinationSupernodeOwnership(ctx, newAddr); err != nil {
+			return nil, err
+		}
+	}
 
 	// --- Step V1: Withdraw all commission and delegation rewards ---
 	// Must happen before re-keying so rewards accrue to the correct addresses.

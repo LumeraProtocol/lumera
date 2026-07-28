@@ -90,6 +90,11 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 	if err != nil {
 		return nil, fmt.Errorf("resolve source supernode ownership: %w", err)
 	}
+	if hasSupernode {
+		if err := ms.validateDestinationSupernodeOwnership(ctx, newAddr); err != nil {
+			return nil, err
+		}
+	}
 
 	// --- Execute migration steps ---
 	if err := ms.migrateAccount(ctx, legacyAddr, newAddr, &msg.NewProof, supernode, hasSupernode); err != nil {

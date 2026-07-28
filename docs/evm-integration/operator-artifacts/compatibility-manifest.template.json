@@ -14,7 +14,7 @@
   "artifacts": {
     "chain_executable": {
       "name": "lumerad",
-      "release_path": "REPLACE_WITH_TARBALL_PATH_TO_LUMERAD",
+      "release_path": "/REPLACE_WITH_TARBALL_PATH_TO_LUMERAD",
       "version": "REPLACE_WITH_LUMERAD_VERSION_LONG",
       "tag": "REPLACE_WITH_CHAIN_RELEASE_TAG",
       "commit": "0000000000000000000000000000000000000000",
@@ -23,7 +23,7 @@
     },
     "supernode_executable": {
       "name": "supernode",
-      "release_path": "REPLACE_WITH_TARBALL_PATH_TO_SUPERNODE",
+      "release_path": "/REPLACE_WITH_TARBALL_PATH_TO_SUPERNODE",
       "version": "REPLACE_WITH_SUPERNODE_VERSION",
       "tag": "REPLACE_WITH_SUPERNODE_RELEASE_TAG",
       "commit": "0000000000000000000000000000000000000000",
@@ -32,7 +32,7 @@
     },
     "sncli_executable": {
       "name": "sncli",
-      "release_path": "REPLACE_WITH_TARBALL_PATH_TO_SNCLI",
+      "release_path": "/REPLACE_WITH_TARBALL_PATH_TO_SNCLI",
       "version": "REPLACE_WITH_SNCLI_VERSION",
       "tag": "REPLACE_WITH_SNCLI_RELEASE_TAG",
       "commit": "0000000000000000000000000000000000000000",
@@ -41,7 +41,7 @@
     },
     "relayer_executable": {
       "name": "hermes",
-      "release_path": "REPLACE_WITH_TARBALL_PATH_TO_HERMES",
+      "release_path": "/REPLACE_WITH_TARBALL_PATH_TO_HERMES",
       "version": "REPLACE_WITH_HERMES_VERSION",
       "tag": "REPLACE_WITH_HERMES_RELEASE_TAG",
       "commit": "0000000000000000000000000000000000000000",
@@ -55,62 +55,62 @@
     },
     "bound_files": {
       "scripts/evmigration-common.sh": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_scripts/evmigration-common.sh",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_scripts/evmigration-common.sh",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/evmigration-common.sh"
       },
       "scripts/migrate-account.sh": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-account.sh",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-account.sh",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-account.sh"
       },
       "scripts/migrate-validator.sh": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-validator.sh",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-validator.sh",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-validator.sh"
       },
       "scripts/migrate-multisig.sh": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-multisig.sh",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-multisig.sh",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-multisig.sh"
       },
       "scripts/migrate-batch.sh": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-batch.sh",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_scripts/migrate-batch.sh",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#scripts/migrate-batch.sh"
       },
       "docs/evm-integration/user-guides/operator-migration-runbook.md": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/operator-migration-runbook.md",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/operator-migration-runbook.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/operator-migration-runbook.md"
       },
       "docs/evm-integration/user-guides/migration.md": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/migration.md",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/migration.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/migration.md"
       },
       "docs/evm-integration/user-guides/migration-scripts.md": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/migration-scripts.md",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/migration-scripts.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/migration-scripts.md"
       },
       "docs/evm-integration/user-guides/validator-migration.md": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/validator-migration.md",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/validator-migration.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/validator-migration.md"
       },
       "docs/evm-integration/user-guides/supernode-migration.md": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/supernode-migration.md",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/supernode-migration.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/supernode-migration.md"
       },
       "docs/evm-integration/user-guides/relayer-migration.md": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/relayer-migration.md",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/user-guides/relayer-migration.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/user-guides/relayer-migration.md"
       },
       "docs/evm-integration/evmigration/legacy-migration.md": {
-        "release_path": "REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/evmigration/legacy-migration.md",
+        "release_path": "/REPLACE_WITH_RUNTIME_PATH_TO_docs/evm-integration/evmigration/legacy-migration.md",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "source": "REPLACE_WITH_CHAIN_RELEASE_ASSET#docs/evm-integration/evmigration/legacy-migration.md"
       }

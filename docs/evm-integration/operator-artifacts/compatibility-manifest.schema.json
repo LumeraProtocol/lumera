@@ -217,6 +217,11 @@
     }
   ],
   "$defs": {
+    "absolute_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^/"
+    },
     "non_placeholder": {
       "type": "string",
       "minLength": 3,
@@ -235,7 +240,7 @@
       "additionalProperties": false,
       "required": ["release_path", "sha256", "source"],
       "properties": {
-        "release_path": { "type": "string", "minLength": 1 },
+        "release_path": { "$ref": "#/$defs/absolute_path" },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "source": { "type": "string", "minLength": 1 }
       }
@@ -254,7 +259,7 @@
       "required": ["name", "release_path", "version", "tag", "commit", "sha256", "source"],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
-        "release_path": { "type": "string", "minLength": 1 },
+        "release_path": { "$ref": "#/$defs/absolute_path" },
         "version": { "type": "string", "minLength": 1 },
         "tag": { "type": "string", "minLength": 1 },
         "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },

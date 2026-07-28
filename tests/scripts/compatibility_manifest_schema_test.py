@@ -64,7 +64,6 @@ def approved_manifest(template):
         "status": "verified",
         "implementation": {
             "name": "destination-prestage",
-            "release_path": "/opt/lumera/bin/destination-prestage",
             "argv": [
                 "/opt/lumera/bin/destination-prestage",
                 "--home",
@@ -140,23 +139,17 @@ class CompatibilityManifestSchemaTest(unittest.TestCase):
         ] = "scripts/migrate-validator.sh"
         self.assert_invalid(unsafe)
 
-    def test_approved_prestage_requires_absolute_runtime_binding(self):
-        missing_path = copy.deepcopy(self.approved)
-        del missing_path["operator_contracts"]["destination_prestage_no_echo"][
-            "implementation"
-        ]["release_path"]
-        self.assert_invalid(missing_path)
-
+    def test_approved_prestage_argv_zero_is_the_absolute_runtime_binding(self):
         relative_path = copy.deepcopy(self.approved)
         relative_path["operator_contracts"]["destination_prestage_no_echo"][
             "implementation"
-        ]["release_path"] = "bin/destination-prestage"
+        ]["argv"][0] = "bin/destination-prestage"
         self.assert_invalid(relative_path)
 
         placeholder_path = copy.deepcopy(self.approved)
         placeholder_path["operator_contracts"]["destination_prestage_no_echo"][
             "implementation"
-        ]["release_path"] = "/REPLACE_WITH_DESTINATION_PRESTAGE"
+        ]["argv"][0] = "/REPLACE_WITH_DESTINATION_PRESTAGE"
         self.assert_invalid(placeholder_path)
 
     def test_approved_prestage_requires_exact_non_placeholder_argv(self):
@@ -165,12 +158,6 @@ class CompatibilityManifestSchemaTest(unittest.TestCase):
             "implementation"
         ]["argv"]
         self.assert_invalid(missing_argv)
-
-        relative_executable = copy.deepcopy(self.approved)
-        relative_executable["operator_contracts"]["destination_prestage_no_echo"][
-            "implementation"
-        ]["argv"][0] = "bin/destination-prestage"
-        self.assert_invalid(relative_executable)
 
         placeholder_argument = copy.deepcopy(self.approved)
         placeholder_argument["operator_contracts"]["destination_prestage_no_echo"][

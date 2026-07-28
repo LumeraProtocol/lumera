@@ -305,10 +305,9 @@
     "pr2_implementation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "release_path", "argv", "tag", "commit", "sha256", "source", "no_echo_contract"],
+      "required": ["name", "argv", "tag", "commit", "sha256", "source", "no_echo_contract"],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
-        "release_path": { "$ref": "#/$defs/absolute_path" },
         "argv": {
           "type": "array",
           "minItems": 1,
@@ -328,12 +327,6 @@
         {
           "properties": {
             "name": { "$ref": "#/$defs/non_placeholder" },
-            "release_path": {
-              "allOf": [
-                { "$ref": "#/$defs/absolute_path" },
-                { "$ref": "#/$defs/non_placeholder" }
-              ]
-            },
             "argv": {
               "type": "array",
               "minItems": 1,

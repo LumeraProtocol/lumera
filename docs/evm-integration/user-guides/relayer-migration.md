@@ -123,11 +123,13 @@ sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys add \
   --mnemonic-file /run/secrets/relayer-evm.mnemonic \
   --hd-path "m/44'/60'/0'/0/0"
 
-if ! HERMES_GATE_ADDR=$(
-  sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys list --chain lumera-mainnet-1 |
-    EVMIGRATION_COMMON="$EVMIGRATION_COMMON" EXPECTED_ADDR="$NEWADDR" bash -c \
-      'source "$EVMIGRATION_COMMON"; require_hermes_key_address relayer-evm-gate "$EXPECTED_ADDR"'
-); then
+if ! HERMES_KEYS_OUTPUT=$(sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys list --chain lumera-mainnet-1); then
+  echo 'Hermes keys list failed; do not migrate' >&2
+  exit 1
+fi
+if ! HERMES_GATE_ADDR=$(printf '%s\n' "$HERMES_KEYS_OUTPUT" |
+  EVMIGRATION_COMMON="$EVMIGRATION_COMMON" EXPECTED_ADDR="$NEWADDR" bash -c \
+    'source "$EVMIGRATION_COMMON"; require_hermes_key_address relayer-evm-gate "$EXPECTED_ADDR"'); then
   echo 'Hermes destination-address gate failed; do not migrate' >&2
   exit 1
 fi
@@ -177,11 +179,13 @@ sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys add \
   --mnemonic-file /run/secrets/relayer-evm.mnemonic \
   --hd-path "m/44'/60'/0'/0/0"
 
-if ! HERMES_ACTIVE_ADDR=$(
-  sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys list --chain lumera-mainnet-1 |
-    EVMIGRATION_COMMON="$EVMIGRATION_COMMON" EXPECTED_ADDR="$NEWADDR" bash -c \
-      'source "$EVMIGRATION_COMMON"; require_hermes_key_address relayer "$EXPECTED_ADDR"'
-); then
+if ! HERMES_KEYS_OUTPUT=$(sudo -u <relayer-service-user> "$HERMES" --config "$HERMES_CONFIG" keys list --chain lumera-mainnet-1); then
+  echo 'Hermes keys list failed; keep relayer stopped' >&2
+  exit 1
+fi
+if ! HERMES_ACTIVE_ADDR=$(printf '%s\n' "$HERMES_KEYS_OUTPUT" |
+  EVMIGRATION_COMMON="$EVMIGRATION_COMMON" EXPECTED_ADDR="$NEWADDR" bash -c \
+    'source "$EVMIGRATION_COMMON"; require_hermes_key_address relayer "$EXPECTED_ADDR"'); then
   echo 'Active Hermes key does not control the migrated destination; keep relayer stopped' >&2
   exit 1
 fi

@@ -114,8 +114,8 @@ _role_color() { printf '%s%s%s' "$1" "$2" "$_C_RESET"; }
 legacy_value() { _role_color "$_C_LEGACY" "$1"; }
 new_value() { _role_color "$_C_NEW" "$1"; }
 
-# Parse `hermes keys list` output and fail closed unless exactly one named key
-# derives the expected address. Hermes v1.13 has no JSON output for this command.
+# Parse the pinned `hermes keys list` text rows and fail closed unless exactly
+# one named key derives the expected address.
 # Usage: hermes keys list ... | require_hermes_key_address <key-name> <expected-address>
 require_hermes_key_address() {
   if (( $# != 2 )) || [[ -z "$1" || -z "$2" ]]; then

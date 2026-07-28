@@ -99,15 +99,14 @@ For a supernode or Hermes relayer, use the discovered config path in place of th
 
 **Required PR-2 compatibility dependency:** use only the release's approved destination pre-stage operation that implements the PR-2 no-echo contract. That operation must read the mnemonic from a hidden TTY or protected input file descriptor, never from argv, never echo it, never enable shell tracing, and print only non-secret key metadata. This PR-3 runbook does not claim that an unfinished PR-2 command exists in the current binary; if the release compatibility manifest does not name and hash an implementation of this contract, stop.
 
-The approved manifest must bind both the executable and its full argv. Verify the executable hash, require `argv[0]` to equal the approved absolute path, and execute the array without `eval` or operator substitutions:
+The approved manifest binds the executable exactly once, as `argv[0]` of its full argv. Verify that absolute path's hash and execute the array without `eval` or operator substitutions:
 
 ```bash
-PRESTAGE_IMPL=$(jq -er '.operator_contracts.destination_prestage_no_echo.implementation.release_path' "$MANIFEST")
 PRESTAGE_SHA256=$(jq -er '.operator_contracts.destination_prestage_no_echo.implementation.sha256' "$MANIFEST")
 mapfile -t PRESTAGE_ARGV < <(jq -er '.operator_contracts.destination_prestage_no_echo.implementation.argv[]' "$MANIFEST")
+PRESTAGE_IMPL=${PRESTAGE_ARGV[0]:-}
 test "${PRESTAGE_IMPL#/}" != "$PRESTAGE_IMPL"
 test "${#PRESTAGE_ARGV[@]}" -gt 0
-test "${PRESTAGE_ARGV[0]}" = "$PRESTAGE_IMPL"
 printf '%s  %s\n' "$PRESTAGE_SHA256" "$PRESTAGE_IMPL" | sha256sum -c -
 
 # The implementation itself must obtain the mnemonic through its manifest-approved

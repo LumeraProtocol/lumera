@@ -5,6 +5,17 @@
 **Prerequisite reading**: [migration.md](migration.md) for the chain-level mechanics of legacy → EVM account migration
 
 > **Mandatory operations gate:** Use the [EVM Migration Operator Runbook](operator-migration-runbook.md) for executable/keyring provenance, no-echo destination staging, config backup, concrete systemd/Docker/Kubernetes stop/restart evidence, the irreversible/retry boundary, and sanitized evidence requirements. This guide supplies the supernode-specific finalization steps.
+>
+> **Command context used below:** populate these values from the approved manifest and runbook discovery before any chain query. `LUMERAD` must be the exact absolute `artifacts.chain_executable.release_path`. Each explicit query below receives the supported home, keyring, chain, and node flags; keys commands receive only home and keyring flags. Do not use a universal wrapper. SuperNode and `sncli` operations must likewise use the independently pinned `artifacts.supernode_executable` and `artifacts.sncli_executable` records, never PATH lookup.
+>
+> ```bash
+> LUMERAD=/absolute/path/from/approved/artifacts.chain_executable.release_path
+> LUMERA_HOME=/absolute/discovered/lumera/home
+> KEYRING_BACKEND=<test|file|os>
+> KEYRING_DIR=/absolute/discovered/keyring/location
+> CHAIN_ID=<approved-chain-id>
+> TRUSTED_RPC=<trusted-rpc>
+> ```
 
 ---
 
@@ -29,14 +40,7 @@ Both paths land in the same final state (new EVM key registered as supernode, le
 
 Path B is useful when you want to use Keplr's UX to see each step (the Portal shows balances, delegations, and a pre-migration checklist), when you need to migrate the account's balance urgently for non-supernode reasons, or when your node ops team and your wallet custody team are different people.
 
-> **Terminal alternative for Path B.** If you prefer to stay in a shell rather than use Keplr, you can drive the account-level migration with the bundled shell helper scripts instead of the Portal — the end state (on-chain migration record + matching local key) is identical, and the supernode daemon's `alreadyMigrated` branch activates the same way on restart. See [migration-scripts.md](migration-scripts.md) for the full walkthrough, including multisig rejection, pre-flight estimates, and exit codes. In short:
->
-> ```bash
-> ./scripts/migrate-account.sh legacy-key new-key \
->   --chain-id lumera-mainnet-1 --node tcp://rpc.lumera:26657
-> ```
->
-> Then continue with Step B3 (recover the new EVM key into the supernode keyring) onward.
+> **Terminal alternative for Path B.** Do not use a shortened helper command from this guide. Follow the [Operator Runbook §6](operator-migration-runbook.md#6-re-run-dry-run-verify-destination-broadcast-once) non-validator branch with the manifest-pinned absolute `migrate-account.sh` and `lumerad` paths, discovered service identity, explicit home/keyring backend/keyring location/chain ID/trusted node, and the approved dry-run-before-live sequence. Then continue with Step B3 onward.
 
 **Why both paths work deterministically**: `supernode keys recover` derives keys at HD path `m/44'/60'/0'/0/0` using `eth_secp256k1`. Keplr uses the identical derivation for Lumera's EVM chain definition. Import the chosen destination mnemonic into both tools so they produce the same destination address. That mnemonic may be the legacy mnemonic or a different one.
 
@@ -58,13 +62,7 @@ Before starting:
 
 `supernode keys recover` must produce an `eth_secp256k1` key (coin-type 60) under a **new key name** distinct from the legacy key. **Required PR-2 compatibility dependency:** use the release's approved no-echo destination-prestage operation named and hashed in the compatibility manifest. It must read the mnemonic from a hidden TTY or protected input descriptor, never from argv. PR-3 intentionally does not invent a command for an unfinished PR-2 interface. If the manifest reports this dependency as blocked, stop; do not use the legacy `--mnemonic "..."` argv form.
 
-The output prints the new EVM address derived at coin type 60 from the chosen destination mnemonic. Verify:
-
-```bash
-supernode keys list
-```
-
-You should see both your legacy key and the newly recovered EVM key. They may use the same mnemonic or different mnemonics; the new key uses coin type `60` and `eth_secp256k1`.
+The approved pre-stage operation prints the new EVM address. Verify the resulting public key record using the manifest-pinned absolute `artifacts.supernode_executable.release_path`, the discovered SuperNode service identity/base directory, and the exact keyring backend/location from the operator runbook. Do not copy a bare `supernode keys list` shortcut that falls back to the interactive user's config or keyring.
 
 ## Step 2 — Add `evm_key_name` to `config.yml`
 
@@ -124,7 +122,7 @@ If the logs show `migration record exists on-chain but new address mismatch`, th
 Query the on-chain migration record:
 
 ```bash
-lumerad query evmigration migration-record <legacy-address>
+sudo -u <supernode-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migration-record <legacy-address>
 ```
 
 The response should show `new_address` matching your EVM key's address. Also confirm the supernode's on-chain registration points at the new address:
@@ -132,8 +130,8 @@ The response should show `new_address` matching your EVM key's address. Also con
 ```bash
 # get-supernode takes the VALOPER address (lumeravaloper1…), not the account
 # address. Convert your new account address with:
-#   lumerad keys show <new-key> -a --bech val
-lumerad query supernode get-supernode <new-valoper-address>
+#   sudo -u <supernode-service-user> "$LUMERAD" keys --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" show <new-key> -a --bech val
+sudo -u <supernode-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" supernode get-supernode <new-valoper-address>
 ```
 
 Finally, confirm `config.yml` reflects the switch:
@@ -178,20 +176,14 @@ Quick summary of what you'll do:
 After the Portal shows success, verify the on-chain record on the host (or on the Portal's success screen):
 
 ```bash
-lumerad query evmigration migration-record <legacy-address>
+sudo -u <supernode-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migration-record <legacy-address>
 ```
 
 Note the `new_address` — you'll verify that it matches what the supernode derives locally in Step B5.
 
 ### Step B3 — Recover the new EVM key into the supernode keyring
 
-Exactly the same operation as Path A's Step 1. **Use the same mnemonic you used in Keplr** — this is the critical piece that makes Path B work. Run the release-manifest-approved PR-2 no-echo destination-prestage operation, then run:
-
-```bash
-supernode keys list
-```
-
-Confirm the printed EVM address matches the `new_address` you saw in the Portal and in the migration record. If they don't match, stop — you're using a different mnemonic than Keplr did, and the supernode will refuse to finalize.
+Exactly the same operation as Path A's Step 1. **Use the same mnemonic you used in Keplr** — this is the critical piece that makes Path B work. Run the release-manifest-approved PR-2 no-echo destination-prestage operation, then verify the public record through the same manifest-pinned absolute SuperNode executable, service identity/base directory, and explicit keyring context required there; do not use a bare key-list shortcut.
 
 ### Step B4 — Add `evm_key_name` to `config.yml`
 
@@ -290,41 +282,7 @@ The new operator account is **also** a K-of-N multisig, constructed from `eth_se
 
 ### Why automatic migration is refused
 
-The supernode daemon holds a single signing key and cannot run the K-of-N ceremony required for multisig migration. When it detects `is_multisig=true` from `MigrationEstimate`, it fatals with:
-
-```text
-legacy supernode account lumera1... is a 2-of-3 multisig; automatic migration is not supported.
-
-The daemon holds a single key and cannot run the multi-party signing ceremony.
-Please complete migration offline using the lumerad CLI, then restart supernode —
-the existing on-chain record will trigger local cleanup automatically.
-
-Four-step offline ceremony:
-
-  # 1) Each co-signer generates a fresh eth_secp256k1 sub-key; coordinator
-  #    derives the new multisig:
-  lumerad keys add <op>-eth-<N> --key-type eth_secp256k1 --keyring-backend <backend>
-  lumerad keys add <op>-msig-new --multisig <op>-eth-1,<op>-eth-2,<op>-eth-3 \
-    --multisig-threshold K --nosort --keyring-backend <backend>
-
-  # 2) Coordinator builds the proof template:
-  lumerad tx evmigration generate-proof-payload \
-    --legacy <multisig-legacy-address> \
-    --new <new-multisig-address> \
-    --new-sub-pub-keys <op>-eth-1,<op>-eth-2,<op>-eth-3 \
-    --new-threshold K \
-    --kind claim --chain-id <chain-id> --out proof.json
-
-  # 3) Each of K co-signers signs both sides in one call:
-  lumerad tx evmigration sign-proof proof.json \
-    --from <my-legacy-sub-key> --new-key <my-eth-sub-key> \
-    --keyring-backend <backend> --chain-id <chain-id> \
-    --out <signer>-partial.json
-
-  # 4) Combine and submit (no --from on submit-proof):
-  lumerad tx evmigration combine-proof *-partial.json --out tx.json
-  lumerad tx evmigration submit-proof tx.json --chain-id <chain-id>
-```
+The daemon's refusal directs operators to the offline multisig ceremony. That diagnostic is not an approved command source: do not copy any abbreviated command embedded in daemon output. Use the release manifest and [Operator Runbook](operator-migration-runbook.md) to pin the exact absolute `lumerad` path and every home/keyring/chain/node input, then follow the proof semantics below without bypassing that execution context.
 
 ### Multisig flow overview
 
@@ -332,25 +290,9 @@ You complete the 4-step offline ceremony with `lumerad`, then restart the supern
 
 #### Step 1 — Generate N fresh `eth_secp256k1` sub-keys and derive the new multisig
 
-Each co-signer generates their own destination-side eth sub-key on their own host (or wherever they hold the legacy sub-key). The coordinator collects the resulting pubkeys and derives the new multisig address:
+Each co-signer generates a destination-side eth sub-key in the exact keyring established by the operator runbook. The coordinator collects the N public keys and derives the destination composite with the same K, N, and member order as the legacy multisig. Use the manifest-pinned absolute `lumerad` path and explicit home, keyring backend, and keyring location for every key operation; do not use a bare `lumerad keys` shortcut.
 
-```bash
-# Each co-signer, on their own machine:
-lumerad keys add <op-name>-eth-<N> --key-type eth_secp256k1 \
-  --keyring-backend <backend>
-
-# Coordinator, once all N eth sub-keys are available:
-lumerad keys add <op-name>-msig-new \
-  --multisig <op-name>-eth-1,<op-name>-eth-2,<op-name>-eth-3 \
-  --multisig-threshold 2 \
-  --nosort \
-  --keyring-backend <backend>
-
-lumerad keys show <op-name>-msig-new --address
-# lumera1...   <-- the new multisig bech32; record this as new_address
-```
-
-> **`--nosort` is required, and member order must mirror the legacy side.** Without `--nosort`, `keys add` sorts sub-keys by address, so this composite address won't match the one `generate-proof-payload` derives from `--new-sub-pub-keys` (which preserves the listed order), and the signer indices won't line up. List the members in the **same order as the legacy multisig's `public_keys`** (`lumerad query auth account <multisig-legacy-address>`) so each co-signer holds the same signer index on both sides — the consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`.
+> **`--nosort` is required, and member order must mirror the legacy side.** The coordinator must inspect the legacy multisig through the same manifest-pinned binary and trusted node, then list destination members in that exact order so signer indices match on both sides.
 
 This replaces the old single-EOA "recover the new EVM key" step: the destination is a multisig derived from fresh eth sub-keys, not an EOA recovered from a mnemonic.
 
@@ -358,75 +300,32 @@ Set `evm_key_name` in the supernode's `config.yml` to the name of the new multis
 
 #### Step 2 — Ensure the multisig's pubkey is on-chain
 
-If the multisig has received funds but never signed a transaction, its `LegacyAminoPubKey` is nil on-chain and `generate-proof-payload` will fail. Submit any transaction from the multisig first (a 1-`ulume` self-send is sufficient), then confirm:
-
-```bash
-lumerad query auth account <multisig-legacy-address>
-```
-
-The response must show a `multisig` pubkey structure listing all N legacy sub-keys.
+If the multisig has received funds but never signed a transaction, its `LegacyAminoPubKey` is nil on-chain and proof generation fails. Complete the required pubkey-registration transaction through the runbook's manifest-pinned execution context, then query the account with the same absolute binary, explicit home/keyring context, chain ID, and trusted node. The response must show all N legacy sub-keys.
 
 #### Step 3 — Coordinator generates the proof payload template
 
-```bash
-lumerad tx evmigration generate-proof-payload \
-  --legacy <multisig-legacy-address> \
-  --new <new-multisig-address-from-step-1> \
-  --new-sub-pub-keys <op-name>-eth-1,<op-name>-eth-2,<op-name>-eth-3 \
-  --new-threshold 2 \
-  --kind claim \
-  --chain-id <chain-id> \
-  --keyring-backend <backend> \
-  --out proof.json
-```
+The coordinator generates `proof.json` with the manifest-pinned absolute chain executable, explicit home/keyring backend/keyring location, exact chain ID, trusted node, legacy address, destination public keys in legacy order, matching threshold, and `claim` proof kind. Do not copy an abbreviated proof-generation command from this guide.
 
-- `--new-sub-pub-keys` accepts either keyring key names or base64 compressed 33-byte `eth_secp256k1` pubkeys. Mix freely.
-- `--new-threshold` is **required** whenever `--new-sub-pub-keys` is set.
-- `--kind claim` targets `MsgClaimLegacyAccount`; use `--kind validator` if the multisig is also a validator operator.
-- `--chain-id` is **required** — it is embedded in the signed payload, so an empty or wrong value makes every sub-signature fail verification on-chain.
-- `generate-proof-payload` does not broadcast anything, but it **does** need keyring access (to resolve `--new-sub-pub-keys` / `--legacy-key` entries that are local key names). Pass `--keyring-backend` (and `--keyring-dir` / `--home` when applicable).
+- Destination sub-public-keys may be key names in that explicit keyring or base64 compressed 33-byte `eth_secp256k1` public keys.
+- The destination threshold is required and must match the legacy K.
+- Use `claim` for `MsgClaimLegacyAccount`; a validator operator must instead follow the validator guide.
+- The exact chain ID is embedded in every signature.
 
-Distribute `proof.json` to all co-signers.
+Distribute the resulting `proof.json` to all co-signers through the approved custody channel.
 
 #### Step 4 — Each co-signer signs both sides in one invocation
 
-Every participating co-signer must hold **both** their legacy Cosmos sub-key (`--from`) **and** their destination-side eth sub-key (`--new-key`) in the same keyring. `sign-proof` signs both sides and writes a single partial file:
-
-```bash
-lumerad tx evmigration sign-proof proof.json \
-  --from <my-legacy-sub-key-name> \
-  --new-key <my-eth-sub-key-name> \
-  --keyring-backend <backend> \
-  --chain-id <chain-id> \
-  --out <signer>-partial.json
-```
-
-`sign-proof` is idempotent on both sides — re-running it replaces this signer's prior entries in both `partial_legacy_signatures` and `partial_new_signatures`, never duplicates. Each co-signer sends their partial file back to the coordinator.
+Every participating co-signer must hold both their legacy Cosmos sub-key and destination-side eth sub-key at matching indices. Each signs both sides with the manifest-pinned absolute chain executable, their explicit home/keyring backend/keyring location, the same chain ID and trusted node, and a distinct partial-output path. Do not use a bare `sign-proof` example that can silently select another keyring. Re-signing replaces that participant's prior entries rather than duplicating them; return partials through the approved custody channel.
 
 #### Step 5 — Coordinator combines partials
 
-```bash
-lumerad tx evmigration combine-proof \
-  alice-partial.json bob-partial.json carol-partial.json \
-  --out tx.json
-```
+The coordinator combines the reviewed partial files with the same manifest-pinned absolute executable and explicit home/keyring/chain/node context, writing a single `tx.json`. Do not use an abbreviated combine command from this guide.
 
 `combine-proof` rejects the set if any two partials disagree on `chain_id`, `evm_chain_id`, `legacy_address`, `new_address`, `payload_hex`, proof kind, or either side's `sub_pub_keys` list. It verifies every merged partial on both legacy and new sides, drops invalid entries with a stderr warning, then **intersects** the valid signer-index sets across the two sides and selects the first K indices present on BOTH. This is what guarantees `legacy_proof.signer_indices == new_proof.signer_indices`, the consensus-level mirror-source rule. A one-sided partial (e.g. a co-signer who signed only the legacy half because they lost their eth sub-key) does not contribute toward quorum unless another co-signer supplied the new-side signature at the same index. If the intersection has fewer than K entries, combine-proof errors with `need <K> valid partial signatures signed on BOTH sides at matching indices, have <N>` and writes nothing.
 
 #### Step 6 — Coordinator submits the pre-assembled tx
 
-```bash
-lumerad tx evmigration submit-proof tx.json \
-  --chain-id <chain-id>
-```
-
-`submit-proof` broadcasts the pre-assembled tx **without signing at the Cosmos layer**. Migration messages declare zero signers (authorization is fully embedded in `legacy_proof` and `new_proof`), fees are waived by the evmigration ante handler, and replay is prevented by the keeper's `MigrationRecords.Has(legacyAddr)` check. There is no `--from` broadcaster key, no fee-payer, and no envelope signature — `submit-proof` loads `tx.json`, runs `ValidateBasic`, simulates gas via the migration-specific estimator, builds an unsigned tx, and broadcasts.
-
-Verify the migration record:
-
-```bash
-lumerad query evmigration migration-record <multisig-legacy-address>
-```
+Submission is the irreversible boundary. Return to [Operator Runbook §6](operator-migration-runbook.md#6-re-run-dry-run-verify-destination-broadcast-once), prove the relevant workload stopped, and submit `tx.json` exactly once with the manifest-pinned absolute chain executable, explicit home/keyring backend/keyring location, exact chain ID, and trusted node used throughout the ceremony. `submit-proof` has no `--from`, fee, or envelope-signature flags. After a tx hash or ambiguous transport failure, apply the runbook's query-before-retry rule; verify the migration record through its manifest-pinned query form.
 
 #### Step 7 — Restart the supernode (local cleanup only)
 
@@ -449,17 +348,7 @@ The new operator account is a Cosmos SDK multisig bech32 derived from `kmultisig
 - The new operator can perform **all** Cosmos-side operations required for supernode life-cycle: `MsgEditSupernode`, validator edits (if applicable), `x/staking` delegations, `x/distribution` withdrawals, `x/authz` grants, and IBC transfers. Every supernode-relevant workflow continues to work.
 - The new operator **cannot** originate `MsgEthereumTx` — multisig bech32 addresses are not valid senders for EVM transactions, and there is no way to produce a single ECDSA signature that authenticates K-of-N.
 
-Operators who want EVM DeFi access for their supernode rewards should configure a separate **single-EOA withdraw address** via:
-
-```bash
-lumerad tx distribution set-withdraw-addr <single-eth-eoa> \
-  --from <new-multisig-key> \
-  --multisig <new-multisig-key> \
-  --chain-id <chain-id> \
-  # ... plus the usual multisig sign/sign-batch/multi-sign/broadcast steps
-```
-
-Rewards then accrue to the single-EOA withdraw address, which **is** EVM-addressable and can originate `MsgEthereumTx` to interact with any EVM contract.
+Operators who want EVM DeFi access for rewards may configure a separate single-EOA withdraw address after migration. This is a new signed transaction, not part of the migration ceremony; execute it only through the same manifest-pinned absolute chain binary and explicit home/keyring backend/keyring location/chain ID/trusted node context, following the platform's complete multisig signing and broadcast procedure. No abbreviated command is provided here.
 
 ### Post-migration cleanup
 
@@ -485,9 +374,9 @@ Regenerate `proof.json` with the correct `--chain-id`, have the affected signer 
 
 **What if I only have K−1 of the sub-keys available on the legacy side?** — you can't complete migration. The K-of-N threshold is enforced by the keeper (`need <K> valid partial signatures, have <N>`). Recover the missing legacy sub-key(s) from their mnemonics, or coordinate with the actual holders.
 
-**What if only K−1 co-signers have provided eth sub-keys for the destination side?** — same situation, symmetric: you need K valid new-side partials. Have the missing co-signer(s) generate their eth sub-key (`lumerad keys add ... --key-type eth_secp256k1`), rebuild `proof.json` via `generate-proof-payload` with the full `--new-sub-pub-keys` list, and re-sign.
+**What if only K−1 co-signers have provided eth sub-keys for the destination side?** — same situation, symmetric: you need K valid new-side partials. Have the missing co-signer(s) generate their eth sub-key (`sudo -u <supernode-service-user> "$LUMERAD" keys --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" add ... --key-type eth_secp256k1`), rebuild `proof.json` via `generate-proof-payload` with the full `--new-sub-pub-keys` list, and re-sign.
 
-**`legacy key "..." is signer index N, but new key "..." is signer index M; multisig migration requires the same signer position to approve both halves`** — raised by `sign-proof` when a co-signer passes both `--from` and `--new-key` in one call but the two keys occupy *different* positions in their respective multisigs. Each co-signer must hold the **same signer index** on the legacy and new sides (the consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`). The usual root cause is a destination multisig built without `--nosort` (so `keys add` sorted the sub-keys) or with a member order that doesn't mirror the legacy `public_keys`. Recreate `<op-name>-msig-new` with `--nosort`, listing the eth sub-keys in the same member order as the legacy multisig (`lumerad query auth account <multisig-legacy-address>`), then regenerate `proof.json` and re-sign.
+**`legacy key "..." is signer index N, but new key "..." is signer index M; multisig migration requires the same signer position to approve both halves`** — raised by `sign-proof` when a co-signer passes both `--from` and `--new-key` in one call but the two keys occupy *different* positions in their respective multisigs. Each co-signer must hold the **same signer index** on the legacy and new sides (the consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`). The usual root cause is a destination multisig built without `--nosort` (so `keys add` sorted the sub-keys) or with a member order that doesn't mirror the legacy `public_keys`. Recreate `<op-name>-msig-new` with `--nosort`, listing the eth sub-keys in the same member order as the legacy multisig (`sudo -u <supernode-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" auth account <multisig-legacy-address>`), then regenerate `proof.json` and re-sign.
 
 **The supernode's embedded error message says `assemble-proof` but the CLI has `combine-proof`. Which is correct?** — the CLI command is `combine-proof`. Any older embedded error message in the supernode binary is stale; use this guide's commands.
 

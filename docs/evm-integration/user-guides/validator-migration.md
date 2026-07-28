@@ -5,6 +5,17 @@
 **Prerequisite reading**: [migration.md](migration.md) for the chain-level mechanics of legacy → EVM account migration
 
 > **Mandatory operations gate:** Run the [EVM Migration Operator Runbook](operator-migration-runbook.md) before this validator procedure. It requires supervisor/user/base-dir/config/keyring discovery, a mode-0600 config backup, verified destination identity, proof that every instance using the consensus key is stopped, one broadcast, and public-address/gRPC/log verification.
+>
+> **Command context used below:** before any CLI example, populate these values from the approved manifest and runbook discovery. `LUMERAD` must be the exact absolute `artifacts.chain_executable.release_path` whose version/tag/commit/hash/source were verified. Each command below passes only flags supported by that command family: tx/query use the explicit home, keyring, chain, and node context; keys use home and keyring context; status uses only the trusted node; and debug address conversion takes no context flags. Do not replace these commands with bare `lumerad` or a universal wrapper.
+>
+> ```bash
+> LUMERAD=/absolute/path/from/approved/artifacts.chain_executable.release_path
+> LUMERA_HOME=/absolute/discovered/lumera/home
+> KEYRING_BACKEND=<test|file|os>
+> KEYRING_DIR=/absolute/discovered/keyring/location
+> CHAIN_ID=<approved-chain-id>
+> TRUSTED_RPC=<trusted-rpc>
+> ```
 
 ---
 
@@ -18,7 +29,7 @@ Validators **must** use `MsgMigrateValidator` (not `MsgClaimLegacyAccount`). The
 
 **This guide's main flow covers the common single-sig validator operator key case.** If your validator operator key is a K-of-N multisig (rare), see the [Multisig validator operator keys](#multisig-validator-operator-keys) section at the end.
 
-> **Note on `systemctl` commands.** This guide uses `systemctl stop/start lumerad` (and `systemctl restart supernode`) as examples. Many validators don't run the node under systemd — Docker/Kubernetes, cosmovisor, runit/s6, or a bare `lumerad start` under a process supervisor are all common. Substitute whatever supervises your node (e.g. `docker stop <container>`, your cosmovisor service unit, or `pkill -f "lumerad start"`). The only invariant that matters: **`lumerad` must not be producing blocks when you broadcast the migration.**
+> **Supervisor stop is mandatory.** Discover the actual supervisor and service/workload identity, then stop and restart only through that supervisor (systemd, Docker, Kubernetes, cosmovisor, runit/s6, or equivalent). Never use an ad hoc process-signal shortcut: a restart policy can immediately respawn the process. Before broadcasting, prove that the supervisor is stopped and that no process, container, pod, or duplicate instance capable of accessing this validator's `priv_validator_key.json` remains. Follow the canonical [Operator Runbook §5](operator-migration-runbook.md#5-stop-and-prove-stopped); if the supervisor cannot be identified or stopped, do not migrate.
 
 ---
 
@@ -45,7 +56,7 @@ The consensus key, voting power at block height, and validator jailing/slashing 
 2. **Verify eligibility.** Run the pre-flight estimate:
 
    ```bash
-   lumerad query evmigration migration-estimate <legacy-validator-address>
+   sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migration-estimate <legacy-validator-address>
    ```
 
    Check for:
@@ -57,14 +68,14 @@ The consensus key, voting power at block height, and validator jailing/slashing 
 
 3. **Prepare both keys.** Keep the legacy `secp256k1` key (coin type 118) and prepare an `eth_secp256k1` destination key (coin type 60). It may use the same mnemonic or a different mnemonic. See step 2 below.
 4. **Pick a trusted external RPC.** Your own node will be stopped during the migration broadcast, so route the migration tx through a trusted peer.
-5. **Confirm the validator is healthy *now*.** Sample the active validator set (`lumerad query staking validators --output json | jq '.validators[] | select(.operator_address == "<your-valoper>") | {status, jailed, tokens}'`) and confirm `jailed: false` (and that status is not `BOND_STATUS_UNBONDING`) immediately before the maintenance window. A jail event between checklist completion and migration start is the most common preventable cause of a failed migration window — keep the gap short, and re-run pre-flight just before Step 4.
+5. **Confirm the validator is healthy *now*.** Sample the active validator set (`sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" staking validators --output json | jq '.validators[] | select(.operator_address == "<your-valoper>") | {status, jailed, tokens}'`) and confirm `jailed: false` (and that status is not `BOND_STATUS_UNBONDING`) immediately before the maintenance window. A jail event between checklist completion and migration start is the most common preventable cause of a failed migration window — keep the gap short, and re-run pre-flight just before Step 4.
 
 ---
 
 ## Step 1 — Check migration parameters
 
 ```bash
-lumerad query evmigration params
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration params
 ```
 
 ```json
@@ -90,10 +101,7 @@ The destination requirements are coin type `60`, key type `eth_secp256k1`, a fre
 Verify both public key records using the exact approved binary/home/backend/location:
 
 ```bash
-sudo -u <validator-service-user> /absolute/approved/lumerad keys list \
-  --home /absolute/lumera/home \
-  --keyring-backend <backend> \
-  --keyring-dir /absolute/keyring/location
+sudo -u <validator-service-user> "$LUMERAD" keys --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" list
 ```
 
 You should see the existing legacy key with pubkey type `/cosmos.crypto.secp256k1.PubKey` and `val-new` with pubkey type `/cosmos.evm.crypto.v1.ethsecp256k1.PubKey`.
@@ -103,7 +111,7 @@ You should see the existing legacy key with pubkey type `/cosmos.crypto.secp256k
 Before stopping the node, confirm the migration will succeed:
 
 ```bash
-lumerad query evmigration migration-estimate <legacy-validator-address>
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migration-estimate <legacy-validator-address>
 ```
 
 ```json
@@ -123,7 +131,7 @@ lumerad query evmigration migration-estimate <legacy-validator-address>
 
 `would_succeed: true` with `is_validator: true`, `validator_jailed: false`, `validator_status` ∈ {`BOND_STATUS_BONDED`, `BOND_STATUS_UNBONDED`}, and `val_delegation_count + val_unbonding_count + val_redelegation_count <= max_validator_delegations` means you're clear to proceed.
 
-> **A terminal rejection may return *only* `rejection_reason`.** When the account can never be migrated as-is — most commonly because it was **already migrated** — the estimate collapses to a single field, e.g. `{ "rejection_reason": "already migrated" }`, with none of the `is_validator` / `would_succeed` / count fields shown above. The query isn't broken; the condition is terminal. For `already migrated`, look up where it went with `lumerad query evmigration migration-record <legacy-address>` and use the new address going forward. See [Troubleshooting](#troubleshooting).
+> **A terminal rejection may return *only* `rejection_reason`.** When the account can never be migrated as-is — most commonly because it was **already migrated** — the estimate collapses to a single field, e.g. `{ "rejection_reason": "already migrated" }`, with none of the `is_validator` / `would_succeed` / count fields shown above. The query isn't broken; the condition is terminal. For `already migrated`, look up where it went with `sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migration-record <legacy-address>` and use the new address going forward. See [Troubleshooting](#troubleshooting).
 
 The chain rejects migration in exactly two cases: the validator is **jailed**, or it is still **`BOND_STATUS_UNBONDING`**. A `BOND_STATUS_UNBONDED` validator that is *not* jailed is fully migratable — this is the recovery path for an operator who fell out of the active set on stake weight. The failure shapes you may see:
 
@@ -143,40 +151,39 @@ If the pre-flight reported `validator_jailed: true`, your validator was kicked o
 `unjail` is a **transaction signed by the validator's operator key** (the same key you're trying to migrate). It requires the node to be **running, synced, and able to broadcast**. But migrate-validator requires the node to be **stopped before broadcast** to avoid double-signing risk. So the recovery sequence intentionally restarts the node, runs `unjail`, waits for re-bonding, then stops again before the migration:
 
 ```bash
-# 1. Make sure the validator is running.
-systemctl start lumerad
+# 1. Start through the supervisor identity discovered by the operator runbook.
+<discovered-supervisor-command> start <validator-service-or-workload>
 
 # 2. Wait for it to catch up to the tip. Repeat until catching_up = false.
-lumerad status | jq '.sync_info | {catching_up, latest_block_height}'
+sudo -u <validator-service-user> "$LUMERAD" status --node "$TRUSTED_RPC" | jq '.sync_info | {catching_up, latest_block_height}'
 
 # 3. Submit the unjail transaction (signed with the validator's operator key).
-lumerad tx slashing unjail \
+sudo -u <validator-service-user> "$LUMERAD" tx --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" slashing unjail \
   --from <validator-key> \
-  --chain-id <chain-id> \
-  --keyring-backend <backend> \
   --gas auto --gas-adjustment 1.3 --fees <fee>ulume \
   --yes
 
 # 4. Wait one block, then verify status.
-VALOPER=$(lumerad debug addr <legacy-validator-address> | awk -F': ' '/^Bech32 Val: /{print $2; exit}')
-lumerad query staking validator "$VALOPER" --output json \
+VALOPER=$(sudo -u <validator-service-user> "$LUMERAD" debug addr <legacy-validator-address> | awk -F': ' '/^Bech32 Val: /{print $2; exit}')
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" staking validator "$VALOPER" --output json \
   | jq '.validator | {status, jailed, tokens, delegator_shares}'
 # Expect: jailed = false. Status BOND_STATUS_BONDED (rebonded) or
 # BOND_STATUS_UNBONDED (not enough stake to rebond) — both are migratable.
 
 # 5. Re-run the pre-flight estimate to confirm migration is now unblocked.
-lumerad query evmigration migration-estimate <legacy-validator-address>
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migration-estimate <legacy-validator-address>
 # Expect: would_succeed = true.
 
-# 6. Stop the node again before broadcasting the migration (Step 4).
-systemctl stop lumerad
+# 6. Stop through that same discovered supervisor, then repeat its stopped-state
+# and consensus-key process/container/pod proofs before broadcasting (Step 4).
+<discovered-supervisor-command> stop <validator-service-or-workload>
 ```
 
 ### Common failure modes when unjailing
 
-- **`validator still jailed; cannot be unjailed`** — the slashing window hasn't fully elapsed. Wait ~30 s and retry. (The window is `signed_blocks_window` blocks, which on Lumera is parameterized via `slashing` module params; query `lumerad query slashing params` to see the current value.)
-- **`validator missing self-delegation`** — your validator's self-stake fell below `min_self_delegation`. Self-delegate first (`lumerad tx staking delegate <valoper> <amount>`), then retry unjail.
-- **`unauthorized: account does not exist`** — the operator key you're signing with isn't the validator's operator. Confirm `lumerad keys show <validator-key> -a` matches the legacy address you're migrating.
+- **`validator still jailed; cannot be unjailed`** — the slashing window hasn't fully elapsed. Wait ~30 s and retry. (The window is `signed_blocks_window` blocks, which on Lumera is parameterized via `slashing` module params; query `sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" slashing params` to see the current value.)
+- **`validator missing self-delegation`** — your validator's self-stake fell below `min_self_delegation`. Self-delegate first (`sudo -u <validator-service-user> "$LUMERAD" tx --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" staking delegate <valoper> <amount>`), then retry unjail.
+- **`unauthorized: account does not exist`** — the operator key you're signing with isn't the validator's operator. Confirm `sudo -u <validator-service-user> "$LUMERAD" keys --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" show <validator-key> -a` matches the legacy address you're migrating.
 
 ### What if the validator is `BOND_STATUS_UNBONDED` with `jailed: false`?
 
@@ -219,71 +226,9 @@ Revert this to `"10s"` and restart once the migration is done — see [Step 7](#
 
 ## Step 5 — Broadcast the validator migration
 
-Route the transaction through a trusted external RPC since your own node is down:
+Do not use a shortened raw-CLI or helper command from this account-specific guide. Return to [Operator Runbook §6](operator-migration-runbook.md#6-re-run-dry-run-verify-destination-broadcast-once) and execute its canonical manifest-pinned helper command for the discovered systemd, Docker, or Kubernetes environment. The post-stop dry-run and one live invocation must use the manifest-pinned absolute helper and `lumerad` paths, exact service identity, explicit home, keyring backend and location, chain ID, trusted node, and stopped-node acknowledgement. The live invocation must be identical to the approved dry-run except for removal of `--dry-run`.
 
-```bash
-lumerad tx evmigration migrate-validator val-legacy val-new \
-  --keyring-backend file \
-  --chain-id <chain-id> \
-  --node tcp://<trusted-rpc>:26657
-```
-
-> **Shell helper alternative.** The bundled `scripts/migrate-validator.sh` wraps this command (plus the pre-flight estimate in Step 3, the delegation-cap check, post-migration verification against a pre-broadcast balance snapshot, and the post-migration checklist) into a single safer invocation. Use it when you want one command that enforces the guards rather than running each check by hand:
->
-> ```bash
-> ./scripts/migrate-validator.sh val-legacy val-new \
->   --keyring-backend file \
->   --chain-id <chain-id> \
->   --node tcp://<trusted-rpc>:26657 \
->   --i-have-stopped-the-node
-> ```
->
-> `--i-have-stopped-the-node` acknowledges the jailing risk non-interactively (required for systemd / CI / non-TTY runs; omitting it makes the script prompt for the literal word `yes`). `--yes` alone does **not** satisfy this check. This gate applies to `--dry-run` too: a dry-run from a non-TTY context (a pipe, CI, `docker exec -i`) aborts with `validator downtime not acknowledged and no TTY available` unless you also pass `--i-have-stopped-the-node` — even though a dry-run never broadcasts. See [migration-scripts.md](migration-scripts.md) for full flag reference, exit codes, and troubleshooting.
-
-Example interactive helper run:
-
-```text
-$ ./scripts/migrate-validator.sh validator-legacy validator-evm --node http://172.28.0.11:26657
-INFO  chain ID: lumera-devnet-1
-INFO  legacy key validator-legacy -> address lumera1k0aj0fp28trnnfsn7u2recq7yfnujk7wqj9j4y
-INFO  new EVM key validator-evm -> address lumera1ay0lsu8uw0unswqakvx7ytmdelslkm4vt5nnht
-INFO  check OK: no migration record found for legacy address lumera1k0aj0fp28trnnfsn7u2recq7yfnujk7wqj9j4y
-INFO  check OK: destination address lumera1ay0lsu8uw0unswqakvx7ytmdelslkm4vt5nnht has no migration record as a legacy address
-INFO  check OK: no migration record found by new address lumera1ay0lsu8uw0unswqakvx7ytmdelslkm4vt5nnht
-INFO  check OK: destination address lumera1ay0lsu8uw0unswqakvx7ytmdelslkm4vt5nnht does not exist on-chain
-Migration preview for legacy account lumera1k0aj0fp28trnnfsn7u2recq7yfnujk7wqj9j4y (coin-type 118, secp256k1):
-  Validator:         yes
-  Val delegations:   38 (to validator)
-  Val unbondings:    8 (to validator)
-  Val redelegations: 16 (src or dst)
-  Validator status:  Bonded
-  Jailed:            no
-  Multisig:          no
-  Balance:           999740294121ulume
-  Delegations:       1
-  Unbonding:         none
-  Redelegations:     none
-  Authz grants:      none
-  Feegrants:         none
-  Actions:           none
-  Supernode:         yes
-  Would succeed:     yes
-================================================================
-WARNING - VALIDATOR MIGRATION
-Your validator will miss blocks and may be jailed during
-migration. The node MUST be stopped before broadcasting this tx.
-================================================================
-Type "yes" to confirm the node is stopped: yes
-INFO  migrating legacy validator lumera1k0aj0fp28trnnfsn7u2recq7yfnujk7wqj9j4y -> EVM-compatible lumera1ay0lsu8uw0unswqakvx7ytmdelslkm4vt5nnht
-```
-
-The CLI:
-
-1. Reads both keys from the keyring.
-2. Derives both addresses and builds the migration payload `lumera-evm-migration:<chain-id>:<evm-chain-id>:validator:<legacy>:<new>`.
-3. Signs the legacy proof with `val-legacy` (secp256k1).
-4. Signs the new proof with `val-new` (eth_secp256k1).
-5. Simulates gas, asks for confirmation, and broadcasts.
+The helper reads both keys from the selected keyring, derives both addresses, signs the legacy and destination proofs, simulates gas, and broadcasts exactly once. Preserve its transaction hash and public-address output, then apply the runbook's query-before-retry boundary.
 
 On success you'll see `"code": 0` and the `migrate_validator` event in the response:
 
@@ -299,8 +244,7 @@ On success you'll see `"code": 0` and the `migrate_validator` event in the respo
 ## Step 6 — Verify the migration record
 
 ```bash
-lumerad query evmigration migration-record <legacy-validator-address> \
-  --node tcp://<trusted-rpc>:26657
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migration-record <legacy-validator-address>
 ```
 
 ```json
@@ -317,14 +261,12 @@ lumerad query evmigration migration-record <legacy-validator-address> \
 Confirm the validator's new operator address under the new valoper prefix:
 
 ```bash
-lumerad query staking validator <new-valoper-address> --node tcp://<trusted-rpc>:26657
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" staking validator <new-valoper-address>
 ```
 
 ## Step 7 — Restart the validator immediately
 
-```bash
-systemctl start lumerad   # or however you supervise the node — see "Note on systemctl commands" in the Overview
-```
+Restart only through the exact supervisor and workload identity discovered in the operator runbook, then prove that exactly one supervised instance is running. Use the runbook's concrete systemd, Docker, or Kubernetes restart-and-verification branch; do not substitute an ad hoc process launch.
 
 > **Warning:** restart promptly after migration. Extended downtime leads to missed blocks and eventual jailing. Use a trusted external RPC for the migration broadcast so you're not blocked on your own node being up.
 
@@ -333,11 +275,11 @@ systemctl start lumerad   # or however you supervise the node — see "Note on s
 Verify the validator is signing blocks:
 
 ```bash
-lumerad query staking validator <new-valoper-address>
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" staking validator <new-valoper-address>
 # Expect status "BOND_STATUS_BONDED"
 
 # After a few blocks:
-lumerad query slashing signing-info <new-consensus-address>
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" slashing signing-info <new-consensus-address>
 # Confirm missed_blocks_counter isn't growing unboundedly
 ```
 
@@ -353,9 +295,7 @@ If your validator account and your supernode account are the **same entity** (th
 
 After the validator migration and restart, also restart the supernode so it picks up the new key state:
 
-```bash
-systemctl restart supernode
-```
+Restart the SuperNode through its independently discovered supervisor/workload identity and prove exactly one supervised instance is running, following the operator runbook's matching systemd, Docker, or Kubernetes branch.
 
 See [supernode-migration.md](supernode-migration.md) for the supernode daemon's config-update behavior — it detects the on-chain migration record on the next startup and rewrites `config.yml` automatically.
 
@@ -369,22 +309,22 @@ After the migration and restart:
 
 ```bash
 # 1. Migration record exists and maps legacy → new
-lumerad query evmigration migration-record <legacy-validator-address>
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migration-record <legacy-validator-address>
 
 # 2. New validator is bonded under the new valoper
-lumerad query staking validator <new-valoper-address>
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" staking validator <new-valoper-address>
 
 # 3. Delegations point at the new valoper (pick any delegator to spot-check)
-lumerad query staking delegations <delegator-address>
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" staking delegations <delegator-address>
 
 # 4. Commission and accumulated rewards are intact at the new address
-lumerad query distribution commission <new-valoper-address>
-lumerad query distribution rewards <delegator-address> <new-valoper-address>
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" distribution commission <new-valoper-address>
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" distribution rewards <delegator-address> <new-valoper-address>
 
 # 5. If running a supernode, confirm record points at the new address.
 #    NOTE: get-supernode takes the VALOPER address (lumeravaloper1…), not the
-#    account address. Convert with: lumerad keys show <new-key> -a --bech val
-lumerad query supernode get-supernode <new-valoper-address>
+#    account address. Convert with: sudo -u <validator-service-user> "$LUMERAD" keys --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" show <new-key> -a --bech val
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" supernode get-supernode <new-valoper-address>
 ```
 
 ---
@@ -398,9 +338,8 @@ Your validator was kicked out of the active set for a slashable offense (almost 
 The minimum command, assuming the node is up and synced:
 
 ```bash
-lumerad tx slashing unjail \
+sudo -u <validator-service-user> "$LUMERAD" tx --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" slashing unjail \
   --from <validator-key> \
-  --chain-id <chain-id> \
   --gas auto --gas-adjustment 1.3 --fees <fee>ulume --yes
 ```
 
@@ -426,7 +365,7 @@ Total of (active delegations + unbonding delegations + redelegations) exceeds th
 This operator key was already migrated (migration is one-shot). The estimate returns only this single field — no `is_validator`, `would_succeed`, or counts. Find where it went and use the new address from now on:
 
 ```bash
-lumerad query evmigration migration-record <legacy-validator-address>
+sudo -u <validator-service-user> "$LUMERAD" query --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migration-record <legacy-validator-address>
 # record.new_address is authoritative — your validator now operates under the
 # valoper derived from that address.
 ```
@@ -435,7 +374,7 @@ If the recorded `new_address` is **not** the EVM key you expected, stop and inve
 
 ### `new address ... already exists on-chain`
 
-The destination EVM key you derived in Step 2 is not fresh — it already has account state on-chain, and the migration refuses to overwrite it. Derive a different coin-type 60 / `eth_secp256k1` key (or, if you intentionally funded it, note that you must instead pick an unused address). See the destination-freshness warning under [Step 2](#step-2--import-both-keys-from-the-same-mnemonic).
+The destination EVM key you derived in Step 2 is not fresh — it already has account state on-chain, and the migration refuses to overwrite it. Derive a different coin-type 60 / `eth_secp256k1` key (or, if you intentionally funded it, note that you must instead pick an unused address). See the destination-freshness warning under [Step 2](#step-2--pre-stage-the-evm-destination-key).
 
 ### `post failed: Post "http://localhost:26657": dial tcp [::1]:26657: connect: connection refused`
 
@@ -461,7 +400,7 @@ This section only applies if your validator's **operator key** is a K-of-N multi
 
 ### Why the single-command path doesn't work
 
-`lumerad tx evmigration migrate-validator` signs with a single `--from` key. A multisig composite can't single-sign, so the command can't drive the migration. Instead, use the four-step offline proof flow with `--kind validator`. The destination **must** also be a K-of-N multisig of `eth_secp256k1` sub-keys — the mirror-source rule (`types.ValidateProofPair`) is a consensus invariant, so migrating a 2-of-3 legacy operator to a single-EOA or 3-of-5 destination is rejected at `ValidateBasic` with `ErrMirrorSourceMismatch` (code 1121).
+`sudo -u <validator-service-user> "$LUMERAD" tx --home "$LUMERA_HOME" --keyring-backend "$KEYRING_BACKEND" --keyring-dir "$KEYRING_DIR" --chain-id "$CHAIN_ID" --node "$TRUSTED_RPC" evmigration migrate-validator` signs with a single `--from` key. A multisig composite can't single-sign, so the command can't drive the migration. Instead, use the four-step offline proof flow with `--kind validator`. The destination **must** also be a K-of-N multisig of `eth_secp256k1` sub-keys — the mirror-source rule (`types.ValidateProofPair`) is a consensus invariant, so migrating a 2-of-3 legacy operator to a single-EOA or 3-of-5 destination is rejected at `ValidateBasic` with `ErrMirrorSourceMismatch` (code 1121).
 
 > **Consensus invariants (multisig validator).** The chain rejects a multisig validator migration tx at `ValidateBasic` if any of these is violated:
 >
@@ -474,84 +413,13 @@ This section only applies if your validator's **operator key** is a K-of-N multi
 
 ### Flow overview
 
-1. Verify the multisig pubkey is registered on-chain (if never signed a tx, submit a 1-ulume self-send first):
+The multisig ceremony remains a seven-stage process: prove the legacy multisig pubkey is registered; pre-stage N fresh destination sub-keys; derive the same-K/same-N destination composite without sorting; generate the validator proof payload; collect matching-index signatures on both sides; stop and prove the validator stopped; combine, submit once, restart, and verify.
 
-   ```bash
-   lumerad query auth account <multisig-valoper-as-acc-address>
-   ```
+Do not execute a shortened `lumerad` command copied from this guide. Each participant and the coordinator must return to the [Operator Runbook](operator-migration-runbook.md), verify the manifest-pinned absolute `artifacts.chain_executable.release_path`, and invoke it with explicit `--home`, `--keyring-backend`, `--keyring-dir`, `--chain-id`, and `--node` as applicable to that stage. The final submit must occur only after the runbook's stopped-node proof and must use the same trusted node and chain ID as the approved ceremony. Treat every proof file and public key list as custody-sensitive evidence and apply the runbook's query-before-retry rule after submission.
 
-   The response must show a `multisig` pubkey listing all N sub-keys.
+The command semantics and proof-file fields are documented in [legacy-migration.md](../evmigration/legacy-migration.md), but its abbreviated examples are not an execution substitute for the manifest-pinned runbook context. In particular, preserve legacy member order with `--nosort`; use `--kind validator`; keep K, N, and signer indices identical across both proof halves; and never add `--from`, fee, or envelope-signature flags to `submit-proof`.
 
-2. **Each co-signer generates a fresh `eth_secp256k1` sub-key** in their own keyring:
-
-   ```bash
-   lumerad keys add val-eth-<N> --key-type eth_secp256k1 --keyring-backend file
-   ```
-
-   The coordinator collects the N eth pubkeys (or local key-names, if sub-signers share a keyring), then derives the destination composite:
-
-   ```bash
-   lumerad keys add val-msig-new \
-     --multisig val-eth-1,val-eth-2,val-eth-3 \
-     --multisig-threshold 2 \
-     --nosort \
-     --keyring-backend file
-
-   lumerad keys show val-msig-new --address
-   # lumera1...  <-- this is the new operator address
-   ```
-
-   > **`--nosort` is required, and member order matters.** Without `--nosort`, `keys add` sorts the sub-keys by address, so the composite address here would not match the one `generate-proof-payload` derives from `--new-sub-pub-keys` (which preserves listed order) — and the signer indices would not line up with the legacy side. List the members in the **same order as the legacy multisig's `public_keys`** (see `lumerad query auth account <multisig-legacy-address>`), so each participant occupies the same signer index on both sides. The consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`.
-
-3. **Coordinator generates the proof payload** with `--kind validator`:
-
-   ```bash
-   lumerad tx evmigration generate-proof-payload \
-     --legacy <multisig-legacy-address> \
-     --new-sub-pub-keys val-eth-1,val-eth-2,val-eth-3 \
-     --new-threshold 2 \
-     --kind validator \
-     --chain-id <chain-id> \
-     --keyring-backend file \
-     --out proof.json
-   ```
-
-   `--chain-id` is **required** — the signed payload embeds it. `generate-proof-payload` needs keyring access to resolve `--new-sub-pub-keys` key names, so pass `--keyring-backend` (and `--keyring-dir` / `--home` when applicable). Mirror-source rule: `--new-threshold` must equal the legacy threshold K and the number of entries in `--new-sub-pub-keys` must equal the legacy N; the CLI rejects a mismatch before writing `proof.json`.
-
-4. **Each co-signer signs both sides** in a single invocation (legacy sub-key + destination eth sub-key):
-
-   ```bash
-   lumerad tx evmigration sign-proof proof.json \
-     --from    <my-legacy-sub-key> \
-     --new-key <my-eth-sub-key> \
-     --keyring-backend file \
-     --chain-id <chain-id> \
-     --out my-partial.json
-   ```
-
-   At least one of `--from` / `--new-key` is required; a co-signer who holds only one sub-key passes only that flag. Re-running is idempotent (replaces the signer's prior entries on the corresponding side).
-
-5. **Stop the validator** before broadcasting:
-
-   ```bash
-   systemctl stop lumerad
-   ```
-
-6. **Coordinator combines partials and broadcasts**:
-
-   ```bash
-   lumerad tx evmigration combine-proof \
-     alice-partial.json bob-partial.json \
-     --out tx.json
-
-   lumerad tx evmigration submit-proof tx.json \
-     --chain-id <chain-id> \
-     --node tcp://<trusted-rpc>:26657 -y
-   ```
-
-   `submit-proof` does **not** sign at the Cosmos layer — migration messages declare zero signers, fees are waived by the evmigration ante handler. There is no `--from`.
-
-7. **Restart the validator** and verify as in steps 6–7 of the single-sig flow. Note: the queryable operator address is now the new multisig bech32 (`val-msig-new`), not an EOA.
+After successful submission, restart through the discovered supervisor and verify as in steps 6–7 of the single-sig flow. The queryable operator address is now the destination multisig bech32, not an EOA.
 
 `combine-proof` verifies each partial under its sub-pub-key on **both sides**, skips invalid entries, then **intersects** the valid signer-index sets across the two sides and selects the first K indices present on BOTH. This is what makes `legacy_proof.signer_indices == new_proof.signer_indices` (the consensus mirror-source rule). A co-signer who signs only one side (e.g. lost access to their eth sub-key) doesn't contribute toward quorum unless another co-signer supplies the other side's signature at the same index. If the intersection has fewer than K entries, combine-proof errors with `need <K> valid partial signatures signed on BOTH sides at matching indices, have <N>` and writes nothing.
 

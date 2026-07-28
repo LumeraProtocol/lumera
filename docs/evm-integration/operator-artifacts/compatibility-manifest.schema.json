@@ -40,10 +40,12 @@
     "artifacts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["chain_executable", "supernode_executable", "bound_files"],
+      "required": ["chain_executable", "supernode_executable", "sncli_executable", "container_image", "bound_files"],
       "properties": {
         "chain_executable": { "$ref": "#/$defs/executable" },
         "supernode_executable": { "$ref": "#/$defs/executable" },
+        "sncli_executable": { "$ref": "#/$defs/executable" },
+        "container_image": { "$ref": "#/$defs/container_image" },
         "bound_files": {
           "type": "object",
           "additionalProperties": false,
@@ -213,7 +215,7 @@
     "non_placeholder": {
       "type": "string",
       "minLength": 3,
-      "pattern": "^(?!REPLACE(?:_|$))(?!.*<[^>]+>)(?!PLACEHOLDER$)(?!TBD$)(?!TODO$)(?!UNKNOWN$).+\\S$"
+      "pattern": "^(?!.*(?:[Pp][Ll][Aa][Cc][Ee][Hh][Oo][Ll][Dd][Ee][Rr]|[Tt][Oo][Dd][Oo]|[Tt][Bb][Dd]|[Uu][Nn][Kk][Nn][Oo][Ww][Nn]|[Rr][Ee][Pp][Ll][Aa][Cc][Ee])(?:[^A-Za-z]|$))(?!.*<[^>]+>).+\\S$"
     },
     "sha256": {
       "type": "string",
@@ -262,6 +264,24 @@
         "tag": { "$ref": "#/$defs/non_placeholder" },
         "commit": { "$ref": "#/$defs/commit" },
         "sha256": { "$ref": "#/$defs/sha256" },
+        "source": { "$ref": "#/$defs/non_placeholder" }
+      }
+    },
+    "container_image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact", "digest", "source"],
+      "properties": {
+        "artifact": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "approved_container_image": {
+      "type": "object",
+      "properties": {
+        "artifact": { "$ref": "#/$defs/non_placeholder" },
+        "digest": { "type": "string", "pattern": "^sha256:(?!0{64}$)[0-9a-f]{64}$" },
         "source": { "$ref": "#/$defs/non_placeholder" }
       }
     },
@@ -320,6 +340,8 @@
       "properties": {
         "chain_executable": { "$ref": "#/$defs/approved_executable" },
         "supernode_executable": { "$ref": "#/$defs/approved_executable" },
+        "sncli_executable": { "$ref": "#/$defs/approved_executable" },
+        "container_image": { "$ref": "#/$defs/approved_container_image" },
         "bound_files": {
           "properties": {
             "scripts/evmigration-common.sh": { "$ref": "#/$defs/approved_file" },

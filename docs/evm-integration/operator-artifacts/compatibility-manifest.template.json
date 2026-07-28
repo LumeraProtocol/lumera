@@ -30,6 +30,20 @@
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "source": "REPLACE_WITH_SUPERNODE_RELEASE_ASSET_URL"
     },
+    "sncli_executable": {
+      "name": "sncli",
+      "release_path": "REPLACE_WITH_TARBALL_PATH_TO_SNCLI",
+      "version": "REPLACE_WITH_SNCLI_VERSION",
+      "tag": "REPLACE_WITH_SNCLI_RELEASE_TAG",
+      "commit": "0000000000000000000000000000000000000000",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source": "REPLACE_WITH_SNCLI_RELEASE_ASSET_URL"
+    },
+    "container_image": {
+      "artifact": "REPLACE_WITH_CONTAINER_IMAGE_REPOSITORY_AND_TAG",
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "source": "REPLACE_WITH_CONTAINER_IMAGE_REGISTRY_URL"
+    },
     "bound_files": {
       "scripts/evmigration-common.sh": {
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -137,7 +151,7 @@
   },
   "_verification": [
     "Release owner: replace every REPLACE_WITH value and every all-zero commit/hash; approval.status=approved is schema-invalid while any remain.",
-    "Extract each release asset into a new mode-0700 directory. Verify the chain and SuperNode executable tag, commit, version, source, and SHA-256, then verify every artifacts.bound_files entry individually with sha256sum.",
+    "Extract each release asset into a new mode-0700 directory. Verify the chain, SuperNode, and sncli executable release path, tag, commit, version, source, and SHA-256; verify the container image artifact, registry source, and immutable digest; then verify every artifacts.bound_files entry individually with sha256sum.",
     "Require operator_contracts.destination_prestage_no_echo.status=verified and bind its implementation name, tag, commit, SHA-256, source, and exact no-echo contract. Do not approve an unfinished or narrative-only PR-2 dependency.",
     "Run every validation command and attach sanitized evidence. Every validation status, including owned_testnet and portal_live, must be pass before approval is schema-valid.",
     "Validate the schema under draft 2020-12, validate this manifest against it, and confirm a copy changed to approval.status=approved while retaining any blocked/postponed/placeholder field is rejected.",

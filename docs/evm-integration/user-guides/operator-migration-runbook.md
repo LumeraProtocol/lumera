@@ -51,7 +51,7 @@ Identify `runAsUser`, command/args, PVC/config/secret mounts, base directory, an
 
 ## 2. Pin binary, home, and keyring provenance
 
-Use the exact release executable and explicit flags. The helpers resolve `--binary` once to an absolute canonical path, then print that path, the actual `version --long` version, SHA-256, and source before doing key work. They print keyring backend and keyring location separately, with each source.
+Use the exact release executables and explicit flags. The helpers resolve `--binary` once to an absolute canonical path, then print that path, the actual `version --long` version, SHA-256, and source before doing key work. They print keyring backend and keyring location separately, with each source. Independently verify all three executable records in the manifest: `artifacts.chain_executable`, `artifacts.supernode_executable`, and `artifacts.sncli_executable`, including each exact `release_path`, version, tag, commit, SHA-256, and source. For container procedures, also pull and inspect the exact `artifacts.container_image.artifact@artifacts.container_image.digest` from `artifacts.container_image.source`; a mutable tag alone is not approved.
 
 ```bash
 LUMERAD=/absolute/path/to/approved/lumerad
@@ -161,40 +161,37 @@ sudo -u <service-user> ./scripts/migrate-validator.sh \
 
 ### Docker one-shot container
 
-Do not apply the systemd command to a container deployment. Keep the original workload container stopped and run a one-shot container from the **manifest-pinned image digest**, as the same numeric UID/GID, with the stopped container's volumes. The image must contain the manifest-pinned helper and binary at the paths below; verify both hashes before use.
+Do not apply the systemd command to a container deployment. Keep the original workload container stopped and run a one-shot container from the manifest's exact `artifacts.container_image.artifact@artifacts.container_image.digest`, as the same numeric UID/GID, with the stopped container's volumes. `--volumes-from` preserves every original mount destination; it does not remap mounts. Therefore set `CONTAINER_HOME` and `CONTAINER_KEYRING_DIR` to the exact original **in-container destination paths** recorded by `docker inspect`, not invented `/mounted/...` paths. The image must contain `artifacts.bound_files["scripts/migrate-validator.sh"]` and `artifacts.chain_executable` at their manifest-pinned `release_path` values; verify both hashes before use.
 
 ```bash
-# The workload container remains stopped for both commands.
+# The workload container remains stopped for both invocations.
 test "$(docker inspect -f '{{.State.Running}}' <stopped-container>)" = false
-APPROVED_IMAGE='<registry>/<image>@sha256:<manifest-image-digest>'
+APPROVED_IMAGE='<artifacts.container_image.artifact>@<artifacts.container_image.digest>'
 SERVICE_UID_GID='<uid>:<gid>'
+MIGRATION_HELPER='<manifest-pinned-helper-release_path-in-image>'
+LUMERAD_IN_IMAGE='<artifacts.chain_executable.release_path-in-image>'
+CONTAINER_HOME='<original-home-mount-destination-from-docker-inspect>'
+CONTAINER_KEYRING_DIR='<original-keyring-mount-destination-from-docker-inspect>'
 
-docker run --rm -it --name evmigration-dry-run \
-  --user "$SERVICE_UID_GID" --network host \
-  --volumes-from <stopped-container>:rw \
-  --entrypoint /release/scripts/migrate-validator.sh \
-  "$APPROVED_IMAGE" \
-  <legacy-key-name> <destination-key-name> \
-  --binary /release/bin/lumerad \
-  --home /mounted/lumera/home \
-  --keyring-backend <backend> \
-  --keyring-dir /mounted/keyring/location \
-  --chain-id <chain-id> --node <trusted-rpc> \
-  --i-have-stopped-the-node --dry-run
+run_migration() {
+  docker run --rm -it --name evmigration-once \
+    --user "$SERVICE_UID_GID" --network host \
+    --volumes-from <stopped-container>:rw \
+    --entrypoint "$MIGRATION_HELPER" \
+    "$APPROVED_IMAGE" \
+    <legacy-key-name> <destination-key-name> \
+    --binary "$LUMERAD_IN_IMAGE" \
+    --home "$CONTAINER_HOME" \
+    --keyring-backend <backend> \
+    --keyring-dir "$CONTAINER_KEYRING_DIR" \
+    --chain-id <chain-id> --node <trusted-rpc> \
+    --i-have-stopped-the-node "$@"
+}
 
-# After approving the dry-run transcript, run this live command ONCE.
-docker run --rm -it --name evmigration-live \
-  --user "$SERVICE_UID_GID" --network host \
-  --volumes-from <stopped-container>:rw \
-  --entrypoint /release/scripts/migrate-validator.sh \
-  "$APPROVED_IMAGE" \
-  <legacy-key-name> <destination-key-name> \
-  --binary /release/bin/lumerad \
-  --home /mounted/lumera/home \
-  --keyring-backend <backend> \
-  --keyring-dir /mounted/keyring/location \
-  --chain-id <chain-id> --node <trusted-rpc> \
-  --i-have-stopped-the-node
+# These invoke the exact same reviewed command; only --dry-run differs.
+run_migration --dry-run
+# After approving the dry-run transcript, invoke the live command ONCE.
+run_migration
 ```
 
 `--network host` is an explicit example for a trusted operator-controlled host. If policy forbids it, attach the one-shot container to an approved network that can reach `<trusted-rpc>`; do not target the stopped container or an untrusted public endpoint.

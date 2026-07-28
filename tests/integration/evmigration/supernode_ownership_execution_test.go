@@ -49,6 +49,12 @@ func (s *MigrationIntegrationSuite) putSupernodeIndex(account sdk.AccAddress, va
 	store.Set(key, valAddr)
 }
 
+func (s *MigrationIntegrationSuite) putSupernodeIndexText(account string, valAddr sdk.ValAddress) {
+	store := s.ctx.KVStore(s.app.GetKey(sntypes.StoreKey))
+	key := append(bytes.Clone(sntypes.SuperNodeByAccountKey), []byte(account)...)
+	store.Set(key, valAddr)
+}
+
 func (s *MigrationIntegrationSuite) assertClaimOwnershipCorruptionRejected(
 	setup func(legacyAddr sdk.AccAddress),
 	wantErr string,
@@ -97,6 +103,32 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_RejectsDuplicateSuper
 	}, "multiple primary records claim")
 }
 
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_RejectsCanonicalDestinationSupernodeOwnerBeforeWrites() {
+	s.enableMigration()
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 123_456))
+	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(coins)
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	sourceVal := sdk.ValAddress(testAddressBytes("claim-source-val"))
+	s.Require().NoError(s.app.SupernodeKeeper.SetSuperNode(s.ctx, validMigrationSupernode(sourceVal, legacyAddr)))
+	destinationVal := sdk.ValAddress(testAddressBytes("claim-dest-val"))
+	destinationSN := validMigrationSupernode(destinationVal, newAddr)
+	destinationSN.SupernodeAccount = strings.ToUpper(newAddr.String())
+	s.putSupernodePrimary(destinationVal, destinationSN)
+	s.putSupernodeIndexText(destinationSN.SupernodeAccount, destinationVal)
+
+	beforeStore := s.supernodeStoreSnapshot()
+	beforeLegacy := s.app.BankKeeper.GetAllBalances(s.ctx, legacyAddr)
+	beforeNew := s.app.BankKeeper.GetAllBalances(s.ctx, newAddr)
+
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, newClaimMsg(s.T(), legacyPrivKey, legacyAddr, newPrivKey, newAddr))
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "destination supernode account")
+	s.Require().Equal(beforeStore, s.supernodeStoreSnapshot())
+	s.Require().Equal(beforeLegacy, s.app.BankKeeper.GetAllBalances(s.ctx, legacyAddr))
+	s.Require().Equal(beforeNew, s.app.BankKeeper.GetAllBalances(s.ctx, newAddr))
+}
+
 func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_RejectsMalformedSupernodePrimaryBeforeWrites() {
 	s.assertClaimOwnershipCorruptionRejected(func(_ sdk.AccAddress) {
 		valAddr := sdk.ValAddress(testAddressBytes("malformed-primary"))
@@ -137,6 +169,33 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_RejectsSourceOwnershipC
 	s.Require().Equal(beforeValidator, afterValidator, "ownership corruption must be rejected before validator mutation")
 	_, newValidatorErr := s.app.StakingKeeper.GetValidator(s.ctx, sdk.ValAddress(newAddr))
 	s.Require().Error(newValidatorErr)
+}
+
+func (s *MigrationIntegrationSuite) TestMigrateValidator_RejectsCanonicalDestinationSupernodeOwnerBeforeValidatorMutation() {
+	s.enableMigration()
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(operatorCoins)
+	oldValAddr, _ := s.createTestValidator(legacyAddr, sdkmath.NewInt(1_000_000))
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	s.Require().NoError(s.app.SupernodeKeeper.SetSuperNode(s.ctx, validMigrationSupernode(oldValAddr, legacyAddr)))
+	destinationVal := sdk.ValAddress(testAddressBytes("validator-dest-val"))
+	destinationSN := validMigrationSupernode(destinationVal, newAddr)
+	destinationSN.SupernodeAccount = strings.ToUpper(newAddr.String())
+	s.putSupernodePrimary(destinationVal, destinationSN)
+	s.putSupernodeIndexText(destinationSN.SupernodeAccount, destinationVal)
+
+	beforeStore := s.supernodeStoreSnapshot()
+	beforeValidator, err := s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+
+	_, err = s.msgServer.MigrateValidator(s.ctx, newValidatorMsg(s.T(), legacyPrivKey, legacyAddr, newPrivKey, newAddr))
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "destination supernode account")
+	s.Require().Equal(beforeStore, s.supernodeStoreSnapshot())
+	afterValidator, getErr := s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(getErr)
+	s.Require().Equal(beforeValidator, afterValidator)
 }
 
 func (s *MigrationIntegrationSuite) TestMigrateValidatorSupernode_TwoDistinctRecordsRealStore() {

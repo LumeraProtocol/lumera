@@ -1133,7 +1133,7 @@ func TestMigrateValidator_FailAtValidatorDelegations(t *testing.T) {
 // MigrateValidatorSupernode (step V5) propagates and no record is stored.
 func TestMigrateValidator_FailAtValidatorSupernode(t *testing.T) {
 	f := initMsgServerFixture(t)
-	legacyAddr, _, oldValAddr, newValAddr, msg := setupPassingValPreChecksWithOwnership(t, f,
+	legacyAddr, newAddr, oldValAddr, newValAddr, msg := setupPassingValPreChecksWithOwnership(t, f,
 		func(f *msgServerFixture, legacyAddr sdk.AccAddress, oldValAddr sdk.ValAddress) {
 			sn := sntypes.SuperNode{
 				ValidatorAddress: oldValAddr.String(),
@@ -1143,6 +1143,7 @@ func TestMigrateValidator_FailAtValidatorSupernode(t *testing.T) {
 			f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
 		},
 	)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), newAddr.String()).Return(sntypes.SuperNode{}, false, nil)
 
 	// Steps V1-V4 succeed.
 	setupV1toV4(f.mockFixture, oldValAddr, newValAddr)

@@ -7,11 +7,13 @@ if [ -z "$1" ]; then
 fi
 
 # Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEVNET_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
 PROPOSAL_ID="$1"
 SERVICE_NAME="supernova_validator_1"
-COMPOSE_FILE="../docker-compose.yml"
+COMPOSE_FILE="${DEVNET_ROOT}/docker-compose.yml"
 FEES="5000ulume"
 # Gas configuration — use a fixed gas amount by default. `--gas auto` simulates
 # a gov vote at ~57.9k and even with a 1.3x bump lands right at the real usage

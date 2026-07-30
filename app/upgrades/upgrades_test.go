@@ -18,6 +18,7 @@ import (
 	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
 	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
+	upgrade_v1_20_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_2"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -47,6 +48,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_12_0.UpgradeName,
 		upgrade_v1_20_0.UpgradeName,
 		upgrade_v1_20_1.UpgradeName,
+		upgrade_v1_20_2.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }

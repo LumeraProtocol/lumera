@@ -277,15 +277,14 @@ func TestMigrateValidator_Success(t *testing.T) {
 	f.distributionKeeper.EXPECT().SetValidatorOutstandingRewards(gomock.Any(), newValAddr, gomock.Any()).Return(nil)
 
 	// HistoricalRewards — one entry carried over to the new validator.
-	f.distributionKeeper.EXPECT().IterateValidatorHistoricalRewards(gomock.Any(), gomock.Any()).
-		Do(func(_ any, cb func(sdk.ValAddress, uint64, distrtypes.ValidatorHistoricalRewards) bool) {
-			cb(oldValAddr, 2, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1})
-		})
+	f.writeValidatorHistoricalRewards(oldValAddr, 2, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1})
+	// The mocked setter does not mutate the raw scoped store used by the later
+	// O(1) target-period lookup, so seed that destination row as well.
+	f.writeValidatorHistoricalRewards(newValAddr, 2, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1})
 	f.distributionKeeper.EXPECT().DeleteValidatorHistoricalRewards(gomock.Any(), oldValAddr)
-	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(2), gomock.Any()).Return(nil)
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(2), gomock.Any()).Return(nil).Times(2)
 
 	// SlashEvents — none.
-	f.distributionKeeper.EXPECT().IterateValidatorSlashEvents(gomock.Any(), gomock.Any())
 	f.distributionKeeper.EXPECT().DeleteValidatorSlashEvents(gomock.Any(), oldValAddr)
 
 	// Step V4: MigrateValidatorDelegations — re-key the one delegation.
@@ -295,7 +294,6 @@ func TestMigrateValidator_Success(t *testing.T) {
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), newValAddr).Return(
 		distrtypes.ValidatorCurrentRewards{Period: 3}, nil,
 	)
-	expectHistoricalRewardsSet(f.distributionKeeper, newValAddr, 2, 2)
 	// V4 fetches the re-keyed validator to convert shares → tokens; a rate-1.0
 	// validator (tokens == shares) keeps Stake == shares for the assertion below.
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
@@ -342,7 +340,6 @@ func TestMigrateValidator_Success(t *testing.T) {
 	f.bankKeeper.EXPECT().SendCoins(gomock.Any(), legacyAddr, newAddr, balances).Return(nil)
 
 	// MigrateAuthz — no grants.
-	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 
 	// MigrateFeegrant — no allowances.
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
@@ -445,23 +442,17 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 	f.distributionKeeper.EXPECT().GetValidatorOutstandingRewards(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorOutstandingRewards{}, nil)
 	f.distributionKeeper.EXPECT().DeleteValidatorOutstandingRewards(gomock.Any(), oldValAddr).Return(nil)
 	f.distributionKeeper.EXPECT().SetValidatorOutstandingRewards(gomock.Any(), newValAddr, gomock.Any()).Return(nil)
-	f.distributionKeeper.EXPECT().IterateValidatorHistoricalRewards(gomock.Any(), gomock.Any())
+	f.writeValidatorHistoricalRewards(oldValAddr, 2, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1})
+	f.writeValidatorHistoricalRewards(newValAddr, 2, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1})
 	f.distributionKeeper.EXPECT().DeleteValidatorHistoricalRewards(gomock.Any(), oldValAddr)
-	f.distributionKeeper.EXPECT().IterateValidatorSlashEvents(gomock.Any(), gomock.Any())
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(2), gomock.Any()).Return(nil).Times(2)
 	f.distributionKeeper.EXPECT().DeleteValidatorSlashEvents(gomock.Any(), oldValAddr)
 
 	// V4: MigrateValidatorDelegations — re-key self-delegation.
 	// Delegations/unbondings are supplied from the pre-check fetch; V4 no longer re-reads.
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), newValAddr).Return(currentRewards, nil)
-	targetPeriod := currentRewards.Period - 1
-	histRewards := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1}
-	// Single write: set target period refcount to base(1) + N delegations.
-	f.distributionKeeper.EXPECT().IterateValidatorHistoricalRewards(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ sdk.Context, fn func(sdk.ValAddress, uint64, distrtypes.ValidatorHistoricalRewards) bool) {
-			fn(newValAddr, targetPeriod, histRewards)
-		},
-	)
-	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, targetPeriod, gomock.Any()).Return(nil)
+	// The destination historical row is seeded above because mocked setters do
+	// not mutate the scoped store used by the O(1) period lookup.
 	// V4 fetches the re-keyed validator to convert shares → tokens (rate 1.0).
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
 		stakingtypes.Validator{OperatorAddress: newValAddr.String(), Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)}, nil,
@@ -496,11 +487,7 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 	)
 	// adjustHistoricalRewardsReferenceCount — ref count > 0, repairZero=true → no-op.
 	otherHistRewards := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1}
-	f.distributionKeeper.EXPECT().IterateValidatorHistoricalRewards(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ sdk.Context, fn func(sdk.ValAddress, uint64, distrtypes.ValidatorHistoricalRewards) bool) {
-			fn(otherValAddr, 1, otherHistRewards)
-		},
-	)
+	f.writeValidatorHistoricalRewards(otherValAddr, 1, otherHistRewards)
 	// Withdraw delegation rewards from otherValAddr.
 	f.distributionKeeper.EXPECT().WithdrawDelegationRewards(gomock.Any(), legacyAddr, otherValAddr).Return(sdk.Coins{}, nil)
 
@@ -515,11 +502,6 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 	otherCurrentRewards := distrtypes.ValidatorCurrentRewards{Period: 2}
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), otherValAddr).Return(otherCurrentRewards, nil)
 	otherTargetPeriod := otherCurrentRewards.Period - 1
-	f.distributionKeeper.EXPECT().IterateValidatorHistoricalRewards(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ sdk.Context, fn func(sdk.ValAddress, uint64, distrtypes.ValidatorHistoricalRewards) bool) {
-			fn(otherValAddr, otherTargetPeriod, otherHistRewards)
-		},
-	)
 	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), otherValAddr, otherTargetPeriod, gomock.Any()).Return(nil)
 	// migrateActiveDelegations fetches otherValAddr to convert shares → tokens (rate 1.0).
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), otherValAddr).Return(
@@ -546,7 +528,6 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 	f.bankKeeper.EXPECT().SendCoins(gomock.Any(), legacyAddr, newAddr, balances).Return(nil)
 
 	// MigrateAuthz, MigrateFeegrant — empty.
-	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 
 	// Step V8: DeleteValidatorRecordNoHooks precondition — new validator exists.
@@ -653,23 +634,16 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 	f.distributionKeeper.EXPECT().GetValidatorOutstandingRewards(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorOutstandingRewards{}, nil)
 	f.distributionKeeper.EXPECT().DeleteValidatorOutstandingRewards(gomock.Any(), oldValAddr).Return(nil)
 	f.distributionKeeper.EXPECT().SetValidatorOutstandingRewards(gomock.Any(), newValAddr, gomock.Any()).Return(nil)
-	f.distributionKeeper.EXPECT().IterateValidatorHistoricalRewards(gomock.Any(), gomock.Any())
+	f.writeValidatorHistoricalRewards(oldValAddr, 4, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 2})
+	f.writeValidatorHistoricalRewards(newValAddr, 4, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 2})
 	f.distributionKeeper.EXPECT().DeleteValidatorHistoricalRewards(gomock.Any(), oldValAddr)
-	f.distributionKeeper.EXPECT().IterateValidatorSlashEvents(gomock.Any(), gomock.Any())
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(4), gomock.Any()).Return(nil).Times(2)
 	f.distributionKeeper.EXPECT().DeleteValidatorSlashEvents(gomock.Any(), oldValAddr)
 
 	// Delegation re-keying (2 delegations). The target period refcount is set to
 	// base(1) + N in a single write before the loop, so the loop does no per-
-	// delegation refcount bump. The iterate below is the lookup for that one write.
-	targetPeriod := currentRewards.Period - 1
-	histRewards := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 2}
+	// delegation refcount bump. The raw destination row is seeded above.
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), newValAddr).Return(currentRewards, nil)
-	f.distributionKeeper.EXPECT().IterateValidatorHistoricalRewards(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ sdk.Context, fn func(sdk.ValAddress, uint64, distrtypes.ValidatorHistoricalRewards) bool) {
-			fn(newValAddr, targetPeriod, histRewards)
-		},
-	)
-	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, targetPeriod, gomock.Any()).Return(nil)
 	// V4 fetches the re-keyed validator once (outside the loop) to convert
 	// shares → tokens; rate 1.0 keeps each delegation's Stake == shares.
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
@@ -711,7 +685,6 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 	balances := sdk.NewCoins(sdk.NewInt64Coin("ulume", 500))
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(balances)
 	f.bankKeeper.EXPECT().SendCoins(gomock.Any(), legacyAddr, newAddr, balances).Return(nil)
-	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 
 	// Step V8: DeleteValidatorRecordNoHooks precondition — new validator exists.

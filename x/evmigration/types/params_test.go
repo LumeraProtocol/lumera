@@ -49,7 +49,17 @@ func TestParamsValidateCanaryLegacyAddresses(t *testing.T) {
 }
 
 func TestNewParamsDefaultsToOpenCanaryList(t *testing.T) {
-	params := types.NewParams(true, 0, 50, 2500, 20)
+	params := types.NewParams(true, 0, 10, 20, 5)
 	require.Empty(t, params.CanaryLegacyAddresses)
+	require.Equal(t, types.DefaultMaxRetainedStateEntries, params.MaxRetainedStateEntries)
 	require.NoError(t, params.Validate())
+}
+
+func TestEffectiveMaxRetainedStateEntriesLegacyCompatibility(t *testing.T) {
+	params := types.DefaultParams()
+	params.MaxRetainedStateEntries = 0 // field absent in pre-field-7 serialized Params
+	require.Equal(t, types.DefaultMaxRetainedStateEntries, params.EffectiveMaxRetainedStateEntries())
+
+	params.MaxRetainedStateEntries = 123
+	require.Equal(t, uint64(123), params.EffectiveMaxRetainedStateEntries())
 }

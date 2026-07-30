@@ -103,6 +103,10 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 			return nil, fmt.Errorf("build audit account transition: %w", err)
 		}
 	}
+	retainedPlan, err := ms.buildRetainedStatePlan(ctx, legacyAddr, newAddr, params.EffectiveMaxRetainedStateEntries())
+	if err != nil {
+		return nil, err
+	}
 
 	// Build the complete staking plan against pristine state. This validates
 	// destination primaries and every touched maturity timeslice before reward
@@ -120,7 +124,7 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 	}
 
 	// --- Execute migration steps ---
-	if err := ms.migrateAccount(ctx, legacyAddr, newAddr, &msg.NewProof, supernode, hasSupernode, auditPlan, delegations, stakingPlan); err != nil {
+	if err := ms.migrateAccount(ctx, legacyAddr, newAddr, &msg.NewProof, supernode, hasSupernode, auditPlan, retainedPlan, delegations, stakingPlan); err != nil {
 		return nil, err
 	}
 
@@ -228,6 +232,7 @@ func (ms msgServer) migrateAccount(
 	supernode sntypes.SuperNode,
 	hasSupernode bool,
 	auditPlan auditkeeper.AccountTransitionPlan,
+	retainedPlan retainedStatePlan,
 	delegations []stakingtypes.Delegation,
 	stakingPlan stakingMigrationPlan,
 ) error {
@@ -263,9 +268,9 @@ func (ms msgServer) migrateAccount(
 		}
 	}
 
-	// Step 4: Re-key authz grants.
-	if err := ms.MigrateAuthz(ctx, legacyAddr, newAddr); err != nil {
-		return fmt.Errorf("migrate authz: %w", err)
+	// Step 4: Apply retained state discovered before Step 1's first write.
+	if err := ms.applyRetainedStatePlan(ctx, retainedPlan); err != nil {
+		return fmt.Errorf("migrate authz/retained SDK state: %w", err)
 	}
 
 	// Step 5: Re-key feegrant allowances.

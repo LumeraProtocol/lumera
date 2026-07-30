@@ -1,11 +1,13 @@
 package keeper_test
 
 import (
+	"context"
 	"errors"
 	"sort"
 	"strings"
 	"testing"
 
+	coreaddress "cosmossdk.io/core/address"
 	corestore "cosmossdk.io/core/store"
 	"cosmossdk.io/math"
 	storetypes "cosmossdk.io/store/types"
@@ -23,6 +25,8 @@ import (
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
+	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	ethsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
@@ -55,6 +59,19 @@ type mockFixture struct {
 	actionKeeper       *evmigrationmocks.MockActionKeeper
 }
 
+// govAccountStub supplies the constructor-only account surface needed by the
+// real governance keeper used in retained-state tests.
+type govAccountStub struct {
+	codec coreaddress.Codec
+	addr  sdk.AccAddress
+}
+
+func (s govAccountStub) AddressCodec() coreaddress.Codec                             { return s.codec }
+func (s govAccountStub) GetAccount(context.Context, sdk.AccAddress) sdk.AccountI     { return nil }
+func (s govAccountStub) GetModuleAddress(string) sdk.AccAddress                      { return s.addr }
+func (s govAccountStub) GetModuleAccount(context.Context, string) sdk.ModuleAccountI { return nil }
+func (s govAccountStub) SetModuleAccount(context.Context, sdk.ModuleAccountI)        {}
+
 func initMockFixture(t *testing.T) *mockFixture {
 	t.Helper()
 
@@ -70,6 +87,7 @@ func initMockFixture(t *testing.T) *mockFixture {
 	supernodeKeeper := evmigrationmocks.NewMockSupernodeKeeper(ctrl)
 	auditKeeper := evmigrationmocks.NewMockAuditKeeper(ctrl)
 	actionKeeper := evmigrationmocks.NewMockActionKeeper(ctrl)
+
 	supernodeKeeper.EXPECT().BuildIdentityMigrationPlan(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ sdk.Context, source, destination sdk.ValAddress) (sntypes.IdentityMigrationPlan, error) {
 			return sntypes.NewIdentityMigrationPlan(source, destination, nil, nil, nil, nil, nil), nil
@@ -83,20 +101,27 @@ func initMockFixture(t *testing.T) *mockFixture {
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
 	stakingStoreKey := storetypes.NewKVStoreKey(stakingtypes.StoreKey)
 	distributionStoreKey := storetypes.NewKVStoreKey(distrtypes.StoreKey)
+	govStoreKey := storetypes.NewKVStoreKey(govtypes.StoreKey)
 	storeService := runtime.NewKVStoreService(storeKey)
 	stakingStoreService := runtime.NewKVStoreService(stakingStoreKey)
 	distributionStoreService := runtime.NewKVStoreService(distributionStoreKey)
+	govStoreService := runtime.NewKVStoreService(govStoreKey)
 	ctx := testutil.DefaultContextWithKeys(
 		map[string]*storetypes.KVStoreKey{
 			types.StoreKey:        storeKey,
 			stakingtypes.StoreKey: stakingStoreKey,
 			distrtypes.StoreKey:   distributionStoreKey,
+			govtypes.StoreKey:     govStoreKey,
 		},
 		map[string]*storetypes.TransientStoreKey{"transient_test": storetypes.NewTransientStoreKey("transient_test")},
 		nil,
 	)
 
 	authority := authtypes.NewModuleAddress(types.GovModuleName)
+	govKeeper := govkeeper.NewKeeper(
+		encCfg.Codec, govStoreService, govAccountStub{codec: addrCodec, addr: authority}, nil, nil, nil, nil,
+		govtypes.DefaultConfig(), authority.String(),
+	)
 
 	k := keeper.NewKeeper(
 		storeService,
@@ -108,6 +133,7 @@ func initMockFixture(t *testing.T) *mockFixture {
 		stakingKeeper,
 		distributionKeeper,
 		authzKeeper,
+		govKeeper,
 		feegrantKeeper,
 		supernodeKeeper,
 		auditKeeper,
@@ -303,19 +329,6 @@ func expectHistoricalRewardsLookup(
 }
 
 func expectHistoricalRewardsIncrement(
-	mock *evmigrationmocks.MockDistributionKeeper,
-	val sdk.ValAddress,
-	period uint64,
-	refCount uint32,
-) {
-	expectHistoricalRewardsLookup(mock, val, period, refCount)
-	mock.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), val, period, gomock.Any()).Return(nil)
-}
-
-// expectHistoricalRewardsSet sets up mock expectations for
-// setHistoricalRewardsReferenceCount: look up the (val, period) row, then write
-// its refcount back in a single set.
-func expectHistoricalRewardsSet(
 	mock *evmigrationmocks.MockDistributionKeeper,
 	val sdk.ValAddress,
 	period uint64,
@@ -1108,7 +1121,7 @@ func TestMigrateAuthz_AsGranter(t *testing.T) {
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any()).
 		Do(func(_ any, cb func(sdk.AccAddress, sdk.AccAddress, authz.Grant) bool) {
 			cb(legacy, grantee, grant)
-		})
+		}).Times(2)
 	f.authzKeeper.EXPECT().DeleteGrant(gomock.Any(), grantee, legacy, "/cosmos.bank.v1beta1.MsgSend").Return(nil)
 	f.authzKeeper.EXPECT().SaveGrant(gomock.Any(), grantee, newAddr, genericAuth, grant.Expiration).Return(nil)
 
@@ -1131,7 +1144,7 @@ func TestMigrateAuthz_AsGrantee(t *testing.T) {
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any()).
 		Do(func(_ any, cb func(sdk.AccAddress, sdk.AccAddress, authz.Grant) bool) {
 			cb(granter, legacy, grant)
-		})
+		}).Times(2)
 	f.authzKeeper.EXPECT().DeleteGrant(gomock.Any(), legacy, granter, "/cosmos.bank.v1beta1.MsgSend").Return(nil)
 	f.authzKeeper.EXPECT().SaveGrant(gomock.Any(), newAddr, granter, genericAuth, grant.Expiration).Return(nil)
 

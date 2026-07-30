@@ -7,6 +7,7 @@ import (
 	"cosmossdk.io/core/address"
 	corestore "cosmossdk.io/core/store"
 	"github.com/cosmos/cosmos-sdk/codec"
+	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
@@ -66,6 +67,7 @@ type Keeper struct {
 	stakingKeeper      types.StakingKeeper
 	distributionKeeper types.DistributionKeeper
 	authzKeeper        types.AuthzKeeper
+	govKeeper          *govkeeper.Keeper
 	feegrantKeeper     types.FeegrantKeeper
 	supernodeKeeper    types.SupernodeKeeper
 	auditKeeper        types.AuditKeeper
@@ -82,6 +84,7 @@ func NewKeeper(
 	stakingKeeper types.StakingKeeper,
 	distributionKeeper types.DistributionKeeper,
 	authzKeeper types.AuthzKeeper,
+	govKeeper *govkeeper.Keeper,
 	feegrantKeeper types.FeegrantKeeper,
 	supernodeKeeper types.SupernodeKeeper,
 	auditKeeper types.AuditKeeper,
@@ -111,6 +114,7 @@ func NewKeeper(
 		stakingKeeper:      stakingKeeper,
 		distributionKeeper: distributionKeeper,
 		authzKeeper:        authzKeeper,
+		govKeeper:          govKeeper,
 		feegrantKeeper:     feegrantKeeper,
 		supernodeKeeper:    supernodeKeeper,
 		auditKeeper:        auditKeeper,

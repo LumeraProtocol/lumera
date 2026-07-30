@@ -61,6 +61,8 @@ var (
 	// DefaultMaxMultisigSubKeys caps the number of sub-keys a multisig legacy
 	// account may have when migrating. Bounds per-tx verification cost.
 	DefaultMaxMultisigSubKeys uint32 = 20
+	// DefaultMaxRetainedStateEntries bounds retained SDK state discovery.
+	DefaultMaxRetainedStateEntries uint64 = 10000
 )
 
 // NewParams creates a new Params instance.
@@ -78,6 +80,7 @@ func NewParams(
 		MaxValidatorDelegations: maxValidatorDelegations,
 		MaxMultisigSubKeys:      maxMultisigSubKeys,
 		CanaryLegacyAddresses:   nil,
+		MaxRetainedStateEntries: DefaultMaxRetainedStateEntries,
 	}
 }
 
@@ -92,6 +95,16 @@ func DefaultParams() Params {
 	)
 }
 
+// EffectiveMaxRetainedStateEntries preserves compatibility with Params values
+// serialized before field 7 existed. Governance-created Params must still pass
+// Validate and therefore cannot explicitly set zero.
+func (p Params) EffectiveMaxRetainedStateEntries() uint64 {
+	if p.MaxRetainedStateEntries == 0 {
+		return DefaultMaxRetainedStateEntries
+	}
+	return p.MaxRetainedStateEntries
+}
+
 // Validate validates the set of params.
 func (p Params) Validate() error {
 	if p.MaxMigrationsPerBlock == 0 {
@@ -102,6 +115,9 @@ func (p Params) Validate() error {
 	}
 	if p.MaxMultisigSubKeys == 0 {
 		return fmt.Errorf("max_multisig_sub_keys must be positive")
+	}
+	if p.MaxRetainedStateEntries == 0 {
+		return fmt.Errorf("max_retained_state_entries must be positive")
 	}
 	if len(p.CanaryLegacyAddresses) > MaxCanaryLegacyAddresses {
 		return fmt.Errorf("canary_legacy_addresses must contain at most %d entries", MaxCanaryLegacyAddresses)

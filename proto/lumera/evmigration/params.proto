@@ -52,4 +52,9 @@ message Params {
   // migration open when enable_migration is true. Entries must be unique and
   // sorted lexicographically; at most 64 entries are permitted.
   repeated string canary_legacy_addresses = 6;
+
+  // max_retained_state_entries bounds deterministic discovery plans for
+  // retained SDK references. Discovery rejects at cap+1 before any write.
+  // Default: 10000.
+  uint64 max_retained_state_entries = 7;
 }

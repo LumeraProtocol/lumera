@@ -164,6 +164,10 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 			return nil, fmt.Errorf("build audit account transition: %w", err)
 		}
 	}
+	retainedPlan, err := ms.buildRetainedStatePlan(ctx, legacyAddr, newAddr, params.EffectiveMaxRetainedStateEntries())
+	if err != nil {
+		return nil, err
+	}
 
 	// Account-owned staking positions are a separate bounded dimension. Build
 	// their snapshot only after all proof/ownership checks, but before any write.
@@ -318,9 +322,9 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		}
 	}
 
-	// Re-key authz grants (both granter and grantee roles).
-	if err := ms.MigrateAuthz(ctx, legacyAddr, newAddr); err != nil {
-		return nil, fmt.Errorf("migrate authz: %w", err)
+	// Apply authz/governance/distribution continuity discovered before V1.
+	if err := ms.applyRetainedStatePlan(ctx, retainedPlan); err != nil {
+		return nil, fmt.Errorf("migrate authz/retained SDK state: %w", err)
 	}
 
 	// Re-key feegrant allowances (both granter and grantee roles).

@@ -203,7 +203,7 @@ func submitStorageRecheckEvidence(
 		"--challenged-result-transcript-hash", challengedHash,
 		"--recheck-transcript-hash", recheckHash,
 		"--recheck-result-class", resultClass,
-		"--gas", "500000", // Per CP3.5 F-B — secondary indexes for recheck reporter result push gas above 200k default.
+		"--gas", "800000", // Raised from 500000: audit account-transition lineage resolution (logical vs current identity) adds gas to every epoch-report submit; observed 500331 used against the old 500000 cap.
 		"--from", fromNode,
 	)
 }
@@ -559,7 +559,7 @@ func TestStorageTruth_HealOp_ScheduledAndVerified(t *testing.T) {
 		strconv.FormatUint(epochID1, 10),
 		auditHostReportJSON(portStates),
 		"--from", prober.nodeName,
-		"--gas", "500000",
+		"--gas", "800000", // Raised from 500000: audit account-transition lineage resolution (logical vs current identity) adds gas to every epoch-report submit; observed 500331 used against the old 500000 cap.
 		"--storage-proof-results", buildStorageProofResultJSONWithClass(
 			prober.accAddr,
 			target.accAddr,

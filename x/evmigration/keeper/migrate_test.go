@@ -1186,17 +1186,21 @@ func TestMigrateActions_CreatorAndSuperNodes(t *testing.T) {
 		ActionID:   "action-1",
 		Creator:    legacy.String(),
 		SuperNodes: []string{legacy.String(), otherAddr.String()},
+		State:      actiontypes.ActionStatePending,
 	}
 	bySuperNode := &actiontypes.Action{
 		ActionID:   "action-1",
 		Creator:    legacy.String(),
 		SuperNodes: []string{legacy.String(), otherAddr.String()},
+		State:      actiontypes.ActionStatePending,
 	}
+	canonical := *byCreator
 
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), legacy.String()).
 		Return([]*actiontypes.Action{byCreator}, nil)
 	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), legacy.String()).
 		Return([]*actiontypes.Action{bySuperNode}, nil)
+	f.actionKeeper.EXPECT().GetActionByID(gomock.Any(), "action-1").Return(&canonical, true)
 	f.actionKeeper.EXPECT().SetAction(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated *actiontypes.Action) error {
 			require.Equal(t, "action-1", updated.ActionID)
@@ -1223,11 +1227,14 @@ func TestMigrateActions_SuperNodeOnly(t *testing.T) {
 		ActionID:   "action-2",
 		Creator:    creator.String(),
 		SuperNodes: []string{legacy.String()},
+		State:      actiontypes.ActionStateProcessing,
 	}
+	canonical := *action
 
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), legacy.String()).Return(nil, nil)
 	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), legacy.String()).
 		Return([]*actiontypes.Action{action}, nil)
+	f.actionKeeper.EXPECT().GetActionByID(gomock.Any(), "action-2").Return(&canonical, true)
 	f.actionKeeper.EXPECT().SetAction(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated *actiontypes.Action) error {
 			require.Equal(t, creator.String(), updated.Creator)

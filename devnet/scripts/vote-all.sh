@@ -11,7 +11,13 @@ CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
 PROPOSAL_ID="$1"
 SERVICE_NAME="supernova_validator_1"
-COMPOSE_FILE="../docker-compose.yml"
+# Resolve relative to THIS script, not the caller's working directory.
+# See submit-upgrade-proposal.sh for the full rationale: a caller-relative
+# path made every `docker compose -f` call fail when the script was invoked
+# from anywhere other than devnet/scripts/, which surfaced as bogus
+# "no votes available" / "unable to resolve key" errors.
+VOTE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_FILE="${COMPOSE_FILE:-${VOTE_SCRIPT_DIR}/../docker-compose.yml}"
 FEES="5000ulume"
 # Gas configuration — use a fixed gas amount by default. `--gas auto` simulates
 # a gov vote at ~57.9k and even with a 1.3x bump lands right at the real usage

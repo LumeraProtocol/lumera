@@ -42,10 +42,23 @@ binary_version() {
 		return 1
 	fi
 
+	# Allow an explicit override. Binaries built locally from a branch (plain
+	# `go build`, no -ldflags) print an EMPTY version string, so probing them
+	# can never succeed. That is the normal case when rehearsing an unreleased
+	# branch, so refusing to proceed would make branch rehearsals impossible.
+	# Release artifacts still self-report and need no override.
+	if [[ -n "${DEVNET_BINARY_VERSION:-}" ]]; then
+		printf '%s\n' "$(normalize_version "${DEVNET_BINARY_VERSION}")"
+		return 0
+	fi
+
 	version="$("${binary}" version 2>/dev/null | head -n 1 | tr -d '\r')"
 	version="$(normalize_version "${version}")"
 	if [[ -z "${version}" ]]; then
 		echo "Failed to determine version for binary: ${binary}" >&2
+		echo "  Binaries built with plain 'go build' report no version." >&2
+		echo "  Set DEVNET_BINARY_VERSION=<tag> to supply it explicitly, e.g." >&2
+		echo "    DEVNET_BINARY_VERSION=v1.20.2 ./devnet/scripts/upgrade.sh v1.20.2 auto-height devnet/bin-v1.20.2" >&2
 		return 1
 	fi
 	printf '%s\n' "${version}"

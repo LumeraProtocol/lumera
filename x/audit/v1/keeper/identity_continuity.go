@@ -302,19 +302,35 @@ func (k Keeper) CurrentAccount(ctx sdk.Context, account string) (string, error) 
 }
 
 func (k Keeper) forwardTransition(ctx sdk.Context, source string) (types.AccountTransition, bool, error) {
-	transition, found, err := k.transitionAtKey(ctx, types.AccountTransitionForwardKey(source))
-	if err == nil && found && transition.SourceAccount != source {
+	forwardKey := types.AccountTransitionForwardKey(source)
+	transition, found, err := k.transitionAtKey(ctx, forwardKey)
+	if err != nil || !found {
+		return transition, found, err
+	}
+	if transition.SourceAccount != source {
 		return types.AccountTransition{}, false, fmt.Errorf("malformed account transition: forward index key does not match source account")
 	}
-	return transition, found, err
+	store := k.kvStore(ctx)
+	if !bytes.Equal(store.Get(forwardKey), store.Get(types.AccountTransitionReverseKey(transition.DestinationAccount))) {
+		return types.AccountTransition{}, false, fmt.Errorf("malformed account transition: forward and reverse indexes disagree")
+	}
+	return transition, true, nil
 }
 
 func (k Keeper) reverseTransition(ctx sdk.Context, destination string) (types.AccountTransition, bool, error) {
-	transition, found, err := k.transitionAtKey(ctx, types.AccountTransitionReverseKey(destination))
-	if err == nil && found && transition.DestinationAccount != destination {
+	reverseKey := types.AccountTransitionReverseKey(destination)
+	transition, found, err := k.transitionAtKey(ctx, reverseKey)
+	if err != nil || !found {
+		return transition, found, err
+	}
+	if transition.DestinationAccount != destination {
 		return types.AccountTransition{}, false, fmt.Errorf("malformed account transition: reverse index key does not match destination account")
 	}
-	return transition, found, err
+	store := k.kvStore(ctx)
+	if !bytes.Equal(store.Get(reverseKey), store.Get(types.AccountTransitionForwardKey(transition.SourceAccount))) {
+		return types.AccountTransition{}, false, fmt.Errorf("malformed account transition: forward and reverse indexes disagree")
+	}
+	return transition, true, nil
 }
 
 func (k Keeper) transitionAtKey(ctx sdk.Context, key []byte) (types.AccountTransition, bool, error) {

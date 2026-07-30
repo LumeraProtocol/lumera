@@ -175,6 +175,19 @@ message QueryAssignedTargetsResponse {
   int64 epoch_start_height = 2;
   repeated uint32 required_open_ports = 3;
   repeated string target_supernode_accounts = 4 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  // reporter_supernode_account is the epoch-logical identity corresponding to
+  // the current account supplied in the request.
+  string reporter_supernode_account = 5 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  // target_account_mappings preserves target_supernode_accounts order while
+  // also exposing the live account to contact for each logical target.
+  repeated AccountIdentityMapping target_account_mappings = 6 [(gogoproto.nullable) = false];
+}
+
+// AccountIdentityMapping pairs an epoch-logical account with the current
+// account that should be contacted for that identity.
+message AccountIdentityMapping {
+  string logical_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  string current_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
 }
 
 message QueryEpochReportRequest {

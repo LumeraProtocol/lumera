@@ -260,12 +260,12 @@ func TestCohortMatrixIsExhaustive(t *testing.T) {
 	const cohortSize = 4
 	covered := map[string]bool{}
 	for _, migrateCount := range []int{0, 1, 2, cohortSize} {
-		switch {
-		case migrateCount == 0:
+		switch migrateCount {
+		case 0:
 			covered["none"] = true
-		case migrateCount == cohortSize:
+		case cohortSize:
 			covered["all"] = true
-		case migrateCount == 1:
+		case 1:
 			covered["one"] = true
 		default:
 			covered["some"] = true

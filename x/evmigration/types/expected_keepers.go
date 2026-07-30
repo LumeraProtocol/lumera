@@ -14,6 +14,7 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	auditkeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -128,6 +129,14 @@ type SupernodeKeeper interface {
 	GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (sntypes.SupernodeMetricsState, bool)
 	SetMetricsState(ctx sdk.Context, state sntypes.SupernodeMetricsState) error
 	DeleteMetricsState(ctx sdk.Context, valAddr sdk.ValAddress)
+	BuildIdentityMigrationPlan(ctx sdk.Context, sourceValidator, destinationValidator sdk.ValAddress) (sntypes.IdentityMigrationPlan, error)
+	ApplyIdentityMigrationPlan(ctx sdk.Context, plan sntypes.IdentityMigrationPlan) error
+}
+
+// AuditKeeper defines the identity-continuity surface owned by x/audit.
+type AuditKeeper interface {
+	BuildCurrentAccountTransitionPlan(ctx sdk.Context, source, destination string) (auditkeeper.AccountTransitionPlan, error)
+	ApplyAccountTransitionPlan(ctx sdk.Context, plan auditkeeper.AccountTransitionPlan) error
 }
 
 // ActionKeeper defines the expected interface for the x/action module.

@@ -28,6 +28,22 @@ type AccountTransitionPlan struct {
 	transitionCount int
 }
 
+// BuildCurrentAccountTransitionPlan derives the transition boundary from
+// Audit's own epoch configuration. Cross-module migration callers must not
+// duplicate or expose Audit's height-to-epoch rules.
+func (k Keeper) BuildCurrentAccountTransitionPlan(ctx sdk.Context, source, destination string) (AccountTransitionPlan, error) {
+	params := k.GetParams(ctx).WithDefaults()
+	currentEpoch, err := deriveEpochAtHeight(ctx.BlockHeight(), params)
+	if err != nil {
+		return AccountTransitionPlan{}, err
+	}
+	return k.BuildAccountTransitionPlan(ctx, types.AccountTransition{
+		SourceAccount:      source,
+		DestinationAccount: destination,
+		EffectiveEpoch:     currentEpoch.EpochID + 1,
+	})
+}
+
 // RecordAccountTransition builds and applies one durable lineage edge. It is a
 // convenience for callers that do not need to aggregate this plan with plans
 // from other modules.

@@ -10,6 +10,7 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	auditkeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
 )
@@ -152,6 +153,17 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 			return nil, err
 		}
 	}
+	identityPlan, err := ms.supernodeKeeper.BuildIdentityMigrationPlan(ctx, oldValAddr, newValAddr)
+	if err != nil {
+		return nil, fmt.Errorf("build supernode identity migration: %w", err)
+	}
+	var auditPlan auditkeeper.AccountTransitionPlan
+	if validatorSupernodePlan.hasAccountOwned {
+		auditPlan, err = ms.auditKeeper.BuildCurrentAccountTransitionPlan(ctx, legacyAddr.String(), newAddr.String())
+		if err != nil {
+			return nil, fmt.Errorf("build audit account transition: %w", err)
+		}
+	}
 
 	// --- Step V1: Withdraw all commission and delegation rewards ---
 	// Must happen before re-keying so rewards accrue to the correct addresses.
@@ -214,7 +226,16 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		return nil, fmt.Errorf("migrate validator delegations: %w", err)
 	}
 
-	// --- Step V5: Mutate both prevalidated SuperNode ownership dimensions ---
+	// --- Step V5: Apply continuity, then mutate prevalidated ownership ---
+	// Continuity must observe the source primary before PR196 moves it.
+	if err := ms.supernodeKeeper.ApplyIdentityMigrationPlan(ctx, identityPlan); err != nil {
+		return nil, fmt.Errorf("apply supernode identity migration: %w", err)
+	}
+	if validatorSupernodePlan.hasAccountOwned {
+		if err := ms.auditKeeper.ApplyAccountTransitionPlan(ctx, auditPlan); err != nil {
+			return nil, fmt.Errorf("apply audit account transition: %w", err)
+		}
+	}
 	if err := ms.migrateValidatedValidatorSupernodes(
 		ctx, oldValAddr, newValAddr, legacyAddr, newAddr, validatorSupernodePlan,
 	); err != nil {

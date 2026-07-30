@@ -48,6 +48,7 @@ func initFixture(t *testing.T) *fixture {
 		nil, // authzKeeper
 		nil, // feegrantKeeper
 		nil, // supernodeKeeper
+		nil, // auditKeeper
 		nil, // actionKeeper
 	)
 

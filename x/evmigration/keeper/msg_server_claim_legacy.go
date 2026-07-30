@@ -11,6 +11,7 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	auditkeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
@@ -95,9 +96,16 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 			return nil, err
 		}
 	}
+	var auditPlan auditkeeper.AccountTransitionPlan
+	if hasSupernode {
+		auditPlan, err = ms.auditKeeper.BuildCurrentAccountTransitionPlan(ctx, legacyAddr.String(), newAddr.String())
+		if err != nil {
+			return nil, fmt.Errorf("build audit account transition: %w", err)
+		}
+	}
 
 	// --- Execute migration steps ---
-	if err := ms.migrateAccount(ctx, legacyAddr, newAddr, &msg.NewProof, supernode, hasSupernode); err != nil {
+	if err := ms.migrateAccount(ctx, legacyAddr, newAddr, &msg.NewProof, supernode, hasSupernode, auditPlan); err != nil {
 		return nil, err
 	}
 
@@ -119,6 +127,19 @@ func (ms msgServer) preChecks(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddres
 	}
 	if !params.EnableMigration {
 		return types.ErrMigrationDisabled
+	}
+	if len(params.CanaryLegacyAddresses) > 0 {
+		canonicalLegacy := legacyAddr.String()
+		allowed := false
+		for _, address := range params.CanaryLegacyAddresses {
+			if address == canonicalLegacy {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return types.ErrMigrationNotCanary
+		}
 	}
 
 	// 2. Migration window
@@ -191,6 +212,7 @@ func (ms msgServer) migrateAccount(
 	destProof *types.MigrationProof,
 	supernode sntypes.SuperNode,
 	hasSupernode bool,
+	auditPlan auditkeeper.AccountTransitionPlan,
 ) error {
 	// Snapshot the original withdraw address before MigrateDistribution
 	// may temporarily redirect it to self (see redirectWithdrawAddrIfMigrated).
@@ -234,7 +256,13 @@ func (ms msgServer) migrateAccount(
 		return fmt.Errorf("migrate feegrant: %w", err)
 	}
 
-	// Step 6: Update the prevalidated supernode account field.
+	// Step 6: Apply Audit continuity before updating the prevalidated SuperNode
+	// account field. A returned error lets BaseApp roll back earlier module writes.
+	if hasSupernode {
+		if err := ms.auditKeeper.ApplyAccountTransitionPlan(ctx, auditPlan); err != nil {
+			return fmt.Errorf("apply audit account transition: %w", err)
+		}
+	}
 	if err := ms.migrateValidatedSupernode(ctx, newAddr, supernode, hasSupernode); err != nil {
 		return fmt.Errorf("migrate supernode: %w", err)
 	}

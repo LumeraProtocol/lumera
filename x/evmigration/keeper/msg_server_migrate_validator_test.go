@@ -354,6 +354,9 @@ func TestMigrateValidator_Success(t *testing.T) {
 	resp, err := f.msgServer.MigrateValidator(f.ctx, msg)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
+	require.Equal(t, 1, *f.identityBuildCalls)
+	require.Equal(t, 1, *f.identityApplyCalls)
+	require.Zero(t, *f.auditBuildCalls, "validator without source-owned SuperNode must not build Audit continuity")
 
 	// Verify migration record was stored.
 	record, err := f.keeper.MigrationRecords.Get(f.ctx, legacyAddr.String())

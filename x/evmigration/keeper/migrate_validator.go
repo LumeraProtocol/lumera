@@ -7,6 +7,7 @@ import (
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
+	auditkeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -277,11 +278,44 @@ func (k Keeper) MigrateValidatorDistribution(ctx sdk.Context, oldValAddr, newVal
 // MigrateValidatorSupernode migrates every validated SuperNode dimension affected
 // by a validator operator migration.
 func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAddr sdk.ValAddress, legacyAddr, newAddr sdk.AccAddress) error {
-	plan, err := k.validateValidatorSupernodeOwnership(ctx, oldValAddr, legacyAddr)
+	cacheCtx, commit := ctx.CacheContext()
+	if err := k.migrateValidatorSupernodeWithContinuity(cacheCtx, oldValAddr, newValAddr, legacyAddr, newAddr); err != nil {
+		return err
+	}
+	commit()
+	return nil
+}
+
+func (k Keeper) migrateValidatorSupernodeWithContinuity(ctx sdk.Context, oldValAddr, newValAddr sdk.ValAddress, legacyAddr, newAddr sdk.AccAddress) error {
+	ownershipPlan, err := k.validateValidatorSupernodeOwnership(ctx, oldValAddr, legacyAddr)
 	if err != nil {
 		return err
 	}
-	return k.migrateValidatedValidatorSupernodes(ctx, oldValAddr, newValAddr, legacyAddr, newAddr, plan)
+	if ownershipPlan.hasAccountOwned {
+		if err := k.validateDestinationSupernodeOwnership(ctx, newAddr); err != nil {
+			return err
+		}
+	}
+	identityPlan, err := k.supernodeKeeper.BuildIdentityMigrationPlan(ctx, oldValAddr, newValAddr)
+	if err != nil {
+		return fmt.Errorf("build supernode identity migration: %w", err)
+	}
+	var auditPlan auditkeeper.AccountTransitionPlan
+	if ownershipPlan.hasAccountOwned {
+		auditPlan, err = k.auditKeeper.BuildCurrentAccountTransitionPlan(ctx, legacyAddr.String(), newAddr.String())
+		if err != nil {
+			return fmt.Errorf("build audit account transition: %w", err)
+		}
+	}
+	if err := k.supernodeKeeper.ApplyIdentityMigrationPlan(ctx, identityPlan); err != nil {
+		return fmt.Errorf("apply supernode identity migration: %w", err)
+	}
+	if ownershipPlan.hasAccountOwned {
+		if err := k.auditKeeper.ApplyAccountTransitionPlan(ctx, auditPlan); err != nil {
+			return fmt.Errorf("apply audit account transition: %w", err)
+		}
+	}
+	return k.migrateValidatedValidatorSupernodes(ctx, oldValAddr, newValAddr, legacyAddr, newAddr, ownershipPlan)
 }
 
 type validatorSupernodeMigrationPlan struct {
@@ -433,16 +467,6 @@ func (k Keeper) migrateValidatedValidatorSupernode(
 		if sn.Evidence[i].ValidatorAddress == oldValAddrStr {
 			sn.Evidence[i].ValidatorAddress = newValAddr.String()
 		}
-	}
-
-	// Migrate metrics state: write under new key, delete old key.
-	metrics, found := k.supernodeKeeper.GetMetricsState(ctx, oldValAddr)
-	if found {
-		metrics.ValidatorAddress = newValAddr.String()
-		if err := k.supernodeKeeper.SetMetricsState(ctx, metrics); err != nil {
-			return err
-		}
-		k.supernodeKeeper.DeleteMetricsState(ctx, oldValAddr)
 	}
 
 	return k.supernodeKeeper.SetSuperNode(ctx, sn)

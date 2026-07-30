@@ -20,6 +20,7 @@ import (
 	address "cosmossdk.io/core/address"
 	feegrant "cosmossdk.io/x/feegrant"
 	types "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	keeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	types0 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	types1 "github.com/cosmos/cosmos-sdk/types"
 	authz "github.com/cosmos/cosmos-sdk/x/authz"
@@ -1109,6 +1110,35 @@ func (m *MockSupernodeKeeper) EXPECT() *MockSupernodeKeeperMockRecorder {
 	return m.recorder
 }
 
+// ApplyIdentityMigrationPlan mocks base method.
+func (m *MockSupernodeKeeper) ApplyIdentityMigrationPlan(ctx types1.Context, plan types0.IdentityMigrationPlan) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyIdentityMigrationPlan", ctx, plan)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyIdentityMigrationPlan indicates an expected call of ApplyIdentityMigrationPlan.
+func (mr *MockSupernodeKeeperMockRecorder) ApplyIdentityMigrationPlan(ctx, plan any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyIdentityMigrationPlan", reflect.TypeOf((*MockSupernodeKeeper)(nil).ApplyIdentityMigrationPlan), ctx, plan)
+}
+
+// BuildIdentityMigrationPlan mocks base method.
+func (m *MockSupernodeKeeper) BuildIdentityMigrationPlan(ctx types1.Context, sourceValidator, destinationValidator types1.ValAddress) (types0.IdentityMigrationPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BuildIdentityMigrationPlan", ctx, sourceValidator, destinationValidator)
+	ret0, _ := ret[0].(types0.IdentityMigrationPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BuildIdentityMigrationPlan indicates an expected call of BuildIdentityMigrationPlan.
+func (mr *MockSupernodeKeeperMockRecorder) BuildIdentityMigrationPlan(ctx, sourceValidator, destinationValidator any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildIdentityMigrationPlan", reflect.TypeOf((*MockSupernodeKeeper)(nil).BuildIdentityMigrationPlan), ctx, sourceValidator, destinationValidator)
+}
+
 // DeleteMetricsState mocks base method.
 func (m *MockSupernodeKeeper) DeleteMetricsState(ctx types1.Context, valAddr types1.ValAddress) {
 	m.ctrl.T.Helper()
@@ -1221,6 +1251,59 @@ func (m *MockSupernodeKeeper) StrictGetSuperNodeByAccount(ctx types1.Context, su
 func (mr *MockSupernodeKeeperMockRecorder) StrictGetSuperNodeByAccount(ctx, supernodeAccount any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StrictGetSuperNodeByAccount", reflect.TypeOf((*MockSupernodeKeeper)(nil).StrictGetSuperNodeByAccount), ctx, supernodeAccount)
+}
+
+// MockAuditKeeper is a mock of AuditKeeper interface.
+type MockAuditKeeper struct {
+	ctrl     *gomock.Controller
+	recorder *MockAuditKeeperMockRecorder
+	isgomock struct{}
+}
+
+// MockAuditKeeperMockRecorder is the mock recorder for MockAuditKeeper.
+type MockAuditKeeperMockRecorder struct {
+	mock *MockAuditKeeper
+}
+
+// NewMockAuditKeeper creates a new mock instance.
+func NewMockAuditKeeper(ctrl *gomock.Controller) *MockAuditKeeper {
+	mock := &MockAuditKeeper{ctrl: ctrl}
+	mock.recorder = &MockAuditKeeperMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockAuditKeeper) EXPECT() *MockAuditKeeperMockRecorder {
+	return m.recorder
+}
+
+// ApplyAccountTransitionPlan mocks base method.
+func (m *MockAuditKeeper) ApplyAccountTransitionPlan(ctx types1.Context, plan keeper.AccountTransitionPlan) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyAccountTransitionPlan", ctx, plan)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyAccountTransitionPlan indicates an expected call of ApplyAccountTransitionPlan.
+func (mr *MockAuditKeeperMockRecorder) ApplyAccountTransitionPlan(ctx, plan any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyAccountTransitionPlan", reflect.TypeOf((*MockAuditKeeper)(nil).ApplyAccountTransitionPlan), ctx, plan)
+}
+
+// BuildCurrentAccountTransitionPlan mocks base method.
+func (m *MockAuditKeeper) BuildCurrentAccountTransitionPlan(ctx types1.Context, source, destination string) (keeper.AccountTransitionPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BuildCurrentAccountTransitionPlan", ctx, source, destination)
+	ret0, _ := ret[0].(keeper.AccountTransitionPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BuildCurrentAccountTransitionPlan indicates an expected call of BuildCurrentAccountTransitionPlan.
+func (mr *MockAuditKeeperMockRecorder) BuildCurrentAccountTransitionPlan(ctx, source, destination any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildCurrentAccountTransitionPlan", reflect.TypeOf((*MockAuditKeeper)(nil).BuildCurrentAccountTransitionPlan), ctx, source, destination)
 }
 
 // MockActionKeeper is a mock of ActionKeeper interface.

@@ -17,7 +17,7 @@ message Params {
   // When false, all MsgClaimLegacyAccount and MsgMigrateValidator messages
   // are rejected regardless of other parameter values.
   // Governance should set this to false once the migration window closes.
-  // Default: true.
+  // Default: false; governance must enable canary or open mode explicitly.
   bool enable_migration = 1;
 
   // migration_end_time is an optional hard deadline expressed as a unix
@@ -46,4 +46,10 @@ message Params {
   // account's MultisigProof. Bounds per-tx verification cost.
   // Default: 20.
   uint32 max_multisig_sub_keys = 5;
+
+  // canary_legacy_addresses optionally restricts migration to the exact,
+  // canonical legacy source addresses listed here. An empty list leaves
+  // migration open when enable_migration is true. Entries must be unique and
+  // sorted lexicographically; at most 64 entries are permitted.
+  repeated string canary_legacy_addresses = 6;
 }

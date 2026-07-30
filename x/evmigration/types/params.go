@@ -7,7 +7,7 @@
 //
 // # Parameters
 //
-// EnableMigration (bool, default: true)
+// EnableMigration (bool, default: false)
 //
 //	Master switch. When false the module rejects every MsgClaimLegacyAccount
 //	and MsgMigrateValidator regardless of other parameter values. Governance
@@ -35,11 +35,20 @@
 //	that exceed the cap must shed delegations before migrating.
 package types
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+)
+
+// MaxCanaryLegacyAddresses bounds the consensus validation and lookup work
+// required by the migration canary gate.
+const MaxCanaryLegacyAddresses = 64
 
 var (
 	// DefaultEnableMigration is the default value for the EnableMigration param.
-	DefaultEnableMigration = true
+	DefaultEnableMigration = false
 	// DefaultMigrationEndTime of 0 means no deadline is enforced.
 	DefaultMigrationEndTime int64 = 0
 	// DefaultMaxMigrationsPerBlock caps claim messages per block.
@@ -68,6 +77,7 @@ func NewParams(
 		MaxMigrationsPerBlock:   maxMigrationsPerBlock,
 		MaxValidatorDelegations: maxValidatorDelegations,
 		MaxMultisigSubKeys:      maxMultisigSubKeys,
+		CanaryLegacyAddresses:   nil,
 	}
 }
 
@@ -92,6 +102,27 @@ func (p Params) Validate() error {
 	}
 	if p.MaxMultisigSubKeys == 0 {
 		return fmt.Errorf("max_multisig_sub_keys must be positive")
+	}
+	if len(p.CanaryLegacyAddresses) > MaxCanaryLegacyAddresses {
+		return fmt.Errorf("canary_legacy_addresses must contain at most %d entries", MaxCanaryLegacyAddresses)
+	}
+	for i, address := range p.CanaryLegacyAddresses {
+		if address == "" {
+			return fmt.Errorf("canary_legacy_addresses[%d] must not be empty", i)
+		}
+		decoded, err := sdk.AccAddressFromBech32(address)
+		if err != nil {
+			return fmt.Errorf("canary_legacy_addresses[%d] is invalid: %w", i, err)
+		}
+		if canonical := decoded.String(); address != canonical {
+			return fmt.Errorf("canary_legacy_addresses[%d] must use canonical account encoding %q", i, canonical)
+		}
+		if i > 0 && !sort.StringsAreSorted(p.CanaryLegacyAddresses[i-1:i+1]) {
+			return fmt.Errorf("canary_legacy_addresses must be sorted lexicographically")
+		}
+		if i > 0 && p.CanaryLegacyAddresses[i-1] == address {
+			return fmt.Errorf("canary_legacy_addresses must not contain duplicates")
+		}
 	}
 	return nil
 }

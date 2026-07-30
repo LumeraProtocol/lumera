@@ -68,6 +68,7 @@ type Keeper struct {
 	authzKeeper        types.AuthzKeeper
 	feegrantKeeper     types.FeegrantKeeper
 	supernodeKeeper    types.SupernodeKeeper
+	auditKeeper        types.AuditKeeper
 	actionKeeper       types.ActionKeeper
 }
 
@@ -83,6 +84,7 @@ func NewKeeper(
 	authzKeeper types.AuthzKeeper,
 	feegrantKeeper types.FeegrantKeeper,
 	supernodeKeeper types.SupernodeKeeper,
+	auditKeeper types.AuditKeeper,
 	actionKeeper types.ActionKeeper,
 ) Keeper {
 	if _, err := addressCodec.BytesToString(authority); err != nil {
@@ -111,6 +113,7 @@ func NewKeeper(
 		authzKeeper:        authzKeeper,
 		feegrantKeeper:     feegrantKeeper,
 		supernodeKeeper:    supernodeKeeper,
+		auditKeeper:        auditKeeper,
 		actionKeeper:       actionKeeper,
 
 		// Allocate once so value-copies of Keeper (e.g. app.EvmigrationKeeper

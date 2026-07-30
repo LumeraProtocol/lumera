@@ -36,6 +36,25 @@ func testAddress(t *testing.T, f *fixture, bz []byte) string {
 	return address
 }
 
+func TestBuildCurrentAccountTransitionPlanUsesNextEpochBoundary(t *testing.T) {
+	f := initFixture(t)
+	old := testAddress(t, f, []byte{111, 112, 113, 114})
+	current := testAddress(t, f, []byte{121, 122, 123, 124})
+	params := f.keeper.GetParams(f.ctx).WithDefaults()
+	const currentEpoch uint64 = 7
+	ctx := f.ctx.WithBlockHeight(int64(params.EpochZeroHeight) + int64(currentEpoch)*int64(params.EpochLengthBlocks))
+
+	plan, err := f.keeper.BuildCurrentAccountTransitionPlan(ctx, old, current)
+	require.NoError(t, err)
+	require.NoError(t, f.keeper.ApplyAccountTransitionPlan(ctx, plan))
+	got, err := f.keeper.AccountForEpoch(ctx, old, currentEpoch)
+	require.NoError(t, err)
+	require.Equal(t, old, got)
+	got, err = f.keeper.AccountForEpoch(ctx, old, currentEpoch+1)
+	require.NoError(t, err)
+	require.Equal(t, current, got)
+}
+
 func TestAccountTransitionLineageBoundariesAndTwoHop(t *testing.T) {
 	f := initFixture(t)
 	old := testAddress(t, f, []byte{1, 2, 3, 4})

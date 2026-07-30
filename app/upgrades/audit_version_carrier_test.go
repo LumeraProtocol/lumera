@@ -55,14 +55,17 @@ func TestAuditConsensusVersionHasCarryingUpgrade(t *testing.T) {
 		"expected v1.20.2 to be the newest registered upgrade carrying the audit 2->3 migration")
 }
 
-// TestV1202IsRegisteredAndMigrationOnly asserts the carrying upgrade is wired
-// into the config and, critically, declares NO store changes.
+// TestV1202IsRegistered asserts the carrying upgrade is wired into the config
+// on every network.
 //
-// A store upgrade here would be actively dangerous: on testnet the EVM stores
-// already exist (v1.20.0 ran), and re-adding a mounted key is a mount error.
-// The whole point of this handler is to be the thinnest possible vehicle for
-// RunMigrations.
-func TestV1202IsRegisteredAndMigrationOnly(t *testing.T) {
+// NOTE: an earlier revision of this test asserted StoreUpgrade == nil, on the
+// reasoning that testnet already has the EVM stores so re-adding them would be
+// a mount error. The Phase 2 mainnet-shaped rehearsal disproved that: mainnet
+// is on 1.12.0 with NO EVM stores, and declaring nothing made every validator
+// crash-loop with "store evmigration mismatch ... expected 155 got 0". The
+// store expectations now live in v1_20_2_store_test.go, which asserts the
+// add-only loader pairing that makes one binary correct on both shapes.
+func TestV1202IsRegistered(t *testing.T) {
 	for _, chainID := range []string{
 		"lumera-mainnet-1",
 		"lumera-testnet-2",
@@ -75,9 +78,6 @@ func TestV1202IsRegisteredAndMigrationOnly(t *testing.T) {
 				"v1.20.2 must be registered on %s - an unregistered upgrade name "+
 					"halts the chain at the plan height with no handler", chainID)
 			require.NotNil(t, cfg.Handler, "v1.20.2 must have a handler")
-			require.Nil(t, cfg.StoreUpgrade,
-				"v1.20.2 must declare NO store changes: on testnet the EVM stores "+
-					"already exist, and re-mounting an existing key is an error")
 		})
 	}
 }

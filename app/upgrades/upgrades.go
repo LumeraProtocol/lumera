@@ -188,11 +188,16 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 		// v1.20.0 nor v1.20.1 can ever run there again to carry it. Without this
 		// upgrade the binary would declare audit 3 against committed state at 2.
 		//
-		// No StoreUpgrade: testnet already mounted the EVM store keys in v1.20.0
-		// and re-mounting an existing key is an error. standardUpgradeHandler runs
-		// RunMigrations and nothing else, which is the entire point.
+		// Declares the EVM store additions on EVERY network, paired with the
+		// add-only store loader (StoreLoaderForUpgrade) which mounts only the keys
+		// missing from committed state. A chain arriving from 1.20.1 already has
+		// them, so nothing is mounted; a chain arriving directly from 1.12.0
+		// (mainnet) has none, so all five are mounted. Declaring nothing here made
+		// every validator on a mainnet-shaped devnet crash-loop with
+		// "store evmigration mismatch ... expected 155 got 0" (Phase 2, 2026-07-30).
 		return UpgradeConfig{
-			Handler: standardUpgradeHandler(upgrade_v1_20_2.UpgradeName, params),
+			StoreUpgrade: &upgrade_v1_20_2.StoreUpgrades,
+			Handler:      upgrade_v1_20_2.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

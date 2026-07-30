@@ -93,7 +93,7 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 					require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey, "v1.20.0 should add evm store key")
 					require.Contains(t, config.StoreUpgrade.Added, erc20types.StoreKey, "v1.20.0 should add erc20 store key")
 				}
-				if upgradeName == upgrade_v1_20_1.UpgradeName && config.StoreUpgrade != nil {
+				if (upgradeName == upgrade_v1_20_1.UpgradeName || upgradeName == upgrade_v1_20_2.UpgradeName) && config.StoreUpgrade != nil {
 					require.Contains(t, config.StoreUpgrade.Added, feemarkettypes.StoreKey, "v1.20.1 should declare feemarket store key")
 					require.Contains(t, config.StoreUpgrade.Added, precisebanktypes.StoreKey, "v1.20.1 should declare precisebank store key")
 					require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey, "v1.20.1 should declare evm store key")
@@ -116,7 +116,8 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 					upgradeName == upgrade_v1_11_1.UpgradeName ||
 					upgradeName == upgrade_v1_12_0.UpgradeName ||
 					upgradeName == upgrade_v1_20_0.UpgradeName ||
-					upgradeName == upgrade_v1_20_1.UpgradeName {
+					upgradeName == upgrade_v1_20_1.UpgradeName ||
+					upgradeName == upgrade_v1_20_2.UpgradeName {
 					continue
 				}
 
@@ -265,9 +266,11 @@ func expectStoreUpgrade(upgradeName, chainID string) bool {
 	case upgrade_v1_20_0.UpgradeName:
 		// EVM stores are added by v1.20.0 only on the networks that run it.
 		return !IsMainnet(chainID)
-	case upgrade_v1_20_1.UpgradeName:
-		// v1.20.1 declares the EVM store additions on every network; the add-only
-		// store loader mounts only the keys missing from committed state.
+	case upgrade_v1_20_1.UpgradeName, upgrade_v1_20_2.UpgradeName:
+		// Both declare the EVM store additions on every network; the add-only
+		// store loader mounts only the keys missing from committed state. v1.20.2
+		// needs them because mainnet may reach it directly from 1.12.0, where no
+		// EVM store exists (proved by the Phase 2 mainnet-shaped rehearsal).
 		return true
 	default:
 		return false

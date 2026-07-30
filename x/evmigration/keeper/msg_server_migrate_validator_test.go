@@ -230,6 +230,7 @@ func TestMigrateValidator_Success(t *testing.T) {
 
 	// Delegation count check — 1 delegation, no unbonding/redelegations.
 	del := stakingtypes.NewDelegation(legacyAddr.String(), oldValAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f.mockFixture, del)
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(
 		[]stakingtypes.Delegation{del}, nil,
 	)
@@ -408,6 +409,7 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 
 	// Self-delegation only (to own validator).
 	selfDel := stakingtypes.NewDelegation(legacyAddr.String(), oldValAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f.mockFixture, selfDel)
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(
 		[]stakingtypes.Delegation{selfDel}, nil,
 	)
@@ -477,6 +479,7 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 	// Operator has a delegation to otherValAddr. MigrateDistribution and
 	// MigrateStaking must handle it.
 	otherDel := stakingtypes.NewDelegation(legacyAddr.String(), otherValAddr.String(), math.LegacyNewDec(50))
+	seedDelegationPrimary(t, f.mockFixture, otherDel)
 
 	// Snapshot withdraw address.
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
@@ -603,7 +606,9 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 
 	// Two delegations: self-delegation + third-party delegator.
 	selfDel := stakingtypes.NewDelegation(legacyAddr.String(), oldValAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f.mockFixture, selfDel)
 	thirdDel := stakingtypes.NewDelegation(thirdPartyDelegator.String(), oldValAddr.String(), math.LegacyNewDec(50))
+	seedDelegationPrimary(t, f.mockFixture, thirdDel)
 	allDels := []stakingtypes.Delegation{selfDel, thirdDel}
 	// Fetched once for the pre-check count; V4 reuses the same slices instead of re-reading.
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(allDels, nil)

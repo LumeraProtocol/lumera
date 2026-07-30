@@ -803,6 +803,21 @@ func (mr *MockDistributionKeeperMockRecorder) GetValidatorOutstandingRewards(ctx
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorOutstandingRewards", reflect.TypeOf((*MockDistributionKeeper)(nil).GetValidatorOutstandingRewards), ctx, val)
 }
 
+// HasDelegatorStartingInfo mocks base method.
+func (m *MockDistributionKeeper) HasDelegatorStartingInfo(ctx context.Context, val types1.ValAddress, del types1.AccAddress) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasDelegatorStartingInfo", ctx, val, del)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasDelegatorStartingInfo indicates an expected call of HasDelegatorStartingInfo.
+func (mr *MockDistributionKeeperMockRecorder) HasDelegatorStartingInfo(ctx, val, del any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasDelegatorStartingInfo", reflect.TypeOf((*MockDistributionKeeper)(nil).HasDelegatorStartingInfo), ctx, val, del)
+}
+
 // IterateValidatorHistoricalRewards mocks base method.
 func (m *MockDistributionKeeper) IterateValidatorHistoricalRewards(ctx context.Context, handler func(types1.ValAddress, uint64, types2.ValidatorHistoricalRewards) bool) {
 	m.ctrl.T.Helper()

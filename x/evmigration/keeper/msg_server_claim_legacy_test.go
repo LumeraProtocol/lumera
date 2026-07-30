@@ -110,6 +110,7 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 	bankKeeper := evmigrationmocks.NewMockBankKeeper(ctrl)
 	stakingKeeper := evmigrationmocks.NewMockStakingKeeper(ctrl)
 	distributionKeeper := evmigrationmocks.NewMockDistributionKeeper(ctrl)
+	distributionKeeper.EXPECT().HasDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil).AnyTimes()
 	authzKeeper := evmigrationmocks.NewMockAuthzKeeper(ctrl)
 	feegrantKeeper := evmigrationmocks.NewMockFeegrantKeeper(ctrl)
 	supernodeKeeper := evmigrationmocks.NewMockSupernodeKeeper(ctrl)
@@ -773,16 +774,14 @@ func TestClaimLegacyAccount_FailAtDistribution(t *testing.T) {
 	f := initMsgServerFixture(t)
 	_, legacyAddr, _, msg := setupPassingPreChecks(t, f)
 
-	// Snapshot + redirectWithdrawAddrIfMigrated both call GetDelegatorWithdrawAddr.
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil).Times(2)
-	// Step 1: MigrateDistribution fails — GetDelegatorDelegations returns error.
+	// Staking discovery is a pristine-state preflight before distribution.
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(
 		nil, fmt.Errorf("staking store corrupted"),
 	)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "migrate distribution")
+	require.Contains(t, err.Error(), "preflight account staking records")
 	assertNoFinalization(t, f, legacyAddr)
 }
 
@@ -790,16 +789,18 @@ func TestClaimLegacyAccount_FailAtDistribution(t *testing.T) {
 // MigrateStaking (step 2) propagates and no record is stored.
 func TestClaimLegacyAccount_FailAtStaking(t *testing.T) {
 	f := initMsgServerFixture(t)
-	_, legacyAddr, _, msg := setupPassingPreChecks(t, f)
+	_, legacyAddr, newAddr, msg := setupPassingPreChecks(t, f)
 
-	// Snapshot + redirectWithdrawAddrIfMigrated both call GetDelegatorWithdrawAddr.
+	// The complete staking snapshot is loaded before distribution performs the
+	// first write. Distribution then performs its own delegation query.
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(2)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil).Times(2)
-	// Step 1: MigrateDistribution succeeds (no delegations).
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
-
-	// Step 2: MigrateStaking — migrateActiveDelegations fails.
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(
-		nil, fmt.Errorf("staking index corrupted"),
+	// With no staking primaries, the final staking operation is the withdraw
+	// address re-key. Fail it to exercise the staking apply error boundary.
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(
+		fmt.Errorf("staking withdraw-address index corrupted"),
 	)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -1007,6 +1008,11 @@ func setupPassingValPreChecksWithOwnership(
 	newPrivKey, newAddr := testNewMigrationAccount(t)
 	oldValAddr := sdk.ValAddress(legacyAddr)
 	newValAddr := sdk.ValAddress(newAddr)
+	for i := range ubds {
+		if ubds[i].ValidatorAddress == "" {
+			ubds[i].ValidatorAddress = oldValAddr.String()
+		}
+	}
 
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
@@ -1026,6 +1032,10 @@ func setupPassingValPreChecksWithOwnership(
 	// wired (empty) store.
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(ubds, nil)
+	// Account-scoped preflight is performed once after proof and ownership plans.
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).AnyTimes()
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).AnyTimes()
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).AnyTimes()
 
 	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
@@ -1214,9 +1224,10 @@ func TestMigrateValidator_FailAtValidatorDelegations(t *testing.T) {
 	// regular delegation would trigger, keeping this focused on the V4 re-key.
 	ubd := stakingtypes.UnbondingDelegation{
 		DelegatorAddress: testAccAddr().String(),
-		ValidatorAddress: sdk.ValAddress(testAccAddr()).String(),
 	}
 	legacyAddr, _, oldValAddr, newValAddr, msg := setupPassingValPreChecks(t, f, ubd)
+	ubd.ValidatorAddress = oldValAddr.String()
+	f.writeUnbondingDelegation(ubd)
 
 	// Steps V1-V3 succeed.
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)
@@ -1356,11 +1367,8 @@ func TestMigrateValidator_FailAtAuth(t *testing.T) {
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
 	// MigrateDistribution: redirect check (self → no-op), no delegations to other validators.
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
-	// MigrateStaking: no delegations/unbonding/redelegations to other validators.
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	// The helper already expects the account staking preflight queries; V7
+	// consumes the preloaded snapshot and does not query UBD/RED state again.
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
 	// MigrateAuth fails — Phase 1 probe of newAddr succeeds (fresh), then legacy not found.
@@ -1386,6 +1394,7 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
 	del := stakingtypes.NewDelegation(legacyAddr.String(), valAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f.mockFixture, del)
 
 	// preChecks: account exists and is not a module account.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)

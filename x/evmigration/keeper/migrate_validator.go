@@ -79,6 +79,40 @@ func (k Keeper) MigrateValidatorDelegations(
 	ubds []stakingtypes.UnbondingDelegation,
 	reds []stakingtypes.Redelegation,
 ) error {
+	cacheCtx, commit := ctx.CacheContext()
+	if reds == nil {
+		var err error
+		reds, err = k.redelegationsForValidator(cacheCtx, oldValAddr)
+		if err != nil {
+			return err
+		}
+	}
+	plan, err := k.buildStakingMigrationPlan(cacheCtx, delegations, ubds, reds, stakingAddressTransform{
+		oldValidator: oldValAddr,
+		newValidator: newValAddr,
+	})
+	if err != nil {
+		return err
+	}
+	if err := k.migrateValidatorDelegationsWithPlan(cacheCtx, oldValAddr, newValAddr, delegations, plan); err != nil {
+		return err
+	}
+	commit()
+	return nil
+}
+
+func (k Keeper) migrateValidatorDelegationsWithPlan(
+	ctx sdk.Context,
+	oldValAddr, newValAddr sdk.ValAddress,
+	delegations []stakingtypes.Delegation,
+	plan stakingMigrationPlan,
+) error {
+	// Validate all raw source/destination primaries and apply queue-backed records
+	// before keeper calls mutate active delegation primaries.
+	if err := k.applyStakingMigrationPlan(ctx, plan, false); err != nil {
+		return err
+	}
+
 	// All delegations reference the same period (currentRewards.Period - 1). Its
 	// reference count becomes base(1) + one per re-keyed delegation. Set it in a
 	// single write here instead of resetting to 1 and incrementing once per
@@ -136,77 +170,6 @@ func (k Keeper) MigrateValidatorDelegations(
 		}
 		if err := k.distributionKeeper.SetDelegatorStartingInfo(ctx, newValAddr, delAddr, startingInfo); err != nil {
 			return err
-		}
-	}
-
-	// Re-key unbonding delegations. (ubds supplied by the caller.)
-	for _, ubd := range ubds {
-		if err := k.stakingKeeper.RemoveUnbondingDelegation(ctx, ubd); err != nil {
-			return err
-		}
-
-		newUbd := stakingtypes.UnbondingDelegation{
-			DelegatorAddress: ubd.DelegatorAddress,
-			ValidatorAddress: newValAddr.String(),
-			Entries:          ubd.Entries,
-		}
-		if err := k.stakingKeeper.SetUnbondingDelegation(ctx, newUbd); err != nil {
-			return err
-		}
-
-		for _, entry := range newUbd.Entries {
-			if err := k.stakingKeeper.InsertUBDQueue(ctx, newUbd, entry.CompletionTime); err != nil {
-				return err
-			}
-			if entry.UnbondingId > 0 {
-				if err := k.stakingKeeper.SetUnbondingDelegationByUnbondingID(ctx, newUbd, entry.UnbondingId); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	// Re-key redelegations where oldValAddr appears as either source or
-	// destination validator. Existing in-flight redelegations must continue to
-	// point at the migrated validator record after operator migration.
-	if reds == nil {
-		var err error
-		reds, err = k.redelegationsForValidator(ctx, oldValAddr)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, red := range reds {
-		if err := k.stakingKeeper.RemoveRedelegation(ctx, red); err != nil {
-			return err
-		}
-
-		newRed := stakingtypes.Redelegation{
-			DelegatorAddress:    red.DelegatorAddress,
-			ValidatorSrcAddress: red.ValidatorSrcAddress,
-			ValidatorDstAddress: red.ValidatorDstAddress,
-			Entries:             red.Entries,
-		}
-		if red.ValidatorSrcAddress == oldValAddr.String() {
-			newRed.ValidatorSrcAddress = newValAddr.String()
-		}
-		if red.ValidatorDstAddress == oldValAddr.String() {
-			newRed.ValidatorDstAddress = newValAddr.String()
-		}
-		if err := k.stakingKeeper.SetRedelegation(ctx, newRed); err != nil {
-			return err
-		}
-
-		for _, entry := range newRed.Entries {
-			if err := k.stakingKeeper.InsertRedelegationQueue(ctx, newRed, entry.CompletionTime); err != nil {
-				return err
-			}
-			if entry.UnbondingId > 0 {
-				if err := k.stakingKeeper.SetRedelegationByUnbondingID(ctx, newRed, entry.UnbondingId); err != nil {
-					return err
-				}
-			}
 		}
 	}
 

@@ -104,8 +104,23 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 		}
 	}
 
+	// Build the complete staking plan against pristine state. This validates
+	// destination primaries and every touched maturity timeslice before reward
+	// withdrawal performs the first write.
+	delegations, ubds, reds, err := ms.accountStakingRecords(ctx, legacyAddr)
+	if err != nil {
+		return nil, fmt.Errorf("preflight account staking records: %w", err)
+	}
+	stakingPlan, err := ms.buildStakingMigrationPlan(ctx, delegations, ubds, reds, stakingAddressTransform{
+		oldDelegator: legacyAddr,
+		newDelegator: newAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("preflight account staking queues: %w", err)
+	}
+
 	// --- Execute migration steps ---
-	if err := ms.migrateAccount(ctx, legacyAddr, newAddr, &msg.NewProof, supernode, hasSupernode, auditPlan); err != nil {
+	if err := ms.migrateAccount(ctx, legacyAddr, newAddr, &msg.NewProof, supernode, hasSupernode, auditPlan, delegations, stakingPlan); err != nil {
 		return nil, err
 	}
 
@@ -213,6 +228,8 @@ func (ms msgServer) migrateAccount(
 	supernode sntypes.SuperNode,
 	hasSupernode bool,
 	auditPlan auditkeeper.AccountTransitionPlan,
+	delegations []stakingtypes.Delegation,
+	stakingPlan stakingMigrationPlan,
 ) error {
 	// Snapshot the original withdraw address before MigrateDistribution
 	// may temporarily redirect it to self (see redirectWithdrawAddrIfMigrated).
@@ -224,7 +241,7 @@ func (ms msgServer) migrateAccount(
 	}
 
 	// Step 2: Re-key staking (delegations, unbonding, redelegations).
-	if err := ms.MigrateStaking(ctx, legacyAddr, newAddr, origWithdrawAddr); err != nil {
+	if err := ms.migrateAccountStakingWithPlan(ctx, legacyAddr, newAddr, origWithdrawAddr, delegations, stakingPlan); err != nil {
 		return fmt.Errorf("migrate staking: %w", err)
 	}
 

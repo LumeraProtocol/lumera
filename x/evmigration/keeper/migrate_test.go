@@ -64,6 +64,7 @@ func initMockFixture(t *testing.T) *mockFixture {
 	bankKeeper := evmigrationmocks.NewMockBankKeeper(ctrl)
 	stakingKeeper := evmigrationmocks.NewMockStakingKeeper(ctrl)
 	distributionKeeper := evmigrationmocks.NewMockDistributionKeeper(ctrl)
+	distributionKeeper.EXPECT().HasDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil).AnyTimes()
 	authzKeeper := evmigrationmocks.NewMockAuthzKeeper(ctrl)
 	feegrantKeeper := evmigrationmocks.NewMockFeegrantKeeper(ctrl)
 	supernodeKeeper := evmigrationmocks.NewMockSupernodeKeeper(ctrl)
@@ -112,6 +113,7 @@ func initMockFixture(t *testing.T) *mockFixture {
 		auditKeeper,
 		actionKeeper,
 	)
+	k.SetStakingStoreService(stakingStoreService)
 
 	// Initialize params with migration enabled.
 	params := types.NewParams(true, 0, 50, 2000, 20)
@@ -142,6 +144,21 @@ func (f *mockFixture) wireScopedMigrationStores() {
 	f.keeper.SetDistributionStoreService(f.distributionStore)
 }
 
+func seedDelegationPrimary(t *testing.T, f *mockFixture, delegation stakingtypes.Delegation) {
+	t.Helper()
+
+	delegator, err := sdk.AccAddressFromBech32(delegation.DelegatorAddress)
+	require.NoError(t, err)
+	validator, err := sdk.ValAddressFromBech32(delegation.ValidatorAddress)
+	require.NoError(t, err)
+
+	store := f.stakingStore.OpenKVStore(f.ctx)
+	require.NoError(t, store.Set(
+		stakingtypes.GetDelegationKey(delegator, validator),
+		stakingtypes.MustMarshalDelegation(f.cdc, delegation),
+	))
+}
+
 func (f *mockFixture) writeRedelegation(red stakingtypes.Redelegation) {
 	delegator, err := sdk.AccAddressFromBech32(red.DelegatorAddress)
 	if err != nil {
@@ -166,6 +183,59 @@ func (f *mockFixture) writeRedelegation(red stakingtypes.Redelegation) {
 	}
 	if err := store.Set(stakingtypes.GetREDByValDstIndexKey(delegator, src, dst), []byte{}); err != nil {
 		panic(err)
+	}
+	triplet := stakingtypes.DVVTriplet{DelegatorAddress: red.DelegatorAddress, ValidatorSrcAddress: red.ValidatorSrcAddress, ValidatorDstAddress: red.ValidatorDstAddress}
+	seen := map[int64]bool{}
+	for _, entry := range red.Entries {
+		if seen[entry.CompletionTime.UnixNano()] {
+			continue
+		}
+		seen[entry.CompletionTime.UnixNano()] = true
+		key := stakingtypes.GetRedelegationTimeKey(entry.CompletionTime)
+		var slice stakingtypes.DVVTriplets
+		if existing, err := store.Get(key); err != nil {
+			panic(err)
+		} else if existing != nil {
+			f.cdc.MustUnmarshal(existing, &slice)
+		}
+		slice.Triplets = append(slice.Triplets, triplet)
+		if err := store.Set(key, f.cdc.MustMarshal(&slice)); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func (f *mockFixture) writeUnbondingDelegation(ubd stakingtypes.UnbondingDelegation) {
+	delegator, err := sdk.AccAddressFromBech32(ubd.DelegatorAddress)
+	if err != nil {
+		panic(err)
+	}
+	validator, err := sdk.ValAddressFromBech32(ubd.ValidatorAddress)
+	if err != nil {
+		panic(err)
+	}
+	store := f.stakingStore.OpenKVStore(f.ctx)
+	if err := store.Set(stakingtypes.GetUBDKey(delegator, validator), stakingtypes.MustMarshalUBD(f.cdc, ubd)); err != nil {
+		panic(err)
+	}
+	pair := stakingtypes.DVPair{DelegatorAddress: ubd.DelegatorAddress, ValidatorAddress: ubd.ValidatorAddress}
+	seen := map[int64]bool{}
+	for _, entry := range ubd.Entries {
+		if seen[entry.CompletionTime.UnixNano()] {
+			continue
+		}
+		seen[entry.CompletionTime.UnixNano()] = true
+		key := stakingtypes.GetUnbondingDelegationTimeKey(entry.CompletionTime)
+		var slice stakingtypes.DVPairs
+		if existing, err := store.Get(key); err != nil {
+			panic(err)
+		} else if existing != nil {
+			f.cdc.MustUnmarshal(existing, &slice)
+		}
+		slice.Pairs = append(slice.Pairs, pair)
+		if err := store.Set(key, f.cdc.MustMarshal(&slice)); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -1271,6 +1341,7 @@ func TestMigrateStaking_ActiveDelegations(t *testing.T) {
 	valAddr := sdk.ValAddress(testAccAddr())
 
 	del := stakingtypes.NewDelegation(legacy.String(), valAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f, del)
 
 	// migrateActiveDelegations
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return([]stakingtypes.Delegation{del}, nil)
@@ -1311,6 +1382,7 @@ func TestMigrateStaking_SlashedValidatorStoresTokensNotShares(t *testing.T) {
 	valAddr := sdk.ValAddress(testAccAddr())
 
 	del := stakingtypes.NewDelegation(legacy.String(), valAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f, del)
 
 	// Slashed validator: 90 tokens / 100 shares → TokensFromSharesTruncated(100) = 90.
 	slashedVal := stakingtypes.Validator{
@@ -1423,6 +1495,7 @@ func TestMigrateStaking_WithUnbondingDelegation(t *testing.T) {
 	valAddr := sdk.ValAddress(testAccAddr())
 
 	del := stakingtypes.NewDelegation(legacy.String(), valAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f, del)
 	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9) // 21 days
 	ubd := stakingtypes.UnbondingDelegation{
 		DelegatorAddress: legacy.String(),
@@ -1437,6 +1510,7 @@ func TestMigrateStaking_WithUnbondingDelegation(t *testing.T) {
 			},
 		},
 	}
+	f.writeUnbondingDelegation(ubd)
 
 	// migrateActiveDelegations
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return([]stakingtypes.Delegation{del}, nil)
@@ -1461,7 +1535,6 @@ func TestMigrateStaking_WithUnbondingDelegation(t *testing.T) {
 			require.Len(t, newUbd.Entries, 1)
 			return nil
 		})
-	f.stakingKeeper.EXPECT().InsertUBDQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetUnbondingDelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(42)).Return(nil)
 
 	// migrateRedelegations
@@ -1484,6 +1557,7 @@ func TestMigrateStaking_WithRedelegation(t *testing.T) {
 	dstValAddr := sdk.ValAddress(testAccAddr())
 
 	del := stakingtypes.NewDelegation(legacy.String(), srcValAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f, del)
 	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
 	red := stakingtypes.Redelegation{
 		DelegatorAddress:    legacy.String(),
@@ -1499,6 +1573,7 @@ func TestMigrateStaking_WithRedelegation(t *testing.T) {
 			},
 		},
 	}
+	f.writeRedelegation(red)
 
 	// migrateActiveDelegations
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return([]stakingtypes.Delegation{del}, nil)
@@ -1527,7 +1602,6 @@ func TestMigrateStaking_WithRedelegation(t *testing.T) {
 			require.Len(t, newRed.Entries, 1)
 			return nil
 		})
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(99)).Return(nil)
 
 	// migrateWithdrawAddress — origWithdrawAddr is nil (not set).
@@ -1560,6 +1634,7 @@ func TestMigrateStaking_UnbondingWithoutActiveDelegation(t *testing.T) {
 			},
 		},
 	}
+	f.writeUnbondingDelegation(ubd)
 
 	// migrateActiveDelegations
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
@@ -1574,7 +1649,6 @@ func TestMigrateStaking_UnbondingWithoutActiveDelegation(t *testing.T) {
 			require.Len(t, newUbd.Entries, 1)
 			return nil
 		})
-	f.stakingKeeper.EXPECT().InsertUBDQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetUnbondingDelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(77)).Return(nil)
 
 	// migrateRedelegations
@@ -1616,6 +1690,7 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			},
 		},
 	}
+	f.writeUnbondingDelegation(ubd)
 	f.stakingKeeper.EXPECT().RemoveUnbondingDelegation(gomock.Any(), ubd).Return(nil)
 	f.stakingKeeper.EXPECT().SetUnbondingDelegation(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, newUbd stakingtypes.UnbondingDelegation) error {
@@ -1623,7 +1698,6 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			require.Equal(t, delegator.String(), newUbd.DelegatorAddress)
 			return nil
 		})
-	f.stakingKeeper.EXPECT().InsertUBDQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetUnbondingDelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(77)).Return(nil)
 
 	// Two redelegations with an UnbondingId: one where the migrated validator is
@@ -1658,15 +1732,8 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			},
 		},
 	}
-	// Redelegations are discovered by an internal scan; this fixture leaves the
-	// scoped store unwired, so the scan falls back to IterateRedelegations.
-	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ any, fn func(int64, stakingtypes.Redelegation) bool) error {
-			require.False(t, fn(0, srcRed))
-			require.False(t, fn(1, dstRed))
-			return nil
-		},
-	)
+	f.writeRedelegation(srcRed)
+	f.writeRedelegation(dstRed)
 	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), srcRed).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, newRed stakingtypes.Redelegation) error {
@@ -1675,7 +1742,6 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			return nil
 		},
 	)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(88)).Return(nil)
 	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), dstRed).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -1685,14 +1751,13 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			return nil
 		},
 	)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(89)).Return(nil)
 
 	err := f.keeper.MigrateValidatorDelegations(
 		f.ctx, oldValAddr, newValAddr,
 		nil,
 		[]stakingtypes.UnbondingDelegation{ubd},
-		nil,
+		[]stakingtypes.Redelegation{srcRed, dstRed},
 	)
 	require.NoError(t, err)
 }
@@ -1759,7 +1824,6 @@ func TestMigrateValidatorDelegations_UsesScopedRedelegationIndexes(t *testing.T)
 			return nil
 		},
 	).Times(2)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(2)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
 	// V4's internal scoped scan discovers the two related redelegations
@@ -1804,7 +1868,6 @@ func TestMigrateValidatorDelegations_DeduplicatesSourceAndDestinationIndexes(t *
 			return nil
 		},
 	).Times(1)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(1)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(101)).Return(nil).Times(1)
 
 	// V4's internal scan collects the doubly-indexed redelegation exactly once
@@ -1834,6 +1897,7 @@ func TestMigrateValidatorDelegations_UsesPreloadedRedelegations(t *testing.T) {
 			UnbondingId:    111,
 		}},
 	}
+	f.writeRedelegation(red)
 
 	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), red).Return(nil).Times(1)
 	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -1843,7 +1907,6 @@ func TestMigrateValidatorDelegations_UsesPreloadedRedelegations(t *testing.T) {
 			return nil
 		},
 	).Times(1)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(1)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(111)).Return(nil).Times(1)
 
 	// The staking store intentionally has no redelegation rows. Passing a
@@ -1953,7 +2016,6 @@ func TestMigrateValidatorDelegations_RekeysMultipleSourceRedelegations(t *testin
 			return nil
 		},
 	).Times(2)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(2)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
 	// Both redelegations share the val-src index prefix; V4's internal scan must
@@ -1984,6 +2046,7 @@ func TestMigrateValidatorDelegations_SetsHistoricalRewardsRefCountOnce(t *testin
 	dels := make([]stakingtypes.Delegation, 3)
 	for i := range dels {
 		dels[i] = stakingtypes.NewDelegation(testAccAddr().String(), oldValAddr.String(), math.LegacyNewDec(int64(10*(i+1))))
+		seedDelegationPrimary(t, f, dels[i])
 	}
 
 	// Current rewards period 5 → target (previous) period 4.
@@ -2045,6 +2108,7 @@ func TestMigrateValidatorDelegations_SlashedValidatorStoresTokensNotShares(t *te
 	newValAddr := sdk.ValAddress(testAccAddr())
 
 	del := stakingtypes.NewDelegation(testAccAddr().String(), oldValAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f, del)
 
 	// Slashed validator: 90 tokens back 100 shares (exchange rate 0.9), so
 	// TokensFromSharesTruncated(100) = 90, strictly less than the 100 shares.
@@ -2481,7 +2545,6 @@ func TestMigrateValidatorScopedIteration_SimulatesGlobalStateImprovement(t *test
 			return nil
 		},
 	).Times(2)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(2)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
 	err = f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, nil, nil, []stakingtypes.Redelegation{srcRed, dstRed})
@@ -2560,7 +2623,6 @@ func TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic(t *testin
 			return nil
 		},
 	).Times(numReds)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(numReds)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(numReds)
 
 	// Passing nil redelegations forces the internal scoped scan (the map path).

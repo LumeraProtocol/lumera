@@ -11,6 +11,12 @@ const (
 	// MaxStorageProofResultsPerReport caps the number of storage proof results
 	// a reporter may submit in a single epoch report. Per PR #118 / Zee F2.
 	MaxStorageProofResultsPerReport = 16
+
+	// Identity-continuity bounds are consensus constants. Exceeding either cap
+	// fails closed instead of turning migration or lineage reads into an
+	// unbounded store scan.
+	MaxAccountTransitions        = 256
+	MaxIdentityTransitionHealOps = 10_000
 )
 
 var (
@@ -45,6 +51,10 @@ var (
 	// Format: "eps/" + u64be(epoch_id)
 	epochParamsSnapshotPrefix = []byte("eps/")
 	reportPrefix              = []byte("r/")
+
+	// Durable deterministic account-lineage indexes.
+	accountTransitionForwardPrefix = []byte("id/f/")
+	accountTransitionReversePrefix = []byte("id/r/")
 
 	reportIndexPrefix = []byte("ri/")
 
@@ -130,6 +140,20 @@ var (
 	// Format: "st/spt-tbe/" + target + "/" + u32be(bucket) + "/" + u64be(epoch) + "/" + transcriptHash
 	transcriptByTargetBucketEpochPrefix = []byte("st/spt-tbe/")
 )
+
+func AccountTransitionForwardKey(source string) []byte {
+	key := append([]byte{}, accountTransitionForwardPrefix...)
+	return append(key, source...)
+}
+
+func AccountTransitionReverseKey(destination string) []byte {
+	key := append([]byte{}, accountTransitionReversePrefix...)
+	return append(key, destination...)
+}
+
+func AccountTransitionForwardPrefix() []byte { return accountTransitionForwardPrefix }
+
+func AccountTransitionReversePrefix() []byte { return accountTransitionReversePrefix }
 
 // EpochAnchorKey returns the store key for the EpochAnchor identified by epochID.
 func EpochAnchorKey(epochID uint64) []byte {

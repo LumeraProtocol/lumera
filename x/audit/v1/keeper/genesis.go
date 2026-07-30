@@ -16,6 +16,17 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 	if err := params.Validate(); err != nil {
 		return err
 	}
+	if err := types.ValidateAccountTransitions(genState.AccountTransitions); err != nil {
+		return err
+	}
+	for _, transition := range genState.AccountTransitions {
+		if err := k.validateTransitionEndpoints(transition); err != nil {
+			return err
+		}
+	}
+	if err := validateGenesisSingletonTransitionEndpoints(genState); err != nil {
+		return err
+	}
 
 	// Genesis is the initial source of truth for module params. After genesis, params can
 	// only be updated via governance (MsgUpdateParams).
@@ -35,6 +46,11 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 	}
 	if err := types.ValidateScoreStatesGenesis(genState, currentEpoch); err != nil {
 		return err
+	}
+	for _, transition := range genState.AccountTransitions {
+		if err := k.ImportAccountTransition(sdkCtx, transition); err != nil {
+			return err
+		}
 	}
 
 	var nextEvidenceID uint64
@@ -167,6 +183,51 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 	return nil
 }
 
+func validateGenesisSingletonTransitionEndpoints(genState types.GenesisState) error {
+	forward := make(map[string]string, len(genState.AccountTransitions))
+	for _, transition := range genState.AccountTransitions {
+		forward[transition.SourceAccount] = transition.DestinationAccount
+	}
+	checkCurrent := func(kind, account string) error {
+		current := account
+		for hops := 0; ; hops++ {
+			next, found := forward[current]
+			if !found {
+				break
+			}
+			if hops >= types.MaxAccountTransitions {
+				return fmt.Errorf("audit genesis: account lineage exceeds transition limit")
+			}
+			current = next
+		}
+		if current != account {
+			return fmt.Errorf("audit genesis: live %s singleton %q is keyed to non-current transition source; want %q", kind, account, current)
+		}
+		return nil
+	}
+	for _, state := range genState.NodeSuspicionStates {
+		if err := checkCurrent("node-suspicion", state.SupernodeAccount); err != nil {
+			return err
+		}
+	}
+	for _, state := range genState.ReporterReliabilityStates {
+		if err := checkCurrent("reporter-reliability", state.ReporterSupernodeAccount); err != nil {
+			return err
+		}
+	}
+	for _, marker := range genState.StorageTruthPostponements {
+		if err := checkCurrent("storage-truth-postponement", marker.SupernodeAccount); err != nil {
+			return err
+		}
+	}
+	for _, marker := range genState.ActionFinalizationPostponements {
+		if err := checkCurrent("action-finalization-postponement", marker.SupernodeAccount); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ExportGenesis returns the module's exported genesis.
 func (k Keeper) ExportGenesis(ctx context.Context) (*types.GenesisState, error) {
 	genesis := types.DefaultGenesis()
@@ -245,6 +306,10 @@ func (k Keeper) ExportGenesis(ctx context.Context) (*types.GenesisState, error) 
 	genesis.ReportIndices = k.GetAllReportIndicesForGenesis(sdkCtx)
 	genesis.HostReportIndices = k.GetAllHostReportIndicesForGenesis(sdkCtx)
 	genesis.StorageChallengeIndices = k.GetAllStorageChallengeIndicesForGenesis(sdkCtx)
+	genesis.AccountTransitions, err = k.GetAllAccountTransitions(sdkCtx)
+	if err != nil {
+		return nil, err
+	}
 
 	return genesis, nil
 }

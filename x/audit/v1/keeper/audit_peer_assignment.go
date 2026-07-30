@@ -263,9 +263,9 @@ func sortedUniqueStrings(in []string) []string {
 	return out
 }
 
-func (k Keeper) storageTruthEligibleChallengers(ctx sdk.Context, activeSorted []string, epochID uint64, params types.Params) []string {
+func (k Keeper) storageTruthEligibleChallengers(ctx sdk.Context, activeSorted []string, epochID uint64, params types.Params) ([]string, error) {
 	if params.StorageTruthEnforcementMode == types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED {
-		return append([]string(nil), activeSorted...)
+		return append([]string(nil), activeSorted...), nil
 	}
 
 	threshold := params.StorageTruthReporterReliabilityIneligibleThreshold
@@ -274,17 +274,25 @@ func (k Keeper) storageTruthEligibleChallengers(ctx sdk.Context, activeSorted []
 	}
 
 	eligible := make([]string, 0, len(activeSorted))
-	for _, account := range activeSorted {
-		state, found := k.GetReporterReliabilityState(ctx, account)
+	for _, epochAccount := range activeSorted {
+		// Epoch anchors are immutable and keep the account that was logical at
+		// epoch start. Reliability is mutable current state and moves with an
+		// identity transition, so read it through the live lineage endpoint while
+		// retaining the anchored account in the assignment set.
+		currentAccount, err := k.CurrentAccount(ctx, epochAccount)
+		if err != nil {
+			return nil, err
+		}
+		state, found := k.GetReporterReliabilityState(ctx, currentAccount)
 		if !found {
-			eligible = append(eligible, account)
+			eligible = append(eligible, epochAccount)
 			continue
 		}
 		score := decayTowardZero(state.ReliabilityScore, params.StorageTruthReporterReliabilityDecayPerEpoch, epochDelta(epochID, state.LastUpdatedEpoch))
 		if score >= threshold || (state.IneligibleUntilEpoch != 0 && state.IneligibleUntilEpoch >= epochID) {
 			continue
 		}
-		eligible = append(eligible, account)
+		eligible = append(eligible, epochAccount)
 	}
-	return eligible
+	return eligible, nil
 }

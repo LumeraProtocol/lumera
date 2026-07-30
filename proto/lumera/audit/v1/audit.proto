@@ -210,4 +210,17 @@ message EpochReport {
   HostReport host_report = 4 [(gogoproto.nullable) = false];
   repeated StorageChallengeObservation storage_challenge_observations = 5;
   repeated StorageProofResult storage_proof_results = 6;
+
+  // current_submitter is the live account that authenticated submission. It is
+  // intentionally distinct from supernode_account, the epoch-logical identity.
+  // Empty decodes preserve reports written before identity continuity shipped.
+  string current_submitter = 7 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+}
+
+// AccountTransition records a durable account lineage edge. The destination
+// becomes the account for the lineage beginning at effective_epoch.
+message AccountTransition {
+  string source_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  string destination_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 effective_epoch = 3;
 }

@@ -144,21 +144,8 @@ func (ms msgServer) preChecks(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddres
 	if err != nil {
 		return err
 	}
-	if !params.EnableMigration {
-		return types.ErrMigrationDisabled
-	}
-	if len(params.CanaryLegacyAddresses) > 0 {
-		canonicalLegacy := legacyAddr.String()
-		allowed := false
-		for _, address := range params.CanaryLegacyAddresses {
-			if address == canonicalLegacy {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			return types.ErrMigrationNotCanary
-		}
+	if err := CheckMigrationActivation(params, legacyAddr); err != nil {
+		return err
 	}
 
 	// 2. Migration window

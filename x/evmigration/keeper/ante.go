@@ -68,9 +68,12 @@ func (k Keeper) VerifyMigrationProofsForAnte(ctx sdk.Context, msg sdk.Msg) error
 	}
 
 	// Admission gate: keep zero-fee, zero-signature migration txs out of the
-	// mempool once migration is switched off or the window has closed.
-	if !params.EnableMigration {
-		return types.ErrMigrationDisabled
+	// mempool once migration is switched off, restricted to a canary allowlist,
+	// or the window has closed. This shares CheckMigrationActivation with
+	// preChecks so the mempool filter can never diverge from the consensus
+	// decision.
+	if err := CheckMigrationActivation(params, legacyAddr); err != nil {
+		return err
 	}
 	if params.MigrationEndTime > 0 && ctx.BlockTime().After(time.Unix(params.MigrationEndTime, 0)) {
 		return types.ErrMigrationWindowClosed
@@ -100,6 +103,37 @@ func (k Keeper) VerifyMigrationProofsForAnte(ctx sdk.Context, msg sdk.Msg) error
 		legacyAddr, newAddr, newAddr,
 		newProof, sigverify.SubKeyTypeEthSecp256k1,
 	)
+}
+
+// CheckMigrationActivation is the single activation-policy helper shared by the
+// ante mempool gate and by message execution. Both entry points must agree:
+// the ante keeps fee-free, zero-signature migration txs out of the mempool and
+// out of block proposals, while message execution remains the authoritative
+// consensus decision.
+//
+// Policy modes:
+//   - disabled: EnableMigration=false rejects everything;
+//   - canary:   a non-empty allowlist admits only the exact canonical legacy
+//     source addresses it names;
+//   - open:     EnableMigration=true with an empty allowlist admits any
+//     otherwise-eligible source.
+//
+// Params.Validate enforces that allowlist entries are canonical, unique and
+// sorted, so a plain canonical string comparison here is exact.
+func CheckMigrationActivation(params types.Params, legacyAddr sdk.AccAddress) error {
+	if !params.EnableMigration {
+		return types.ErrMigrationDisabled
+	}
+	if len(params.CanaryLegacyAddresses) == 0 {
+		return nil
+	}
+	canonicalLegacy := legacyAddr.String()
+	for _, address := range params.CanaryLegacyAddresses {
+		if address == canonicalLegacy {
+			return nil
+		}
+	}
+	return types.ErrMigrationNotCanary
 }
 
 func (k Keeper) verifyMigrationAdmissionState(ctx sdk.Context, msg sdk.Msg, legacyAddr, newAddr sdk.AccAddress) error {

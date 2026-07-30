@@ -51,6 +51,12 @@ const testLegacyBech32 = "lumera1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc58av9gw"
 func TestEVMMempool_CheckTxAcceptsZeroSignerMigrationTx(t *testing.T) {
 	legacyPriv := secp256k1.GenPrivKey()
 	app := setupAppWithLegacyAccountForMempool(t, legacyPriv)
+	// evmigration params default to EnableMigration=false since the continuity
+	// work landed; open the activation gate so this test still exercises the
+	// mempool/ante behavior it names rather than short-circuiting on
+	// "migration is disabled". Disabled-by-default is pinned separately in
+	// x/evmigration/keeper/ante_test.go.
+	enableMigrationInCommittedState(t, app)
 
 	msg := validMigrationMsgForMempoolWithLegacy(t, testChainID, legacyPriv)
 	tx := newUnsignedMigrationTxForMempool(t, app, msg)
@@ -82,6 +88,12 @@ func TestEVMMempool_CheckTxAcceptsZeroSignerMigrationTx(t *testing.T) {
 
 func TestEVMMempool_CheckTxRejectsProofValidNonexistentLegacyAccount(t *testing.T) {
 	app := lumeraapp.Setup(t)
+	// evmigration params default to EnableMigration=false since the continuity
+	// work landed; open the activation gate so this test still exercises the
+	// legacy-account admission check it names rather than short-circuiting on
+	// "migration is disabled". Disabled-by-default is pinned separately in
+	// x/evmigration/keeper/ante_test.go.
+	enableMigrationInCommittedState(t, app)
 
 	msg := validMigrationMsgForMempool(t, testChainID)
 	tx := newUnsignedMigrationTxForMempool(t, app, msg)
@@ -287,6 +299,12 @@ func TestEVMMempool_DuplicateLegacyMigrationTxDoesNotGrowMempool(t *testing.T) {
 func TestEVMMempool_PrepareProposalIncludesZeroSignerMigrationTx(t *testing.T) {
 	legacyPriv := secp256k1.GenPrivKey()
 	app := setupAppWithLegacyAccountForMempool(t, legacyPriv)
+	// evmigration params default to EnableMigration=false since the continuity
+	// work landed; open the activation gate so this test still exercises the
+	// mempool/ante behavior it names rather than short-circuiting on
+	// "migration is disabled". Disabled-by-default is pinned separately in
+	// x/evmigration/keeper/ante_test.go.
+	enableMigrationInCommittedState(t, app)
 
 	msg := validMigrationMsgForMempoolWithLegacy(t, testChainID, legacyPriv)
 	tx := newUnsignedMigrationTxForMempool(t, app, msg)

@@ -131,6 +131,69 @@ func TestVerifyMigrationProofsForAnte_AdmissionGate(t *testing.T) {
 	})
 }
 
+// TestVerifyMigrationProofsForAnte_CanaryGate pins the canary allowlist at the
+// ante admission gate. Migration txs carry no fee and no envelope signature, so
+// the ante is the only place a non-allowlisted source can be kept out of the
+// mempool and out of block proposals. Without this, canary mode still admits
+// unlimited zero-fee txs from arbitrary sources: each one runs full multisig
+// proof verification in CheckTx and is only rejected later by preChecks in
+// DeliverTx, after it has already consumed proposal space. The consensus
+// decision itself stays authoritative in preChecks; this gate is the mempool
+// filter that must agree with it.
+func TestVerifyMigrationProofsForAnte_CanaryGate(t *testing.T) {
+	legacyPriv := secp256k1.GenPrivKey()
+	legacyAddr := sdk.AccAddress(legacyPriv.PubKey().Address())
+	newPriv, newAddr := testNewMigrationAccount(t)
+
+	canaryParams := func(entries ...string) types.Params {
+		params := types.NewParams(true, 0, 50, 2000, 20)
+		params.CanaryLegacyAddresses = entries
+		return params
+	}
+
+	t.Run("rejects source outside canary allowlist", func(t *testing.T) {
+		fixture := initMsgServerFixture(t)
+		other := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+		require.NoError(t, fixture.keeper.Params.Set(fixture.ctx, canaryParams(other.String())))
+
+		msg := newClaimMigrationMsg(t, legacyPriv, legacyAddr, newPriv, newAddr)
+		err := fixture.keeper.VerifyMigrationProofsForAnte(fixture.ctx, msg)
+		require.ErrorIs(t, err, types.ErrMigrationNotCanary)
+	})
+
+	t.Run("admits allowlisted source", func(t *testing.T) {
+		fixture := initMsgServerFixture(t)
+		require.NoError(t, fixture.keeper.Params.Set(fixture.ctx, canaryParams(legacyAddr.String())))
+		fixture.accountKeeper.EXPECT().
+			GetAccount(gomock.Any(), legacyAddr).
+			Return(authtypes.NewBaseAccountWithAddress(legacyAddr))
+
+		msg := newClaimMigrationMsg(t, legacyPriv, legacyAddr, newPriv, newAddr)
+		require.NoError(t, fixture.keeper.VerifyMigrationProofsForAnte(fixture.ctx, msg))
+	})
+
+	t.Run("empty allowlist leaves open mode unchanged", func(t *testing.T) {
+		fixture := initMsgServerFixture(t)
+		require.NoError(t, fixture.keeper.Params.Set(fixture.ctx, canaryParams()))
+		fixture.accountKeeper.EXPECT().
+			GetAccount(gomock.Any(), legacyAddr).
+			Return(authtypes.NewBaseAccountWithAddress(legacyAddr))
+
+		msg := newClaimMigrationMsg(t, legacyPriv, legacyAddr, newPriv, newAddr)
+		require.NoError(t, fixture.keeper.VerifyMigrationProofsForAnte(fixture.ctx, msg))
+	})
+
+	t.Run("validator migration honours the same allowlist", func(t *testing.T) {
+		fixture := initMsgServerFixture(t)
+		other := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+		require.NoError(t, fixture.keeper.Params.Set(fixture.ctx, canaryParams(other.String())))
+
+		msg := newValidatorMigrationMsg(t, legacyPriv, legacyAddr, newPriv, newAddr)
+		err := fixture.keeper.VerifyMigrationProofsForAnte(fixture.ctx, msg)
+		require.ErrorIs(t, err, types.ErrMigrationNotCanary)
+	})
+}
+
 func TestVerifyMigrationProofsForAnte_CheapStateAdmission(t *testing.T) {
 	legacyPriv := secp256k1.GenPrivKey()
 	legacyAddr := sdk.AccAddress(legacyPriv.PubKey().Address())

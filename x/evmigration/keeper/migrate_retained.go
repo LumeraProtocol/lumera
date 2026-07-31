@@ -414,14 +414,14 @@ func (k Keeper) buildGovernancePlan(ctx sdk.Context, legacyAddr, newAddr sdk.Acc
 		if !sdk.Coins(deposit.Amount).IsValid() {
 			return true, fmt.Errorf("source deposit has invalid coins for proposal %d", key.K1())
 		}
-		result := *proto.Clone(&deposit).(*govv1.Deposit)
+		result := cloneGovDeposit(deposit)
 		result.Depositor = newAddr.String()
 		move := govDepositMove{proposalID: key.K1(), source: deposit, result: result}
 		if destination, getErr := k.govKeeper.Deposits.Get(ctx, collections.Join(key.K1(), newAddr)); getErr == nil {
 			if destination.Depositor != newAddr.String() || destination.ProposalId != key.K1() || !sdk.Coins(destination.Amount).IsValid() {
 				return true, fmt.Errorf("destination deposit is malformed for proposal %d", key.K1())
 			}
-			destCopy := *proto.Clone(&destination).(*govv1.Deposit)
+			destCopy := cloneGovDeposit(destination)
 			move.destination = &destCopy
 			// Valid sdk.Coins are sorted and unique, so Add preserves canonical order
 			// without changing deposit semantics.
@@ -500,4 +500,39 @@ func verifyOptionalCollectionValue[K, V any](ctx sdk.Context, m collections.Map[
 		return fmt.Errorf("value changed")
 	}
 	return nil
+}
+
+// cloneGovDeposit deep-copies a gov Deposit without going through proto.Clone.
+//
+// WHY NOT proto.Clone: govv1.Deposit.Amount is []sdk.Coin, whose Amount is an
+// sdkmath.Int wrapping *big.Int. gogoproto's reflection-based table merge walks
+// into big.Int's unexported `abs []big.Word` slice, finds no registered merger
+// for big.Word, and PANICS:
+//
+//	panic: recovered: merger not found for type:big.Word
+//	  gogoproto/proto.(*mergeInfo).computeMergeInfo
+//	  x/gov/types/v1.(*Deposit).XXX_Merge
+//	  gogoproto/proto.Clone
+//	  keeper.buildGovernancePlan  (migrate_retained.go)
+//
+// Observed on a mainnet-shaped devnet: any legacy account holding an ACTIVE
+// governance deposit failed to migrate with an opaque "merger not found" error.
+// The tx aborts so no state is corrupted, but that account can never migrate
+// while the deposit exists, and the operator-facing error explains nothing.
+//
+// Coins are value types holding an immutable Int, so an explicit element copy is
+// a correct deep copy and avoids reflection entirely.
+func cloneGovDeposit(src govv1.Deposit) govv1.Deposit {
+	out := govv1.Deposit{
+		ProposalId: src.ProposalId,
+		Depositor:  src.Depositor,
+	}
+	if src.Amount != nil {
+		out.Amount = make([]sdk.Coin, len(src.Amount))
+		for i, c := range src.Amount {
+			// Coin.Amount is an immutable sdkmath.Int; copying the struct is safe.
+			out.Amount[i] = sdk.NewCoin(c.Denom, c.Amount)
+		}
+	}
+	return out
 }

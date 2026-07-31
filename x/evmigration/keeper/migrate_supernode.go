@@ -8,14 +8,36 @@ import (
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
-// MigrateSupernode updates the SupernodeAccount field if legacyAddr is a supernode.
-// Also records the migration in PrevSupernodeAccounts history.
+// MigrateSupernode preserves the same continuity guarantees as the production
+// account-migration handler. All plans are built before the first write.
 func (k Keeper) MigrateSupernode(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress) error {
+	cacheCtx, commit := ctx.CacheContext()
+	if err := k.migrateSupernodeWithContinuity(cacheCtx, legacyAddr, newAddr); err != nil {
+		return err
+	}
+	commit()
+	return nil
+}
+
+func (k Keeper) migrateSupernodeWithContinuity(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress) error {
 	sn, found, err := k.supernodeKeeper.StrictGetSuperNodeByAccount(ctx, legacyAddr.String())
 	if err != nil {
 		return fmt.Errorf("resolve source supernode ownership: %w", err)
 	}
-	return k.migrateValidatedSupernode(ctx, newAddr, sn, found)
+	if !found {
+		return nil
+	}
+	if err := k.validateDestinationSupernodeOwnership(ctx, newAddr); err != nil {
+		return err
+	}
+	auditPlan, err := k.auditKeeper.BuildCurrentAccountTransitionPlan(ctx, legacyAddr.String(), newAddr.String())
+	if err != nil {
+		return fmt.Errorf("build audit account transition: %w", err)
+	}
+	if err := k.auditKeeper.ApplyAccountTransitionPlan(ctx, auditPlan); err != nil {
+		return fmt.Errorf("apply audit account transition: %w", err)
+	}
+	return k.migrateValidatedSupernode(ctx, newAddr, sn, true)
 }
 
 // migrateValidatedSupernode mutates the exact record returned by the strict

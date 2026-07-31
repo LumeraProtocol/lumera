@@ -7,6 +7,7 @@ import (
 	"cosmossdk.io/core/address"
 	corestore "cosmossdk.io/core/store"
 	"github.com/cosmos/cosmos-sdk/codec"
+	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
@@ -66,8 +67,10 @@ type Keeper struct {
 	stakingKeeper      types.StakingKeeper
 	distributionKeeper types.DistributionKeeper
 	authzKeeper        types.AuthzKeeper
+	govKeeper          *govkeeper.Keeper
 	feegrantKeeper     types.FeegrantKeeper
 	supernodeKeeper    types.SupernodeKeeper
+	auditKeeper        types.AuditKeeper
 	actionKeeper       types.ActionKeeper
 }
 
@@ -81,8 +84,10 @@ func NewKeeper(
 	stakingKeeper types.StakingKeeper,
 	distributionKeeper types.DistributionKeeper,
 	authzKeeper types.AuthzKeeper,
+	govKeeper *govkeeper.Keeper,
 	feegrantKeeper types.FeegrantKeeper,
 	supernodeKeeper types.SupernodeKeeper,
+	auditKeeper types.AuditKeeper,
 	actionKeeper types.ActionKeeper,
 ) Keeper {
 	if _, err := addressCodec.BytesToString(authority); err != nil {
@@ -109,8 +114,10 @@ func NewKeeper(
 		stakingKeeper:      stakingKeeper,
 		distributionKeeper: distributionKeeper,
 		authzKeeper:        authzKeeper,
+		govKeeper:          govKeeper,
 		feegrantKeeper:     feegrantKeeper,
 		supernodeKeeper:    supernodeKeeper,
+		auditKeeper:        auditKeeper,
 		actionKeeper:       actionKeeper,
 
 		// Allocate once so value-copies of Keeper (e.g. app.EvmigrationKeeper

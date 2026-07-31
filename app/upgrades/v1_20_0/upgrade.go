@@ -160,8 +160,9 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 		// Derive a finite migration_end_time from the upgrade block time so the
 		// network runs against a real deadline without hardcoding an absolute
 		// timestamp. RunMigrations already seeded the evmigration module with
-		// default params (enable_migration=true, migration_end_time=0); here we
-		// only override the deadline. Devnet gets a short rehearsal window;
+		// default params (enable_migration=false, migration_end_time=0); here we
+		// only set the deadline. Governance must explicitly choose canary or open
+		// mode after the continuity release gates pass. Devnet gets a short
 		// testnet and mainnet both get a 3-calendar-month window.
 		//
 		// The network is identified from the SDK context (ctx.ChainID()), which

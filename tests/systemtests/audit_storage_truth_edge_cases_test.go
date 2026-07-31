@@ -80,7 +80,7 @@ func TestStorageTruth_FullMode_PostponesLikeSoft(t *testing.T) {
 		strconv.FormatUint(epochID1, 10),
 		auditHostReportJSON(portStates),
 		"--from", prober.nodeName,
-		"--gas", "500000",
+		"--gas", "800000", // Raised from 500000: audit account-transition lineage resolution (logical vs current identity) adds gas to every epoch-report submit; observed 500331 used against the old 500000 cap.
 		"--storage-proof-results", buildStorageProofResultJSONWithClass(
 			prober.accAddr,
 			target.accAddr,
@@ -458,7 +458,7 @@ func TestStorageTruth_FailedHeal_BumpsTicketDeterioration(t *testing.T) {
 		strconv.FormatUint(epochID1, 10),
 		auditHostReportJSON(portStates),
 		"--from", prober.nodeName,
-		"--gas", "500000",
+		"--gas", "800000", // Raised from 500000: audit account-transition lineage resolution (logical vs current identity) adds gas to every epoch-report submit; observed 500331 used against the old 500000 cap.
 		"--storage-proof-results", buildStorageProofResultJSONWithClass(
 			prober.accAddr,
 			target.accAddr,

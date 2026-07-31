@@ -34,6 +34,7 @@ func TestEVMigrationZeroSignerTxBroadcastSyncWithMempoolEnabled(t *testing.T) {
 	node := evmtest.NewEVMNode(t, "lumera-evmigration-mempool", 20)
 	legacyPriv := secp256k1.GenPrivKey()
 	addGenesisLegacyAccount(t, node, sdk.AccAddress(legacyPriv.PubKey().Address().Bytes()))
+	enableMigrationInGenesis(t, node)
 	node.StartAndWaitRPC()
 	defer node.Stop()
 	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
@@ -50,6 +51,7 @@ func TestEVMigrationZeroSignerTxBroadcastSyncAfterLegacyMainnetConfigMigration(t
 	evmtest.WriteLegacyPreEVMAppToml(t, node.HomeDir(), -1)
 	legacyPriv := secp256k1.GenPrivKey()
 	addGenesisLegacyAccount(t, node, sdk.AccAddress(legacyPriv.PubKey().Address().Bytes()))
+	enableMigrationInGenesis(t, node)
 	node.StartAndWaitRPC()
 	defer node.Stop()
 	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
@@ -72,6 +74,7 @@ func TestEVMigrationZeroSignerTxBroadcastSyncAfterLegacyMainnetConfigMigration(t
 
 func TestEVMigrationProofValidNonexistentLegacyAccountRejectedByAnte(t *testing.T) {
 	node := evmtest.NewEVMNode(t, "lumera-evmigration-no-legacy", 20)
+	enableMigrationInGenesis(t, node)
 	node.StartAndWaitRPC()
 	defer node.Stop()
 	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
@@ -187,6 +190,50 @@ func validZeroSignerMigrationTxBytes(t *testing.T, chainID string, legacyPriv *s
 		}}},
 	}
 	return unsignedTxBytes(t, msg)
+}
+
+// enableMigrationInGenesis flips evmigration's EnableMigration to true in the
+// node's genesis file before startup.
+//
+// evmigration params default to EnableMigration=false since the continuity work
+// landed: migration must be switched on deliberately by governance. These
+// end-to-end tests exercise the zero-signer mempool/ante path, which sits behind
+// the activation gate, so without this they short-circuit on "migration is
+// disabled" and stop testing what they name.
+//
+// Disabled-by-default is pinned separately, and deliberately, in
+// x/evmigration/keeper/ante_test.go and x/evmigration/types/params_test.go.
+//
+// Must be called before node.StartAndWaitRPC().
+func enableMigrationInGenesis(t *testing.T, node *evmtest.Node) {
+	t.Helper()
+
+	encCfg := lumeraapp.MakeEncodingConfig(t)
+	genesisPath := filepath.Join(node.HomeDir(), "config", "genesis.json")
+	genesisBytes, err := os.ReadFile(genesisPath)
+	require.NoError(t, err)
+
+	var genesisDoc map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(genesisBytes, &genesisDoc))
+
+	var appState map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(genesisDoc["app_state"], &appState))
+
+	var evmigrationGenesis evmigrationtypes.GenesisState
+	raw, ok := appState[evmigrationtypes.ModuleName]
+	require.True(t, ok, "evmigration module must be present in genesis app_state")
+	encCfg.Codec.MustUnmarshalJSON(raw, &evmigrationGenesis)
+
+	evmigrationGenesis.Params.EnableMigration = true
+	require.NoError(t, evmigrationGenesis.Params.Validate())
+	appState[evmigrationtypes.ModuleName] = encCfg.Codec.MustMarshalJSON(&evmigrationGenesis)
+
+	genesisDoc["app_state"], err = json.Marshal(appState)
+	require.NoError(t, err)
+
+	updated, err := json.MarshalIndent(genesisDoc, "", "  ")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(genesisPath, updated, 0o644))
 }
 
 func addGenesisLegacyAccount(t *testing.T, node *evmtest.Node, legacyAddr sdk.AccAddress) {

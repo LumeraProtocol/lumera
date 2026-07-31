@@ -1,12 +1,13 @@
 package keeper_test
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"sort"
 	"strings"
 	"testing"
 
+	coreaddress "cosmossdk.io/core/address"
 	corestore "cosmossdk.io/core/store"
 	"cosmossdk.io/math"
 	storetypes "cosmossdk.io/store/types"
@@ -24,12 +25,15 @@ import (
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
+	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	ethsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	auditkeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	evmigrationmocks "github.com/LumeraProtocol/lumera/x/evmigration/mocks"
 	module "github.com/LumeraProtocol/lumera/x/evmigration/module"
@@ -51,8 +55,22 @@ type mockFixture struct {
 	authzKeeper        *evmigrationmocks.MockAuthzKeeper
 	feegrantKeeper     *evmigrationmocks.MockFeegrantKeeper
 	supernodeKeeper    *evmigrationmocks.MockSupernodeKeeper
+	auditKeeper        *evmigrationmocks.MockAuditKeeper
 	actionKeeper       *evmigrationmocks.MockActionKeeper
 }
+
+// govAccountStub supplies the constructor-only account surface needed by the
+// real governance keeper used in retained-state tests.
+type govAccountStub struct {
+	codec coreaddress.Codec
+	addr  sdk.AccAddress
+}
+
+func (s govAccountStub) AddressCodec() coreaddress.Codec                             { return s.codec }
+func (s govAccountStub) GetAccount(context.Context, sdk.AccAddress) sdk.AccountI     { return nil }
+func (s govAccountStub) GetModuleAddress(string) sdk.AccAddress                      { return s.addr }
+func (s govAccountStub) GetModuleAccount(context.Context, string) sdk.ModuleAccountI { return nil }
+func (s govAccountStub) SetModuleAccount(context.Context, sdk.ModuleAccountI)        {}
 
 func initMockFixture(t *testing.T) *mockFixture {
 	t.Helper()
@@ -63,30 +81,47 @@ func initMockFixture(t *testing.T) *mockFixture {
 	bankKeeper := evmigrationmocks.NewMockBankKeeper(ctrl)
 	stakingKeeper := evmigrationmocks.NewMockStakingKeeper(ctrl)
 	distributionKeeper := evmigrationmocks.NewMockDistributionKeeper(ctrl)
+	distributionKeeper.EXPECT().HasDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil).AnyTimes()
 	authzKeeper := evmigrationmocks.NewMockAuthzKeeper(ctrl)
 	feegrantKeeper := evmigrationmocks.NewMockFeegrantKeeper(ctrl)
 	supernodeKeeper := evmigrationmocks.NewMockSupernodeKeeper(ctrl)
+	auditKeeper := evmigrationmocks.NewMockAuditKeeper(ctrl)
 	actionKeeper := evmigrationmocks.NewMockActionKeeper(ctrl)
+
+	supernodeKeeper.EXPECT().BuildIdentityMigrationPlan(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ sdk.Context, source, destination sdk.ValAddress) (sntypes.IdentityMigrationPlan, error) {
+			return sntypes.NewIdentityMigrationPlan(source, destination, nil, nil, nil, nil, nil), nil
+		}).AnyTimes()
+	supernodeKeeper.EXPECT().ApplyIdentityMigrationPlan(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	auditKeeper.EXPECT().BuildCurrentAccountTransitionPlan(gomock.Any(), gomock.Any(), gomock.Any()).Return(auditkeeper.AccountTransitionPlan{}, nil).AnyTimes()
+	auditKeeper.EXPECT().ApplyAccountTransitionPlan(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	encCfg := moduletestutil.MakeTestEncodingConfig(module.AppModule{})
 	addrCodec := addresscodec.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix())
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
 	stakingStoreKey := storetypes.NewKVStoreKey(stakingtypes.StoreKey)
 	distributionStoreKey := storetypes.NewKVStoreKey(distrtypes.StoreKey)
+	govStoreKey := storetypes.NewKVStoreKey(govtypes.StoreKey)
 	storeService := runtime.NewKVStoreService(storeKey)
 	stakingStoreService := runtime.NewKVStoreService(stakingStoreKey)
 	distributionStoreService := runtime.NewKVStoreService(distributionStoreKey)
+	govStoreService := runtime.NewKVStoreService(govStoreKey)
 	ctx := testutil.DefaultContextWithKeys(
 		map[string]*storetypes.KVStoreKey{
 			types.StoreKey:        storeKey,
 			stakingtypes.StoreKey: stakingStoreKey,
 			distrtypes.StoreKey:   distributionStoreKey,
+			govtypes.StoreKey:     govStoreKey,
 		},
 		map[string]*storetypes.TransientStoreKey{"transient_test": storetypes.NewTransientStoreKey("transient_test")},
 		nil,
 	)
 
 	authority := authtypes.NewModuleAddress(types.GovModuleName)
+	govKeeper := govkeeper.NewKeeper(
+		encCfg.Codec, govStoreService, govAccountStub{codec: addrCodec, addr: authority}, nil, nil, nil, nil,
+		govtypes.DefaultConfig(), authority.String(),
+	)
 
 	k := keeper.NewKeeper(
 		storeService,
@@ -98,10 +133,13 @@ func initMockFixture(t *testing.T) *mockFixture {
 		stakingKeeper,
 		distributionKeeper,
 		authzKeeper,
+		govKeeper,
 		feegrantKeeper,
 		supernodeKeeper,
+		auditKeeper,
 		actionKeeper,
 	)
+	k.SetStakingStoreService(stakingStoreService)
 
 	// Initialize params with migration enabled.
 	params := types.NewParams(true, 0, 50, 2000, 20)
@@ -122,6 +160,7 @@ func initMockFixture(t *testing.T) *mockFixture {
 		authzKeeper:        authzKeeper,
 		feegrantKeeper:     feegrantKeeper,
 		supernodeKeeper:    supernodeKeeper,
+		auditKeeper:        auditKeeper,
 		actionKeeper:       actionKeeper,
 	}
 }
@@ -129,6 +168,21 @@ func initMockFixture(t *testing.T) *mockFixture {
 func (f *mockFixture) wireScopedMigrationStores() {
 	f.keeper.SetStakingStoreService(f.stakingStore)
 	f.keeper.SetDistributionStoreService(f.distributionStore)
+}
+
+func seedDelegationPrimary(t *testing.T, f *mockFixture, delegation stakingtypes.Delegation) {
+	t.Helper()
+
+	delegator, err := sdk.AccAddressFromBech32(delegation.DelegatorAddress)
+	require.NoError(t, err)
+	validator, err := sdk.ValAddressFromBech32(delegation.ValidatorAddress)
+	require.NoError(t, err)
+
+	store := f.stakingStore.OpenKVStore(f.ctx)
+	require.NoError(t, store.Set(
+		stakingtypes.GetDelegationKey(delegator, validator),
+		stakingtypes.MustMarshalDelegation(f.cdc, delegation),
+	))
 }
 
 func (f *mockFixture) writeRedelegation(red stakingtypes.Redelegation) {
@@ -155,6 +209,59 @@ func (f *mockFixture) writeRedelegation(red stakingtypes.Redelegation) {
 	}
 	if err := store.Set(stakingtypes.GetREDByValDstIndexKey(delegator, src, dst), []byte{}); err != nil {
 		panic(err)
+	}
+	triplet := stakingtypes.DVVTriplet{DelegatorAddress: red.DelegatorAddress, ValidatorSrcAddress: red.ValidatorSrcAddress, ValidatorDstAddress: red.ValidatorDstAddress}
+	seen := map[int64]bool{}
+	for _, entry := range red.Entries {
+		if seen[entry.CompletionTime.UnixNano()] {
+			continue
+		}
+		seen[entry.CompletionTime.UnixNano()] = true
+		key := stakingtypes.GetRedelegationTimeKey(entry.CompletionTime)
+		var slice stakingtypes.DVVTriplets
+		if existing, err := store.Get(key); err != nil {
+			panic(err)
+		} else if existing != nil {
+			f.cdc.MustUnmarshal(existing, &slice)
+		}
+		slice.Triplets = append(slice.Triplets, triplet)
+		if err := store.Set(key, f.cdc.MustMarshal(&slice)); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func (f *mockFixture) writeUnbondingDelegation(ubd stakingtypes.UnbondingDelegation) {
+	delegator, err := sdk.AccAddressFromBech32(ubd.DelegatorAddress)
+	if err != nil {
+		panic(err)
+	}
+	validator, err := sdk.ValAddressFromBech32(ubd.ValidatorAddress)
+	if err != nil {
+		panic(err)
+	}
+	store := f.stakingStore.OpenKVStore(f.ctx)
+	if err := store.Set(stakingtypes.GetUBDKey(delegator, validator), stakingtypes.MustMarshalUBD(f.cdc, ubd)); err != nil {
+		panic(err)
+	}
+	pair := stakingtypes.DVPair{DelegatorAddress: ubd.DelegatorAddress, ValidatorAddress: ubd.ValidatorAddress}
+	seen := map[int64]bool{}
+	for _, entry := range ubd.Entries {
+		if seen[entry.CompletionTime.UnixNano()] {
+			continue
+		}
+		seen[entry.CompletionTime.UnixNano()] = true
+		key := stakingtypes.GetUnbondingDelegationTimeKey(entry.CompletionTime)
+		var slice stakingtypes.DVPairs
+		if existing, err := store.Get(key); err != nil {
+			panic(err)
+		} else if existing != nil {
+			f.cdc.MustUnmarshal(existing, &slice)
+		}
+		slice.Pairs = append(slice.Pairs, pair)
+		if err := store.Set(key, f.cdc.MustMarshal(&slice)); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -222,19 +329,6 @@ func expectHistoricalRewardsLookup(
 }
 
 func expectHistoricalRewardsIncrement(
-	mock *evmigrationmocks.MockDistributionKeeper,
-	val sdk.ValAddress,
-	period uint64,
-	refCount uint32,
-) {
-	expectHistoricalRewardsLookup(mock, val, period, refCount)
-	mock.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), val, period, gomock.Any()).Return(nil)
-}
-
-// expectHistoricalRewardsSet sets up mock expectations for
-// setHistoricalRewardsReferenceCount: look up the (val, period) row, then write
-// its refcount back in a single set.
-func expectHistoricalRewardsSet(
 	mock *evmigrationmocks.MockDistributionKeeper,
 	val sdk.ValAddress,
 	period uint64,
@@ -1027,7 +1121,7 @@ func TestMigrateAuthz_AsGranter(t *testing.T) {
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any()).
 		Do(func(_ any, cb func(sdk.AccAddress, sdk.AccAddress, authz.Grant) bool) {
 			cb(legacy, grantee, grant)
-		})
+		}).Times(2)
 	f.authzKeeper.EXPECT().DeleteGrant(gomock.Any(), grantee, legacy, "/cosmos.bank.v1beta1.MsgSend").Return(nil)
 	f.authzKeeper.EXPECT().SaveGrant(gomock.Any(), grantee, newAddr, genericAuth, grant.Expiration).Return(nil)
 
@@ -1050,7 +1144,7 @@ func TestMigrateAuthz_AsGrantee(t *testing.T) {
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any()).
 		Do(func(_ any, cb func(sdk.AccAddress, sdk.AccAddress, authz.Grant) bool) {
 			cb(granter, legacy, grant)
-		})
+		}).Times(2)
 	f.authzKeeper.EXPECT().DeleteGrant(gomock.Any(), legacy, granter, "/cosmos.bank.v1beta1.MsgSend").Return(nil)
 	f.authzKeeper.EXPECT().SaveGrant(gomock.Any(), newAddr, granter, genericAuth, grant.Expiration).Return(nil)
 
@@ -1130,6 +1224,7 @@ func TestMigrateSupernode_Found(t *testing.T) {
 	}
 
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sn, true, nil)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), newAddr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
@@ -1174,17 +1269,21 @@ func TestMigrateActions_CreatorAndSuperNodes(t *testing.T) {
 		ActionID:   "action-1",
 		Creator:    legacy.String(),
 		SuperNodes: []string{legacy.String(), otherAddr.String()},
+		State:      actiontypes.ActionStatePending,
 	}
 	bySuperNode := &actiontypes.Action{
 		ActionID:   "action-1",
 		Creator:    legacy.String(),
 		SuperNodes: []string{legacy.String(), otherAddr.String()},
+		State:      actiontypes.ActionStatePending,
 	}
+	canonical := *byCreator
 
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), legacy.String()).
 		Return([]*actiontypes.Action{byCreator}, nil)
 	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), legacy.String()).
 		Return([]*actiontypes.Action{bySuperNode}, nil)
+	f.actionKeeper.EXPECT().GetActionByID(gomock.Any(), "action-1").Return(&canonical, true)
 	f.actionKeeper.EXPECT().SetAction(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated *actiontypes.Action) error {
 			require.Equal(t, "action-1", updated.ActionID)
@@ -1211,11 +1310,14 @@ func TestMigrateActions_SuperNodeOnly(t *testing.T) {
 		ActionID:   "action-2",
 		Creator:    creator.String(),
 		SuperNodes: []string{legacy.String()},
+		State:      actiontypes.ActionStateProcessing,
 	}
+	canonical := *action
 
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), legacy.String()).Return(nil, nil)
 	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), legacy.String()).
 		Return([]*actiontypes.Action{action}, nil)
+	f.actionKeeper.EXPECT().GetActionByID(gomock.Any(), "action-2").Return(&canonical, true)
 	f.actionKeeper.EXPECT().SetAction(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated *actiontypes.Action) error {
 			require.Equal(t, creator.String(), updated.Creator)
@@ -1252,6 +1354,7 @@ func TestMigrateStaking_ActiveDelegations(t *testing.T) {
 	valAddr := sdk.ValAddress(testAccAddr())
 
 	del := stakingtypes.NewDelegation(legacy.String(), valAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f, del)
 
 	// migrateActiveDelegations
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return([]stakingtypes.Delegation{del}, nil)
@@ -1292,6 +1395,7 @@ func TestMigrateStaking_SlashedValidatorStoresTokensNotShares(t *testing.T) {
 	valAddr := sdk.ValAddress(testAccAddr())
 
 	del := stakingtypes.NewDelegation(legacy.String(), valAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f, del)
 
 	// Slashed validator: 90 tokens / 100 shares → TokensFromSharesTruncated(100) = 90.
 	slashedVal := stakingtypes.Validator{
@@ -1404,6 +1508,7 @@ func TestMigrateStaking_WithUnbondingDelegation(t *testing.T) {
 	valAddr := sdk.ValAddress(testAccAddr())
 
 	del := stakingtypes.NewDelegation(legacy.String(), valAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f, del)
 	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9) // 21 days
 	ubd := stakingtypes.UnbondingDelegation{
 		DelegatorAddress: legacy.String(),
@@ -1418,6 +1523,7 @@ func TestMigrateStaking_WithUnbondingDelegation(t *testing.T) {
 			},
 		},
 	}
+	f.writeUnbondingDelegation(ubd)
 
 	// migrateActiveDelegations
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return([]stakingtypes.Delegation{del}, nil)
@@ -1442,7 +1548,6 @@ func TestMigrateStaking_WithUnbondingDelegation(t *testing.T) {
 			require.Len(t, newUbd.Entries, 1)
 			return nil
 		})
-	f.stakingKeeper.EXPECT().InsertUBDQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetUnbondingDelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(42)).Return(nil)
 
 	// migrateRedelegations
@@ -1465,6 +1570,7 @@ func TestMigrateStaking_WithRedelegation(t *testing.T) {
 	dstValAddr := sdk.ValAddress(testAccAddr())
 
 	del := stakingtypes.NewDelegation(legacy.String(), srcValAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f, del)
 	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
 	red := stakingtypes.Redelegation{
 		DelegatorAddress:    legacy.String(),
@@ -1480,6 +1586,7 @@ func TestMigrateStaking_WithRedelegation(t *testing.T) {
 			},
 		},
 	}
+	f.writeRedelegation(red)
 
 	// migrateActiveDelegations
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return([]stakingtypes.Delegation{del}, nil)
@@ -1508,7 +1615,6 @@ func TestMigrateStaking_WithRedelegation(t *testing.T) {
 			require.Len(t, newRed.Entries, 1)
 			return nil
 		})
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(99)).Return(nil)
 
 	// migrateWithdrawAddress — origWithdrawAddr is nil (not set).
@@ -1541,6 +1647,7 @@ func TestMigrateStaking_UnbondingWithoutActiveDelegation(t *testing.T) {
 			},
 		},
 	}
+	f.writeUnbondingDelegation(ubd)
 
 	// migrateActiveDelegations
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
@@ -1555,7 +1662,6 @@ func TestMigrateStaking_UnbondingWithoutActiveDelegation(t *testing.T) {
 			require.Len(t, newUbd.Entries, 1)
 			return nil
 		})
-	f.stakingKeeper.EXPECT().InsertUBDQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetUnbondingDelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(77)).Return(nil)
 
 	// migrateRedelegations
@@ -1597,6 +1703,7 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			},
 		},
 	}
+	f.writeUnbondingDelegation(ubd)
 	f.stakingKeeper.EXPECT().RemoveUnbondingDelegation(gomock.Any(), ubd).Return(nil)
 	f.stakingKeeper.EXPECT().SetUnbondingDelegation(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, newUbd stakingtypes.UnbondingDelegation) error {
@@ -1604,7 +1711,6 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			require.Equal(t, delegator.String(), newUbd.DelegatorAddress)
 			return nil
 		})
-	f.stakingKeeper.EXPECT().InsertUBDQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetUnbondingDelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(77)).Return(nil)
 
 	// Two redelegations with an UnbondingId: one where the migrated validator is
@@ -1639,15 +1745,8 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			},
 		},
 	}
-	// Redelegations are discovered by an internal scan; this fixture leaves the
-	// scoped store unwired, so the scan falls back to IterateRedelegations.
-	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ any, fn func(int64, stakingtypes.Redelegation) bool) error {
-			require.False(t, fn(0, srcRed))
-			require.False(t, fn(1, dstRed))
-			return nil
-		},
-	)
+	f.writeRedelegation(srcRed)
+	f.writeRedelegation(dstRed)
 	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), srcRed).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, newRed stakingtypes.Redelegation) error {
@@ -1656,7 +1755,6 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			return nil
 		},
 	)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(88)).Return(nil)
 	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), dstRed).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -1666,14 +1764,13 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			return nil
 		},
 	)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(89)).Return(nil)
 
 	err := f.keeper.MigrateValidatorDelegations(
 		f.ctx, oldValAddr, newValAddr,
 		nil,
 		[]stakingtypes.UnbondingDelegation{ubd},
-		nil,
+		[]stakingtypes.Redelegation{srcRed, dstRed},
 	)
 	require.NoError(t, err)
 }
@@ -1740,7 +1837,6 @@ func TestMigrateValidatorDelegations_UsesScopedRedelegationIndexes(t *testing.T)
 			return nil
 		},
 	).Times(2)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(2)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
 	// V4's internal scoped scan discovers the two related redelegations
@@ -1785,7 +1881,6 @@ func TestMigrateValidatorDelegations_DeduplicatesSourceAndDestinationIndexes(t *
 			return nil
 		},
 	).Times(1)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(1)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(101)).Return(nil).Times(1)
 
 	// V4's internal scan collects the doubly-indexed redelegation exactly once
@@ -1815,6 +1910,7 @@ func TestMigrateValidatorDelegations_UsesPreloadedRedelegations(t *testing.T) {
 			UnbondingId:    111,
 		}},
 	}
+	f.writeRedelegation(red)
 
 	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), red).Return(nil).Times(1)
 	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -1824,7 +1920,6 @@ func TestMigrateValidatorDelegations_UsesPreloadedRedelegations(t *testing.T) {
 			return nil
 		},
 	).Times(1)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(1)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(111)).Return(nil).Times(1)
 
 	// The staking store intentionally has no redelegation rows. Passing a
@@ -1934,7 +2029,6 @@ func TestMigrateValidatorDelegations_RekeysMultipleSourceRedelegations(t *testin
 			return nil
 		},
 	).Times(2)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(2)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
 	// Both redelegations share the val-src index prefix; V4's internal scan must
@@ -1965,6 +2059,7 @@ func TestMigrateValidatorDelegations_SetsHistoricalRewardsRefCountOnce(t *testin
 	dels := make([]stakingtypes.Delegation, 3)
 	for i := range dels {
 		dels[i] = stakingtypes.NewDelegation(testAccAddr().String(), oldValAddr.String(), math.LegacyNewDec(int64(10*(i+1))))
+		seedDelegationPrimary(t, f, dels[i])
 	}
 
 	// Current rewards period 5 → target (previous) period 4.
@@ -2026,6 +2121,7 @@ func TestMigrateValidatorDelegations_SlashedValidatorStoresTokensNotShares(t *te
 	newValAddr := sdk.ValAddress(testAccAddr())
 
 	del := stakingtypes.NewDelegation(testAccAddr().String(), oldValAddr.String(), math.LegacyNewDec(100))
+	seedDelegationPrimary(t, f, del)
 
 	// Slashed validator: 90 tokens back 100 shares (exchange rate 0.9), so
 	// TokensFromSharesTruncated(100) = 90, strictly less than the 100 shares.
@@ -2462,7 +2558,6 @@ func TestMigrateValidatorScopedIteration_SimulatesGlobalStateImprovement(t *test
 			return nil
 		},
 	).Times(2)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(2)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
 	err = f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, nil, nil, []stakingtypes.Redelegation{srcRed, dstRed})
@@ -2541,7 +2636,6 @@ func TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic(t *testin
 			return nil
 		},
 	).Times(numReds)
-	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(numReds)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(numReds)
 
 	// Passing nil redelegations forces the internal scoped scan (the map path).
@@ -2549,73 +2643,6 @@ func TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic(t *testin
 	require.NoError(t, err)
 
 	require.Equal(t, expectedOrder, replayOrder, "redelegations must replay in deterministic store-key order")
-}
-
-// --- Validator-supernode metrics tests ---
-
-// TestMigrateValidatorSupernode_WithMetrics verifies that metrics state is
-// re-keyed when the supernode has metrics.
-func TestMigrateValidatorSupernode_WithMetrics(t *testing.T) {
-	f := initMockFixture(t)
-	oldValAddr := sdk.ValAddress(testAccAddr())
-	newValAddr := sdk.ValAddress(testAccAddr())
-	newAddr := sdk.AccAddress(newValAddr)
-
-	sn := sntypes.SuperNode{
-		ValidatorAddress: oldValAddr.String(),
-		SupernodeAccount: sdk.AccAddress(oldValAddr).String(),
-	}
-	metrics := sntypes.SupernodeMetricsState{
-		ValidatorAddress: oldValAddr.String(),
-	}
-
-	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
-	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(metrics, true)
-	f.supernodeKeeper.EXPECT().SetMetricsState(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ any, updated sntypes.SupernodeMetricsState) error {
-			require.Equal(t, newValAddr.String(), updated.ValidatorAddress)
-			return nil
-		})
-	f.supernodeKeeper.EXPECT().DeleteMetricsState(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ any, updated sntypes.SuperNode) error {
-			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
-			return nil
-		})
-
-	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
-	require.NoError(t, err)
-}
-
-// TestMigrateValidatorSupernode_MetricsWriteFails verifies that a failure
-// writing metrics state propagates as an error.
-func TestMigrateValidatorSupernode_MetricsWriteFails(t *testing.T) {
-	f := initMockFixture(t)
-	oldValAddr := sdk.ValAddress(testAccAddr())
-	newValAddr := sdk.ValAddress(testAccAddr())
-	newAddr := sdk.AccAddress(newValAddr)
-
-	sn := sntypes.SuperNode{
-		ValidatorAddress: oldValAddr.String(),
-		SupernodeAccount: sdk.AccAddress(oldValAddr).String(),
-	}
-	metrics := sntypes.SupernodeMetricsState{
-		ValidatorAddress: oldValAddr.String(),
-	}
-
-	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
-	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(metrics, true)
-	f.supernodeKeeper.EXPECT().SetMetricsState(gomock.Any(), gomock.Any()).Return(
-		fmt.Errorf("metrics store write failed"),
-	)
-
-	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "metrics store write failed")
 }
 
 // TestMigrateValidatorSupernode_NotFound verifies no-op when not a supernode.
@@ -2652,8 +2679,8 @@ func TestMigrateValidatorSupernode_EvidenceAddressMigrated(t *testing.T) {
 
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), newAddr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Len(t, updated.Evidence, 2)
@@ -2693,8 +2720,8 @@ func TestMigrateValidatorSupernode_AccountHistoryPreserved(t *testing.T) {
 
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), newAddr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Len(t, updated.PrevSupernodeAccounts, 3)
@@ -2724,8 +2751,8 @@ func TestMigrateValidatorSupernode_AlternateEncodingSelfOwnedMigratesOnce(t *tes
 
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), newAddr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr).Times(1)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, newValAddr.String(), updated.ValidatorAddress)
@@ -2763,7 +2790,6 @@ func TestMigrateValidatorSupernode_IndependentAccountPreserved(t *testing.T) {
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), independentSNAccount).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			// Validator address should be re-keyed.
@@ -2795,6 +2821,7 @@ func TestMigrateValidatorSupernode_AccountOwnedUnderAnotherValidator(t *testing.
 
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(accountOwned, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), newAddr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, accountOwnedVal.String(), updated.ValidatorAddress)
@@ -2826,6 +2853,7 @@ func TestMigrateValidatorSupernode_TwoDistinctRecords(t *testing.T) {
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(accountOwned, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(validatorAssociated, true)
 	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), independentAccount.String()).Return(validatorAssociated, true, nil)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), newAddr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, accountOwnedVal.String(), updated.ValidatorAddress)
@@ -2833,7 +2861,6 @@ func TestMigrateValidatorSupernode_TwoDistinctRecords(t *testing.T) {
 			return nil
 		})
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, newValAddr.String(), updated.ValidatorAddress)

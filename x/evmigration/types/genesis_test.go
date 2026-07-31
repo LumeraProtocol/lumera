@@ -4,10 +4,17 @@ import (
 	"testing"
 
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGenesisState_Validate(t *testing.T) {
+	canaryAddress := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address()).String()
+	canaryParams := types.NewParams(true, 1000000, 100, 3000, 20)
+	canaryParams.CanaryLegacyAddresses = []string{canaryAddress}
+	invalidCanaryParams := canaryParams
+	invalidCanaryParams.CanaryLegacyAddresses = []string{"not-an-address"}
 	tests := []struct {
 		desc     string
 		genState *types.GenesisState
@@ -24,6 +31,16 @@ func TestGenesisState_Validate(t *testing.T) {
 				Params: types.NewParams(true, 1000000, 100, 3000, 20),
 			},
 			valid: true,
+		},
+		{
+			desc:     "valid genesis state with canary",
+			genState: &types.GenesisState{Params: canaryParams},
+			valid:    true,
+		},
+		{
+			desc:     "invalid genesis state with malformed canary",
+			genState: &types.GenesisState{Params: invalidCanaryParams},
+			valid:    false,
 		},
 		{
 			desc: "invalid: zero max_migrations_per_block",

@@ -7,6 +7,7 @@ import (
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
+	auditkeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -78,6 +79,40 @@ func (k Keeper) MigrateValidatorDelegations(
 	ubds []stakingtypes.UnbondingDelegation,
 	reds []stakingtypes.Redelegation,
 ) error {
+	cacheCtx, commit := ctx.CacheContext()
+	if reds == nil {
+		var err error
+		reds, err = k.redelegationsForValidator(cacheCtx, oldValAddr)
+		if err != nil {
+			return err
+		}
+	}
+	plan, err := k.buildStakingMigrationPlan(cacheCtx, delegations, ubds, reds, stakingAddressTransform{
+		oldValidator: oldValAddr,
+		newValidator: newValAddr,
+	})
+	if err != nil {
+		return err
+	}
+	if err := k.migrateValidatorDelegationsWithPlan(cacheCtx, oldValAddr, newValAddr, delegations, plan); err != nil {
+		return err
+	}
+	commit()
+	return nil
+}
+
+func (k Keeper) migrateValidatorDelegationsWithPlan(
+	ctx sdk.Context,
+	oldValAddr, newValAddr sdk.ValAddress,
+	delegations []stakingtypes.Delegation,
+	plan stakingMigrationPlan,
+) error {
+	// Validate all raw source/destination primaries and apply queue-backed records
+	// before keeper calls mutate active delegation primaries.
+	if err := k.applyStakingMigrationPlan(ctx, plan, false); err != nil {
+		return err
+	}
+
 	// All delegations reference the same period (currentRewards.Period - 1). Its
 	// reference count becomes base(1) + one per re-keyed delegation. Set it in a
 	// single write here instead of resetting to 1 and incrementing once per
@@ -135,77 +170,6 @@ func (k Keeper) MigrateValidatorDelegations(
 		}
 		if err := k.distributionKeeper.SetDelegatorStartingInfo(ctx, newValAddr, delAddr, startingInfo); err != nil {
 			return err
-		}
-	}
-
-	// Re-key unbonding delegations. (ubds supplied by the caller.)
-	for _, ubd := range ubds {
-		if err := k.stakingKeeper.RemoveUnbondingDelegation(ctx, ubd); err != nil {
-			return err
-		}
-
-		newUbd := stakingtypes.UnbondingDelegation{
-			DelegatorAddress: ubd.DelegatorAddress,
-			ValidatorAddress: newValAddr.String(),
-			Entries:          ubd.Entries,
-		}
-		if err := k.stakingKeeper.SetUnbondingDelegation(ctx, newUbd); err != nil {
-			return err
-		}
-
-		for _, entry := range newUbd.Entries {
-			if err := k.stakingKeeper.InsertUBDQueue(ctx, newUbd, entry.CompletionTime); err != nil {
-				return err
-			}
-			if entry.UnbondingId > 0 {
-				if err := k.stakingKeeper.SetUnbondingDelegationByUnbondingID(ctx, newUbd, entry.UnbondingId); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	// Re-key redelegations where oldValAddr appears as either source or
-	// destination validator. Existing in-flight redelegations must continue to
-	// point at the migrated validator record after operator migration.
-	if reds == nil {
-		var err error
-		reds, err = k.redelegationsForValidator(ctx, oldValAddr)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, red := range reds {
-		if err := k.stakingKeeper.RemoveRedelegation(ctx, red); err != nil {
-			return err
-		}
-
-		newRed := stakingtypes.Redelegation{
-			DelegatorAddress:    red.DelegatorAddress,
-			ValidatorSrcAddress: red.ValidatorSrcAddress,
-			ValidatorDstAddress: red.ValidatorDstAddress,
-			Entries:             red.Entries,
-		}
-		if red.ValidatorSrcAddress == oldValAddr.String() {
-			newRed.ValidatorSrcAddress = newValAddr.String()
-		}
-		if red.ValidatorDstAddress == oldValAddr.String() {
-			newRed.ValidatorDstAddress = newValAddr.String()
-		}
-		if err := k.stakingKeeper.SetRedelegation(ctx, newRed); err != nil {
-			return err
-		}
-
-		for _, entry := range newRed.Entries {
-			if err := k.stakingKeeper.InsertRedelegationQueue(ctx, newRed, entry.CompletionTime); err != nil {
-				return err
-			}
-			if entry.UnbondingId > 0 {
-				if err := k.stakingKeeper.SetRedelegationByUnbondingID(ctx, newRed, entry.UnbondingId); err != nil {
-					return err
-				}
-			}
 		}
 	}
 
@@ -277,11 +241,44 @@ func (k Keeper) MigrateValidatorDistribution(ctx sdk.Context, oldValAddr, newVal
 // MigrateValidatorSupernode migrates every validated SuperNode dimension affected
 // by a validator operator migration.
 func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAddr sdk.ValAddress, legacyAddr, newAddr sdk.AccAddress) error {
-	plan, err := k.validateValidatorSupernodeOwnership(ctx, oldValAddr, legacyAddr)
+	cacheCtx, commit := ctx.CacheContext()
+	if err := k.migrateValidatorSupernodeWithContinuity(cacheCtx, oldValAddr, newValAddr, legacyAddr, newAddr); err != nil {
+		return err
+	}
+	commit()
+	return nil
+}
+
+func (k Keeper) migrateValidatorSupernodeWithContinuity(ctx sdk.Context, oldValAddr, newValAddr sdk.ValAddress, legacyAddr, newAddr sdk.AccAddress) error {
+	ownershipPlan, err := k.validateValidatorSupernodeOwnership(ctx, oldValAddr, legacyAddr)
 	if err != nil {
 		return err
 	}
-	return k.migrateValidatedValidatorSupernodes(ctx, oldValAddr, newValAddr, legacyAddr, newAddr, plan)
+	if ownershipPlan.hasAccountOwned {
+		if err := k.validateDestinationSupernodeOwnership(ctx, newAddr); err != nil {
+			return err
+		}
+	}
+	identityPlan, err := k.supernodeKeeper.BuildIdentityMigrationPlan(ctx, oldValAddr, newValAddr)
+	if err != nil {
+		return fmt.Errorf("build supernode identity migration: %w", err)
+	}
+	var auditPlan auditkeeper.AccountTransitionPlan
+	if ownershipPlan.hasAccountOwned {
+		auditPlan, err = k.auditKeeper.BuildCurrentAccountTransitionPlan(ctx, legacyAddr.String(), newAddr.String())
+		if err != nil {
+			return fmt.Errorf("build audit account transition: %w", err)
+		}
+	}
+	if err := k.supernodeKeeper.ApplyIdentityMigrationPlan(ctx, identityPlan); err != nil {
+		return fmt.Errorf("apply supernode identity migration: %w", err)
+	}
+	if ownershipPlan.hasAccountOwned {
+		if err := k.auditKeeper.ApplyAccountTransitionPlan(ctx, auditPlan); err != nil {
+			return fmt.Errorf("apply audit account transition: %w", err)
+		}
+	}
+	return k.migrateValidatedValidatorSupernodes(ctx, oldValAddr, newValAddr, legacyAddr, newAddr, ownershipPlan)
 }
 
 type validatorSupernodeMigrationPlan struct {
@@ -433,16 +430,6 @@ func (k Keeper) migrateValidatedValidatorSupernode(
 		if sn.Evidence[i].ValidatorAddress == oldValAddrStr {
 			sn.Evidence[i].ValidatorAddress = newValAddr.String()
 		}
-	}
-
-	// Migrate metrics state: write under new key, delete old key.
-	metrics, found := k.supernodeKeeper.GetMetricsState(ctx, oldValAddr)
-	if found {
-		metrics.ValidatorAddress = newValAddr.String()
-		if err := k.supernodeKeeper.SetMetricsState(ctx, metrics); err != nil {
-			return err
-		}
-		k.supernodeKeeper.DeleteMetricsState(ctx, oldValAddr)
 	}
 
 	return k.supernodeKeeper.SetSuperNode(ctx, sn)

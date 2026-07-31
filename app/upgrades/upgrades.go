@@ -44,7 +44,7 @@ import (
 // | v1.12.0 | custom   | none (Everlight in supernode)     | Runs migrations; Everlight logic embedded in x/supernode
 // | v1.20.0 | custom   | non-mainnet: add feemarket, precisebank, vm, erc20 | EVM bring-up; gated to non-mainnet (mainnet runs it via v1.20.1)
 // | v1.20.1 | custom   | state-driven add-only: feemarket, precisebank, vm, erc20 | EVM bring-up when EVM absent (any network, incl. direct 1.12.0->1.20.1); migrations-only hotfix when EVM already present. Add-only store loader mounts only missing keys.
-// | v1.20.2 | standard | none                              | Migrations only; no historical state repair
+// | v1.20.2 | standard | none                              | Migration-only carrier for module consensus-version bumps that shipped after v1.20.1 had already executed on testnet (audit 2->3). No store changes by design.
 // =================================================================================================================================
 
 type UpgradeConfig struct {
@@ -180,9 +180,24 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 			StoreUpgrade: &upgrade_v1_20_0.StoreUpgrades,
 			Handler:      upgrade_v1_20_1.CreateUpgradeHandler(params),
 		}, true
+
 	case upgrade_v1_20_2.UpgradeName:
+		// Migration-only carrier. x/audit went from ConsensusVersion 2 to 3 after
+		// v1.20.1 had ALREADY executed on lumera-testnet-2 (verified live
+		// 2026-07-30: app_version 1.20.1, audit module version 2), so neither
+		// v1.20.0 nor v1.20.1 can ever run there again to carry it. Without this
+		// upgrade the binary would declare audit 3 against committed state at 2.
+		//
+		// Declares the EVM store additions on EVERY network, paired with the
+		// add-only store loader (StoreLoaderForUpgrade) which mounts only the keys
+		// missing from committed state. A chain arriving from 1.20.1 already has
+		// them, so nothing is mounted; a chain arriving directly from 1.12.0
+		// (mainnet) has none, so all five are mounted. Declaring nothing here made
+		// every validator on a mainnet-shaped devnet crash-loop with
+		// "store evmigration mismatch ... expected 155 got 0" (Phase 2, 2026-07-30).
 		return UpgradeConfig{
-			Handler: standardUpgradeHandler(upgrade_v1_20_2.UpgradeName, params),
+			StoreUpgrade: &upgrade_v1_20_2.StoreUpgrades,
+			Handler:      upgrade_v1_20_2.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

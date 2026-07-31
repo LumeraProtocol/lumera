@@ -10,6 +10,7 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	auditkeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
 )
@@ -152,6 +153,52 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 			return nil, err
 		}
 	}
+	identityPlan, err := ms.supernodeKeeper.BuildIdentityMigrationPlan(ctx, oldValAddr, newValAddr)
+	if err != nil {
+		return nil, fmt.Errorf("build supernode identity migration: %w", err)
+	}
+	var auditPlan auditkeeper.AccountTransitionPlan
+	if validatorSupernodePlan.hasAccountOwned {
+		auditPlan, err = ms.auditKeeper.BuildCurrentAccountTransitionPlan(ctx, legacyAddr.String(), newAddr.String())
+		if err != nil {
+			return nil, fmt.Errorf("build audit account transition: %w", err)
+		}
+	}
+	retainedPlan, err := ms.buildRetainedStatePlan(ctx, legacyAddr, newAddr, params.EffectiveMaxRetainedStateEntries())
+	if err != nil {
+		return nil, err
+	}
+
+	// Account-owned staking positions are a separate bounded dimension. Build
+	// their snapshot only after all proof/ownership checks, but before any write.
+	accountDelegations, accountUBDs, accountREDs, err := ms.accountStakingRecords(ctx, legacyAddr)
+	if err != nil {
+		return nil, fmt.Errorf("preflight validator account staking records: %w", err)
+	}
+
+	// Build one final-state plan for the union of validator- and account-scoped
+	// records. In particular, a self UBD moves (legacy, oldVal) directly to
+	// (new, newVal), and each queue row is decoded and marshalled only once.
+	allUBDs := append(append([]stakingtypes.UnbondingDelegation(nil), ubds...), accountUBDs...)
+	allREDs := append(append([]stakingtypes.Redelegation(nil), reds...), accountREDs...)
+	allDelegations := append(append([]stakingtypes.Delegation(nil), delegations...), accountDelegations...)
+	stakingPlan, err := ms.buildStakingMigrationPlan(ctx, allDelegations, allUBDs, allREDs, stakingAddressTransform{
+		oldDelegator: legacyAddr,
+		newDelegator: newAddr,
+		oldValidator: oldValAddr,
+		newValidator: newValAddr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("preflight validator staking queues: %w", err)
+	}
+
+	// V4 changes the validator component of account delegation keys before V7
+	// changes their delegator component. Carry that exact intermediate snapshot.
+	for i := range accountDelegations {
+		if accountDelegations[i].ValidatorAddress == oldValAddr.String() {
+			accountDelegations[i].ValidatorAddress = newValAddr.String()
+		}
+	}
 
 	// --- Step V1: Withdraw all commission and delegation rewards ---
 	// Must happen before re-keying so rewards accrue to the correct addresses.
@@ -210,11 +257,20 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	// MaxValidatorDelegations pre-check above; nothing since (reward withdrawal,
 	// record re-key, distribution re-key) mutates these staking records, so a
 	// second read would be pure overhead on a validator with many delegations.
-	if err := ms.MigrateValidatorDelegations(ctx, oldValAddr, newValAddr, delegations, ubds, reds); err != nil {
+	if err := ms.migrateValidatorDelegationsWithPlan(ctx, oldValAddr, newValAddr, delegations, stakingPlan); err != nil {
 		return nil, fmt.Errorf("migrate validator delegations: %w", err)
 	}
 
-	// --- Step V5: Mutate both prevalidated SuperNode ownership dimensions ---
+	// --- Step V5: Apply continuity, then mutate prevalidated ownership ---
+	// Continuity must observe the source primary before PR196 moves it.
+	if err := ms.supernodeKeeper.ApplyIdentityMigrationPlan(ctx, identityPlan); err != nil {
+		return nil, fmt.Errorf("apply supernode identity migration: %w", err)
+	}
+	if validatorSupernodePlan.hasAccountOwned {
+		if err := ms.auditKeeper.ApplyAccountTransitionPlan(ctx, auditPlan); err != nil {
+			return nil, fmt.Errorf("apply audit account transition: %w", err)
+		}
+	}
 	if err := ms.migrateValidatedValidatorSupernodes(
 		ctx, oldValAddr, newValAddr, legacyAddr, newAddr, validatorSupernodePlan,
 	); err != nil {
@@ -243,7 +299,7 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 
 	// Re-key the operator's delegations, unbonding delegations, and
 	// redelegations to OTHER validators (V4 handled delegations TO this validator).
-	if err := ms.MigrateStaking(ctx, legacyAddr, newAddr, origWithdrawAddr); err != nil {
+	if err := ms.migrateAccountStakingWithPlan(ctx, legacyAddr, newAddr, origWithdrawAddr, accountDelegations, stakingMigrationPlan{}); err != nil {
 		return nil, fmt.Errorf("migrate staking: %w", err)
 	}
 
@@ -266,9 +322,9 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		}
 	}
 
-	// Re-key authz grants (both granter and grantee roles).
-	if err := ms.MigrateAuthz(ctx, legacyAddr, newAddr); err != nil {
-		return nil, fmt.Errorf("migrate authz: %w", err)
+	// Apply authz/governance/distribution continuity discovered before V1.
+	if err := ms.applyRetainedStatePlan(ctx, retainedPlan); err != nil {
+		return nil, fmt.Errorf("migrate authz/retained SDK state: %w", err)
 	}
 
 	// Re-key feegrant allowances (both granter and grantee roles).

@@ -195,7 +195,10 @@ func (k Keeper) applyNodeSuspicionDelta(
 	if result == nil || result.TargetSupernodeAccount == "" {
 		return 0, false, nil
 	}
-	supernodeAccount := result.TargetSupernodeAccount
+	supernodeAccount, err := k.CurrentAccount(ctx, result.TargetSupernodeAccount)
+	if err != nil {
+		return 0, false, err
+	}
 	state, found := k.GetNodeSuspicionState(ctx, supernodeAccount)
 	if !found && delta == 0 {
 		return 0, false, nil
@@ -301,6 +304,10 @@ func (k Keeper) applyReporterReliabilityDelta(
 	if reporterAccount == "" {
 		return types.ReporterReliabilityState{}, false, nil
 	}
+	reporterAccount, err := k.CurrentAccount(ctx, reporterAccount)
+	if err != nil {
+		return types.ReporterReliabilityState{}, false, err
+	}
 	state, found := k.GetReporterReliabilityState(ctx, reporterAccount)
 	if !found && delta == 0 && contradictionIncrements == 0 {
 		return types.ReporterReliabilityState{}, false, nil
@@ -376,6 +383,29 @@ func (k Keeper) applyTicketDeteriorationDelta(
 	if !found && delta == 0 {
 		return types.TicketDeteriorationState{}, false, nil
 	}
+	logicalReporter, err := k.AccountForEpoch(ctx, reporterAccount, epochID)
+	if err != nil {
+		return types.TicketDeteriorationState{}, false, err
+	}
+	logicalTarget := ""
+	if result != nil && result.TargetSupernodeAccount != "" {
+		logicalTarget, err = k.AccountForEpoch(ctx, result.TargetSupernodeAccount, epochID)
+		if err != nil {
+			return types.TicketDeteriorationState{}, false, err
+		}
+	}
+	sameTargetLineage := false
+	if found && state.LastTargetSupernodeAccount != "" && logicalTarget != "" {
+		priorTargetAtStoredEpoch, resolveErr := k.AccountForEpoch(ctx, state.LastTargetSupernodeAccount, state.LastResultEpoch)
+		if resolveErr != nil {
+			return types.TicketDeteriorationState{}, false, resolveErr
+		}
+		currentTargetAtStoredEpoch, resolveErr := k.AccountForEpoch(ctx, result.TargetSupernodeAccount, state.LastResultEpoch)
+		if resolveErr != nil {
+			return types.TicketDeteriorationState{}, false, resolveErr
+		}
+		sameTargetLineage = priorTargetAtStoredEpoch == currentTargetAtStoredEpoch
+	}
 
 	current := int64(0)
 	if found {
@@ -391,7 +421,7 @@ func (k Keeper) applyTicketDeteriorationDelta(
 		result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS &&
 		found &&
 		state.LastTargetSupernodeAccount != "" &&
-		state.LastTargetSupernodeAccount != result.TargetSupernodeAccount &&
+		!sameTargetLineage &&
 		isStorageTruthFailureClass(state.LastResultClass) {
 		next = addInt64Saturated(next, -3)
 	}
@@ -412,7 +442,7 @@ func (k Keeper) applyTicketDeteriorationDelta(
 		}
 		if result.TicketId != "" {
 			// Track distinct holder failure count.
-			if isFailure && state.LastTargetSupernodeAccount != "" && state.LastTargetSupernodeAccount != result.TargetSupernodeAccount {
+			if isFailure && state.LastTargetSupernodeAccount != "" && !sameTargetLineage {
 				if nextState.DistinctHolderFailureCount < math.MaxUint32 {
 					nextState.DistinctHolderFailureCount++
 				}
@@ -433,8 +463,8 @@ func (k Keeper) applyTicketDeteriorationDelta(
 				}
 			}
 
-			nextState.LastTargetSupernodeAccount = result.TargetSupernodeAccount
-			nextState.LastReporterSupernodeAccount = reporterAccount
+			nextState.LastTargetSupernodeAccount = logicalTarget
+			nextState.LastReporterSupernodeAccount = logicalReporter
 			nextState.LastResultClass = result.ResultClass
 			nextState.LastResultEpoch = epochID
 			// Per Zee 119-F7 — same-epoch contradictions must be counted; <= not <.
@@ -443,7 +473,7 @@ func (k Keeper) applyTicketDeteriorationDelta(
 			// independent reporter PASS in window AND no clean recheck transcript).
 			if contradictionConfirmed &&
 				state.LastResultEpoch <= epochID &&
-				state.LastTargetSupernodeAccount == result.TargetSupernodeAccount &&
+				sameTargetLineage &&
 				storageTruthResultsContradict(state.LastResultClass, result.ResultClass) {
 				nextState.ContradictionCount = state.ContradictionCount + 1
 			}
@@ -564,7 +594,11 @@ func (k Keeper) storageTruthBookkeepingForResult(
 	}
 
 	reliabilityScore := int64(0)
-	if state, found := k.GetReporterReliabilityState(ctx, reporterAccount); found {
+	currentReporter, err := k.CurrentAccount(ctx, reporterAccount)
+	if err != nil {
+		return bookkeeping, err
+	}
+	if state, found := k.GetReporterReliabilityState(ctx, currentReporter); found {
 		reliabilityScore = decayTowardZero(state.ReliabilityScore, params.StorageTruthReporterReliabilityDecayPerEpoch, epochDelta(epochID, state.LastUpdatedEpoch))
 	}
 	bookkeeping.reporterTrustBand = reporterTrustBandForScore(reliabilityScore, params)
@@ -586,6 +620,22 @@ func (k Keeper) storageTruthBookkeepingForResult(
 	}
 
 	ticketState, found := k.GetTicketDeteriorationState(ctx, result.TicketId)
+	logicalResultTarget, err := k.AccountForEpoch(ctx, result.TargetSupernodeAccount, epochID)
+	if err != nil {
+		return bookkeeping, err
+	}
+	sameTargetLineage := false
+	if found && ticketState.LastTargetSupernodeAccount != "" && logicalResultTarget != "" {
+		previousTargetAtStoredEpoch, resolveErr := k.AccountForEpoch(ctx, ticketState.LastTargetSupernodeAccount, ticketState.LastResultEpoch)
+		if resolveErr != nil {
+			return bookkeeping, resolveErr
+		}
+		resultTargetAtStoredEpoch, resolveErr := k.AccountForEpoch(ctx, result.TargetSupernodeAccount, ticketState.LastResultEpoch)
+		if resolveErr != nil {
+			return bookkeeping, resolveErr
+		}
+		sameTargetLineage = previousTargetAtStoredEpoch == resultTargetAtStoredEpoch
+	}
 	if isStorageTruthFailureClass(result.ResultClass) {
 		patternWindow := uint64(params.StorageTruthPatternEscalationWindow)
 		if patternWindow == 0 {
@@ -606,7 +656,7 @@ func (k Keeper) storageTruthBookkeepingForResult(
 			// Different holder failing same ticket in window: +10.
 			// Same holder failing same ticket in a different epoch: +6.
 			if epochID != ticketState.LastFailureEpoch && ticketState.LastTargetSupernodeAccount != "" {
-				if ticketState.LastTargetSupernodeAccount != result.TargetSupernodeAccount {
+				if !sameTargetLineage {
 					bookkeeping.ticketBonus = 10
 				} else {
 					bookkeeping.ticketBonus = 6
@@ -639,7 +689,7 @@ func (k Keeper) storageTruthBookkeepingForResult(
 	}
 
 	if found && ticketState.LastResultEpoch <= epochID &&
-		ticketState.LastTargetSupernodeAccount == result.TargetSupernodeAccount &&
+		sameTargetLineage &&
 		isStorageTruthFailureClass(ticketState.LastResultClass) &&
 		result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS {
 		contradictionWindow := uint64(params.StorageTruthContradictionWindowEpochs)
@@ -659,7 +709,18 @@ func (k Keeper) storageTruthBookkeepingForResult(
 		}
 		if confirmed {
 			bookkeeping.contradictionDetected = true
-			if ticketState.LastReporterSupernodeAccount != "" && ticketState.LastReporterSupernodeAccount != reporterAccount {
+			previousReporterAtStoredEpoch := ""
+			if ticketState.LastReporterSupernodeAccount != "" {
+				previousReporterAtStoredEpoch, err = k.AccountForEpoch(ctx, ticketState.LastReporterSupernodeAccount, ticketState.LastResultEpoch)
+				if err != nil {
+					return bookkeeping, err
+				}
+			}
+			currentReporterAtStoredEpoch, resolveErr := k.AccountForEpoch(ctx, reporterAccount, ticketState.LastResultEpoch)
+			if resolveErr != nil {
+				return bookkeeping, resolveErr
+			}
+			if ticketState.LastReporterSupernodeAccount != "" && previousReporterAtStoredEpoch != currentReporterAtStoredEpoch {
 				bookkeeping.contradictedReporter = ticketState.LastReporterSupernodeAccount
 				bookkeeping.contradictedReporterDelta = 12
 			}

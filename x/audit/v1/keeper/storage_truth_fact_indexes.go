@@ -266,23 +266,32 @@ func (k Keeper) linkStorageTruthRecheckTranscript(
 func (k Keeper) distinctNodeFailedTickets(ctx sdk.Context, supernodeAccount string, startEpoch uint64, endEpoch uint64, include func(storageTruthNodeFailureRecord) bool) (map[string]struct{}, uint32, error) {
 	tickets := make(map[string]struct{})
 	var events uint32
-	// Bounded epoch scan per CP-NEW-A-11 residue.
-	start, end := types.NodeStorageTruthFailureEpochScanRange(supernodeAccount, startEpoch, endEpoch)
-	it := k.kvStore(ctx).Iterator(start, end)
-	defer func() { _ = it.Close() }()
-	for ; it.Valid(); it.Next() {
-		var record storageTruthNodeFailureRecord
-		if err := json.Unmarshal(it.Value(), &record); err != nil {
+	for epoch := startEpoch; ; epoch++ {
+		logical, err := k.AccountForEpoch(ctx, supernodeAccount, epoch)
+		if err != nil {
 			return nil, 0, err
 		}
-		if include != nil && !include(record) {
-			continue
+		start, end := types.NodeStorageTruthFailureEpochScanRange(logical, epoch, epoch)
+		it := k.kvStore(ctx).Iterator(start, end)
+		for ; it.Valid(); it.Next() {
+			var record storageTruthNodeFailureRecord
+			if err := json.Unmarshal(it.Value(), &record); err != nil {
+				_ = it.Close()
+				return nil, 0, err
+			}
+			if include != nil && !include(record) {
+				continue
+			}
+			if record.TicketID != "" {
+				tickets[record.TicketID] = struct{}{}
+			}
+			if events < ^uint32(0) {
+				events++
+			}
 		}
-		if record.TicketID != "" {
-			tickets[record.TicketID] = struct{}{}
-		}
-		if events < ^uint32(0) {
-			events++
+		_ = it.Close()
+		if epoch == endEpoch {
+			break
 		}
 	}
 	return tickets, events, nil
@@ -304,25 +313,38 @@ func (k Keeper) hasIndependentReporterPassInWindow(
 	// Per 122-Copilot-3 + 122-F1 — indexed lookup avoids DeliverTx full-table scan.
 	// Scan secondary index: "st/rrs-tt/" + target + "/" + u64be(epoch) + "/"
 	// for each epoch in [startEpoch, endEpoch].
-	startKey, endKey := types.ReporterStorageTruthResultByTargetEpochScanRange(targetAccount, startEpoch, endEpoch)
-	it := k.kvStore(ctx).Iterator(startKey, endKey)
-	defer func() { _ = it.Close() }()
-
-	for ; it.Valid(); it.Next() {
-		var record storageTruthReporterResultRecord
-		if err := json.Unmarshal(it.Value(), &record); err != nil {
+	for epoch := startEpoch; ; epoch++ {
+		logical, err := k.AccountForEpoch(ctx, targetAccount, epoch)
+		if err != nil {
 			return false, err
 		}
-		if record.TicketID != ticketID {
-			continue
+		startKey, endKey := types.ReporterStorageTruthResultByTargetEpochScanRange(logical, epoch, epoch)
+		it := k.kvStore(ctx).Iterator(startKey, endKey)
+		for ; it.Valid(); it.Next() {
+			var record storageTruthReporterResultRecord
+			if err := json.Unmarshal(it.Value(), &record); err != nil {
+				_ = it.Close()
+				return false, err
+			}
+			excludedForRecordEpoch, err := k.AccountForEpoch(ctx, excludeReporter, record.EpochID)
+			if err != nil {
+				_ = it.Close()
+				return false, err
+			}
+			recordReporterForEpoch, err := k.AccountForEpoch(ctx, record.Reporter, record.EpochID)
+			if err != nil {
+				_ = it.Close()
+				return false, err
+			}
+			if record.TicketID == ticketID && types.StorageProofResultClass(record.ResultClass) == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS && record.Reporter != "" && recordReporterForEpoch != excludedForRecordEpoch {
+				_ = it.Close()
+				return true, nil
+			}
 		}
-		if types.StorageProofResultClass(record.ResultClass) != types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS {
-			continue
+		_ = it.Close()
+		if epoch == endEpoch {
+			break
 		}
-		if record.Reporter == "" || record.Reporter == excludeReporter {
-			continue
-		}
-		return true, nil
 	}
 	return false, nil
 }
@@ -337,22 +359,28 @@ func (k Keeper) hasCleanRecheckInWindow(
 	// Per 122-Copilot-4 + 122-F1 — indexed lookup avoids DeliverTx full-table scan.
 	// Scan secondary index: "st/spt-tbe/" + target + "/" + u32be(RECHECK) + "/" epoch range.
 	recheckBucket := uint32(types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK)
-	startKey, endKey := types.TranscriptByTargetBucketEpochScanRange(targetAccount, recheckBucket, startEpoch, endEpoch)
-	it := k.kvStore(ctx).Iterator(startKey, endKey)
-	defer func() { _ = it.Close() }()
-
-	for ; it.Valid(); it.Next() {
-		var record storageProofTranscriptRecord
-		if err := json.Unmarshal(it.Value(), &record); err != nil {
+	for epoch := startEpoch; ; epoch++ {
+		logical, err := k.AccountForEpoch(ctx, targetAccount, epoch)
+		if err != nil {
 			return false, err
 		}
-		if record.TicketID != ticketID {
-			continue
+		startKey, endKey := types.TranscriptByTargetBucketEpochScanRange(logical, recheckBucket, epoch, epoch)
+		it := k.kvStore(ctx).Iterator(startKey, endKey)
+		for ; it.Valid(); it.Next() {
+			var record storageProofTranscriptRecord
+			if err := json.Unmarshal(it.Value(), &record); err != nil {
+				_ = it.Close()
+				return false, err
+			}
+			if record.TicketID == ticketID && types.StorageProofResultClass(record.ResultClass) == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS {
+				_ = it.Close()
+				return true, nil
+			}
 		}
-		if types.StorageProofResultClass(record.ResultClass) != types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS {
-			continue
+		_ = it.Close()
+		if epoch == endEpoch {
+			break
 		}
-		return true, nil
 	}
 	return false, nil
 }
@@ -369,17 +397,23 @@ func (k Keeper) setStorageTruthFailedHeal(ctx sdk.Context, supernodeAccount stri
 }
 
 func (k Keeper) hasStorageTruthFailedHeal(ctx sdk.Context, supernodeAccount string, startEpoch uint64, endEpoch uint64) bool {
-	prefix := types.StorageTruthFailedHealPrefix(supernodeAccount)
-	it := k.kvStore(ctx).Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer func() { _ = it.Close() }()
-	for ; it.Valid(); it.Next() {
-		key := it.Key()
-		if len(key) < len(prefix)+8 {
-			continue
+	for epoch := startEpoch; ; epoch++ {
+		logical, err := k.AccountForEpoch(ctx, supernodeAccount, epoch)
+		if err != nil {
+			panic(err)
 		}
-		epochID := binary.BigEndian.Uint64(key[len(prefix) : len(prefix)+8])
-		if epochID >= startEpoch && epochID <= endEpoch {
+		prefix := types.StorageTruthFailedHealPrefix(logical)
+		start := append(append([]byte(nil), prefix...), make([]byte, 8)...)
+		binary.BigEndian.PutUint64(start[len(prefix):], epoch)
+		end := append(append([]byte(nil), start...), 0xff)
+		it := k.kvStore(ctx).Iterator(start, end)
+		found := it.Valid()
+		_ = it.Close()
+		if found {
 			return true
+		}
+		if epoch == endEpoch {
+			break
 		}
 	}
 	return false

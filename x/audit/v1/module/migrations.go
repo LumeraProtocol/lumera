@@ -39,3 +39,9 @@ func NewMigrateV1ToV2(k keeper.Keeper) func(ctx sdk.Context) error {
 		return k.SetParams(ctx, params)
 	}
 }
+
+// NewMigrateV2ToV3 is state-no-op. Legacy reports decode with an empty
+// current_submitter and identity indexes begin empty.
+func NewMigrateV2ToV3() func(ctx sdk.Context) error {
+	return func(_ sdk.Context) error { return nil }
+}

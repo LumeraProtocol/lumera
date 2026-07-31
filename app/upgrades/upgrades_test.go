@@ -228,13 +228,26 @@ func TestV1201CarriesEVMBringupOnAllNetworks(t *testing.T) {
 	}
 }
 
-func TestV1202IsMigrationOnlyOnAllNetworks(t *testing.T) {
+// TestV1202RegistersOnAllNetworks asserts v1.20.2 is wired up everywhere.
+//
+// NOTE: this test previously also asserted `config.StoreUpgrade == nil`, on the
+// reasoning that v1.20.2 is a migration-only carrier. That premise was correct
+// for testnet and WRONG for mainnet, and the mainnet-shaped devnet rehearsal
+// disproved it: mainnet is still on 1.12.0 with NO EVM stores, so declaring no
+// StoreUpgrades made every validator crash-loop with
+//
+//	panic: version of store evmigration mismatch root store's version;
+//	expected 155 got 0; new stores should be added using StoreUpgrades
+//
+// v1.20.2 therefore declares the EVM store additions on every network, paired
+// with the add-only store loader that mounts only the keys missing from
+// committed state. Store expectations now live in v1_20_2_store_test.go.
+func TestV1202RegistersOnAllNetworks(t *testing.T) {
 	for _, chainID := range []string{"lumera-mainnet-1", "lumera-testnet-2", "lumera-devnet-1"} {
 		params := newTestUpgradeParams(chainID)
 		config, found := SetupUpgrades(upgrade_v1_20_2.UpgradeName, params)
 		require.True(t, found)
 		require.NotNil(t, config.Handler, "v1.20.2 must register a handler on %s", chainID)
-		require.Nil(t, config.StoreUpgrade, "v1.20.2 must not alter stores on %s", chainID)
 	}
 }
 

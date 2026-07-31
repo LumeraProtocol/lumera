@@ -119,11 +119,29 @@ ensure_fee_funds() {
 		return 0
 	fi
 	echo "  💧 $svc voter has ${spendable}ulume spendable (< ${FEE_MIN}); topping up ${FEE_TOPUP} from ${SERVICE_NAME}/${PRIMARY_FUNDING_KEY}"
-	topup_json=$(docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE_NAME" \
-		lumerad tx bank send "$PRIMARY_FUNDING_KEY" "$addr" "$FEE_TOPUP" \
-		--keyring-backend "$KEYRING_BACKEND" --chain-id "$CHAIN_ID" \
-		--gas "$GAS_AMOUNT" --gas-prices 0.025ulume -y -o json 2>&1)
-	topup_rc=$?
+	# Every voter is topped up from the SAME funding account in a tight loop, so
+	# back-to-back sends race the account sequence: the second is broadcast before
+	# the first is committed and fails with "account sequence mismatch, expected N,
+	# got N-1". The caller then SKIPS that validator's vote entirely — observed
+	# twice during the Phase 2 rehearsals, each time dropping one of five votes
+	# (4000000000000 instead of 5000000000000). The proposal still passed there,
+	# but on a network where one validator carries decisive weight this silently
+	# changes a governance outcome. Retry on sequence mismatch specifically.
+	local attempt=1 max_attempts="${TOPUP_MAX_ATTEMPTS:-4}"
+	while :; do
+		topup_json=$(docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE_NAME" \
+			lumerad tx bank send "$PRIMARY_FUNDING_KEY" "$addr" "$FEE_TOPUP" \
+			--keyring-backend "$KEYRING_BACKEND" --chain-id "$CHAIN_ID" \
+			--gas "$GAS_AMOUNT" --gas-prices 0.025ulume -y -o json 2>&1)
+		topup_rc=$?
+		if echo "$topup_json" | grep -q "account sequence mismatch" && [ "$attempt" -lt "$max_attempts" ]; then
+			echo "  ⏳ $svc: sequence mismatch on top-up (attempt ${attempt}/${max_attempts}); waiting for the previous send to commit"
+			sleep "${TOPUP_RETRY_SECS:-6}"
+			attempt=$((attempt + 1))
+			continue
+		fi
+		break
+	done
 	if [ "$topup_rc" -ne 0 ]; then
 		echo "  ❌ $svc: fee top-up command failed with exit code $topup_rc" >&2
 		echo "$topup_json" >&2

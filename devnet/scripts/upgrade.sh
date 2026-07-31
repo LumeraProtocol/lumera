@@ -216,11 +216,23 @@ if ! detect_upgrade_halt; then
 	LIVE_HEIGHT="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
 		lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
 	if [[ "${LIVE_HEIGHT}" =~ ^[0-9]+$ ]]; then
-		echo "ERROR: chain is still producing blocks (height ${LIVE_HEIGHT}) and has NOT halted for the ${RELEASE_NAME} upgrade." >&2
-		echo "       The upgrade did not execute — the proposal likely failed to pass (quorum/threshold)." >&2
-		echo "       Inspect: lumerad query gov proposal ${PROPOSAL_ID}" >&2
-		echo "       Refusing to swap binaries; running ${RELEASE_NAME} on un-upgraded state would crash all nodes." >&2
-		exit 1
+		# A node that has stopped for an upgrade KEEPS SERVING RPC at the halt
+		# height, so a numeric height is not proof the chain is live. Sample twice
+		# and compare: only an ADVANCING height means blocks are still being made.
+		# Without this the guard aborted correct upgrades whose halt height had
+		# just been reached (observed on the two-hop rehearsal at height 207).
+		sleep "${HALT_CONFIRM_SECS:-12}"
+		LIVE_HEIGHT_2="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+			lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
+		if [[ "${LIVE_HEIGHT_2}" =~ ^[0-9]+$ ]] && ((LIVE_HEIGHT_2 > LIVE_HEIGHT)); then
+			echo "ERROR: chain is still producing blocks (${LIVE_HEIGHT} -> ${LIVE_HEIGHT_2}) and has NOT stopped for the ${RELEASE_NAME} upgrade." >&2
+			echo "       Check the proposal actually PASSED and that its plan height is in the future:" >&2
+			echo "         lumerad query gov proposal ${PROPOSAL_ID}" >&2
+			echo "         lumerad query upgrade plan" >&2
+			echo "       Refusing to swap binaries; running ${RELEASE_NAME} on un-upgraded state would crash all nodes." >&2
+			exit 1
+		fi
+		echo "Height static at ${LIVE_HEIGHT} across two samples — chain is stopped at the upgrade boundary; proceeding."
 	fi
 	echo "⚠️  No upgrade-halt marker found and RPC is unreachable; assuming a genuine halt and proceeding." >&2
 fi

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"cosmossdk.io/collections"
@@ -150,7 +151,15 @@ func (k Keeper) verifyRetainedStatePlan(ctx sdk.Context, plan retainedStatePlan)
 		for _, move := range plan.authz {
 			sourceID := authzIdentity(move.oldGranter, move.oldGrantee, move.msgType)
 			grant, ok := current[sourceID]
-			if !ok || !proto.Equal(&grant, &move.source) {
+			if !ok {
+				return fmt.Errorf("stale authz source grant %s", sourceID)
+			}
+			// Bytes comparison, not proto.Equal - see verifyCollectionValue.
+			same, cmpErr := protoBytesEqual(&grant, &move.source)
+			if cmpErr != nil {
+				return cmpErr
+			}
+			if !same {
 				return fmt.Errorf("stale authz source grant %s", sourceID)
 			}
 			targetID := authzIdentity(move.newGranter, move.newGrantee, move.msgType)
@@ -385,7 +394,12 @@ func (k Keeper) buildGovernancePlan(ctx sdk.Context, legacyAddr, newAddr sdk.Acc
 		if getErr == nil {
 			destCopy := *proto.Clone(&destination).(*govv1.Vote)
 			move.destination = &destCopy
-			if !proto.Equal(&result, &destination) {
+			// Bytes comparison, not proto.Equal - see verifyCollectionValue.
+			sameVote, cmpErr := protoBytesEqual(&result, &destination)
+			if cmpErr != nil {
+				return true, cmpErr
+			}
+			if !sameVote {
 				return true, fmt.Errorf("conflicting destination vote for proposal %d", key.K1())
 			}
 			move.collapse = true
@@ -469,21 +483,82 @@ func (k Keeper) buildWithdrawAddressPlan(ctx sdk.Context, legacyAddr sdk.AccAddr
 
 // These helpers keep stale checks exact while allowing the concrete collection
 // value type to remain inferred from the SDK keeper fields.
+// verifyCollectionValue re-reads a value and asserts it still matches the
+// expectation captured when the plan was built.
+//
+// WHY NOT proto.Equal: gogoproto's reflection-based comparison is unreliable for
+// messages carrying sdk.Coin, because Coin.Amount is an sdkmath.Int wrapping
+// *big.Int with an unexported `abs []big.Word`. proto.Equal returns FALSE for two
+// byte-identical gov Deposits (proved by TestProtoEqualOnIdenticalGovDeposits) --
+// the same reflection family that outright panics in proto.Clone.
+//
+// Using it here produced a FALSE staleness positive: migrating a legacy account
+// holding a governance deposit failed with
+//
+//	stale governance deposit source for proposal 2: value changed
+//
+// on a deposit nothing had touched. Fail-closed, so it was safe, but it blocked
+// a legitimate migration and the message pointed at concurrent mutation that
+// never happened.
+//
+// Marshalled-bytes comparison is the deterministic, consensus-relevant notion of
+// "unchanged" -- it is exactly what the store holds -- and it sidesteps
+// reflection entirely.
 func verifyCollectionValue[K, V any](ctx sdk.Context, m collections.Map[K, V], key K, expected proto.Message) error {
 	value, err := m.Get(ctx, key)
 	if err != nil {
 		return err
 	}
 	actual, ok := any(&value).(proto.Message)
-	if !ok || !proto.Equal(actual, expected) {
+	if !ok {
+		return fmt.Errorf("value is not a proto.Message")
+	}
+	same, err := protoBytesEqual(actual, expected)
+	if err != nil {
+		return err
+	}
+	if !same {
 		return fmt.Errorf("value changed")
 	}
 	return nil
 }
 
+// protoBytesEqual compares two proto messages by their marshalled bytes.
+// See verifyCollectionValue for why proto.Equal is not used.
+func protoBytesEqual(a, b proto.Message) (bool, error) {
+	ab, err := proto.Marshal(a)
+	if err != nil {
+		return false, fmt.Errorf("marshal actual: %w", err)
+	}
+	bb, err := proto.Marshal(b)
+	if err != nil {
+		return false, fmt.Errorf("marshal expected: %w", err)
+	}
+	return bytes.Equal(ab, bb), nil
+}
+
+// verifyOptionalCollectionValue asserts that an optional destination entry is
+// still in the state the plan expected: absent if the plan saw it absent, or
+// byte-identical if the plan captured a value.
+//
+// TYPED-NIL TRAP: callers pass a concrete typed pointer (e.g. *govv1.Deposit)
+// for `expected`. When that pointer is nil it is wrapped in a NON-nil
+// proto.Message interface, so a plain `expected == nil` check is FALSE and the
+// "absent is fine" branch never runs. The function then treated a legitimately
+// absent destination as an error and surfaced:
+//
+//	stale governance deposit destination for proposal 2:
+//	  collections: not found: key '("2","lumera1k7del...")' of type ...gov.v1.Deposit
+//
+// i.e. it demanded the destination exist and then failed because it did not.
+// isNilMessage uses reflection on the interface's underlying value to detect the
+// typed-nil case correctly.
+//
+// Comparison is by marshalled bytes, not proto.Equal - see verifyCollectionValue
+// for why gogoproto's reflective equality is unreliable for Coin-bearing values.
 func verifyOptionalCollectionValue[K, V any](ctx sdk.Context, m collections.Map[K, V], key K, expected proto.Message) error {
 	value, err := m.Get(ctx, key)
-	if expected == nil {
+	if isNilMessage(expected) {
 		if errors.Is(err, collections.ErrNotFound) {
 			return nil
 		}
@@ -496,10 +571,33 @@ func verifyOptionalCollectionValue[K, V any](ctx sdk.Context, m collections.Map[
 		return err
 	}
 	actual, ok := any(&value).(proto.Message)
-	if !ok || !proto.Equal(actual, expected) {
+	if !ok {
+		return fmt.Errorf("value is not a proto.Message")
+	}
+	same, cmpErr := protoBytesEqual(actual, expected)
+	if cmpErr != nil {
+		return cmpErr
+	}
+	if !same {
 		return fmt.Errorf("value changed")
 	}
 	return nil
+}
+
+// isNilMessage reports whether a proto.Message interface is nil OR holds a nil
+// typed pointer. A bare `m == nil` misses the second case, which is how an
+// absent optional destination was misread as a hard error.
+func isNilMessage(m proto.Message) bool {
+	if m == nil {
+		return true
+	}
+	v := reflect.ValueOf(m)
+	switch v.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Map, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
 }
 
 // cloneGovDeposit deep-copies a gov Deposit without going through proto.Clone.

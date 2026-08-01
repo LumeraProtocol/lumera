@@ -282,6 +282,10 @@ func (k Keeper) shouldRecoverAtEpochEnd(ctx sdk.Context, supernodeAccount string
 	if len(peers) == 0 {
 		return false, nil
 	}
+	logicalTarget, err := k.AccountForEpoch(ctx, supernodeAccount, epochID)
+	if err != nil {
+		return false, err
+	}
 
 	// Recovery requires at least one peer report that shows all required ports OPEN for this supernode in this epoch.
 	for _, reporter := range peers {
@@ -292,7 +296,7 @@ func (k Keeper) shouldRecoverAtEpochEnd(ctx sdk.Context, supernodeAccount string
 
 		var obs *types.StorageChallengeObservation
 		for i := range r.StorageChallengeObservations {
-			if r.StorageChallengeObservations[i] != nil && r.StorageChallengeObservations[i].TargetSupernodeAccount == supernodeAccount {
+			if r.StorageChallengeObservations[i] != nil && r.StorageChallengeObservations[i].TargetSupernodeAccount == logicalTarget {
 				obs = r.StorageChallengeObservations[i]
 				break
 			}
@@ -486,6 +490,10 @@ func (k Keeper) peersPortStateMeetsThresholdWithPeers(ctx sdk.Context, target st
 	if len(peers) == 0 {
 		return false, nil
 	}
+	logicalTarget, err := k.AccountForEpoch(ctx, target, epochID)
+	if err != nil {
+		return false, err
+	}
 
 	matches := uint64(0)
 	for _, reporter := range peers {
@@ -496,7 +504,7 @@ func (k Keeper) peersPortStateMeetsThresholdWithPeers(ctx sdk.Context, target st
 
 		var obs *types.StorageChallengeObservation
 		for i := range r.StorageChallengeObservations {
-			if r.StorageChallengeObservations[i] != nil && r.StorageChallengeObservations[i].TargetSupernodeAccount == target {
+			if r.StorageChallengeObservations[i] != nil && r.StorageChallengeObservations[i].TargetSupernodeAccount == logicalTarget {
 				obs = r.StorageChallengeObservations[i]
 				break
 			}
@@ -518,8 +526,12 @@ func (k Keeper) peersPortStateMeetsThresholdWithPeers(ctx sdk.Context, target st
 }
 
 func (k Keeper) peerReportersForTargetEpoch(ctx sdk.Context, target string, epochID uint64) ([]string, error) {
+	logicalTarget, err := k.AccountForEpoch(ctx, target, epochID)
+	if err != nil {
+		return nil, err
+	}
 	store := k.kvStore(ctx)
-	prefix := types.StorageChallengeReportIndexEpochPrefix(target, epochID)
+	prefix := types.StorageChallengeReportIndexEpochPrefix(logicalTarget, epochID)
 
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
 	defer func() { _ = it.Close() }()

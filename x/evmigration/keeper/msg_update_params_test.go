@@ -66,3 +66,25 @@ func TestMsgUpdateParams(t *testing.T) {
 		})
 	}
 }
+
+func TestMsgUpdateParamsReplacesCanaryList(t *testing.T) {
+	f := initFixture(t)
+	ms := keeper.NewMsgServerImpl(f.keeper)
+	authority, err := f.addressCodec.BytesToString(f.keeper.GetAuthority())
+	require.NoError(t, err)
+
+	params := types.DefaultParams()
+	params.CanaryLegacyAddresses = []string{authority}
+	_, err = ms.UpdateParams(f.ctx, &types.MsgUpdateParams{Authority: authority, Params: params})
+	require.NoError(t, err)
+	stored, err := f.keeper.Params.Get(f.ctx)
+	require.NoError(t, err)
+	require.Equal(t, []string{authority}, stored.CanaryLegacyAddresses)
+
+	params.CanaryLegacyAddresses = nil
+	_, err = ms.UpdateParams(f.ctx, &types.MsgUpdateParams{Authority: authority, Params: params})
+	require.NoError(t, err)
+	stored, err = f.keeper.Params.Get(f.ctx)
+	require.NoError(t, err)
+	require.Empty(t, stored.CanaryLegacyAddresses)
+}

@@ -546,9 +546,10 @@ func (k *Keeper) getActionsByIndexPrefix(ctx sdk.Context, indexPrefix string) ([
 		actionID := string(iter.Key()[len(prefixBytes):])
 		action, found := k.GetActionByID(ctx, actionID)
 		if !found {
-			// Stale or corrupted index entry; skip but keep scanning.
-			k.Logger().Error("action referenced in index not found", "action_id", actionID, "index_prefix", indexPrefix)
-			continue
+			return nil, fmt.Errorf("action %s referenced by index %s not found", actionID, indexPrefix)
+		}
+		if action.ActionID != actionID {
+			return nil, fmt.Errorf("action index %s resolves mismatched action id %s", indexPrefix, action.ActionID)
 		}
 		actions = append(actions, action)
 	}

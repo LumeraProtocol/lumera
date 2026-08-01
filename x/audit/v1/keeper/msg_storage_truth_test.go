@@ -80,7 +80,7 @@ func TestMsgSubmitStorageRecheckEvidence(t *testing.T) {
 		RecheckResultClass:             types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 	})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "must not equal creator")
+	require.Contains(t, err.Error(), "creator must not be in the challenged target lineage")
 
 	// Valid request: recheck is now implemented and should succeed.
 	_, err = ms.SubmitStorageRecheckEvidence(f.ctx, &types.MsgSubmitStorageRecheckEvidence{

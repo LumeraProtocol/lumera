@@ -2,58 +2,25 @@ package keeper
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/authz"
 )
 
-// MigrateAuthz re-keys all authz grants where legacyAddr is granter or grantee.
+// MigrateAuthz atomically re-keys grants where the account is granter/grantee
+// and rewrites embedded StakeAuthorization validator allow/deny references.
+// Production handlers use the same prebuilt fragment through retainedStatePlan.
 func (k Keeper) MigrateAuthz(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress) error {
-	type grantToMigrate struct {
-		granter sdk.AccAddress
-		grantee sdk.AccAddress
-		grant   authz.Grant
+	params, err := k.Params.Get(ctx)
+	if err != nil {
+		return err
 	}
-
-	var toMigrate []grantToMigrate
-
-	// Collect all grants involving legacyAddr.
-	k.authzKeeper.IterateGrants(ctx, func(granterAddr, granteeAddr sdk.AccAddress, grant authz.Grant) bool {
-		if granterAddr.Equals(legacyAddr) || granteeAddr.Equals(legacyAddr) {
-			toMigrate = append(toMigrate, grantToMigrate{
-				granter: granterAddr,
-				grantee: granteeAddr,
-				grant:   grant,
-			})
-		}
-		return false
-	})
-
-	for _, g := range toMigrate {
-		auth, err := g.grant.GetAuthorization()
-		if err != nil {
-			return err
-		}
-		msgType := auth.MsgTypeURL()
-
-		// Delete old grant.
-		if err := k.authzKeeper.DeleteGrant(ctx, g.grantee, g.granter, msgType); err != nil {
-			return err
-		}
-
-		// Compute new granter/grantee.
-		newGranter := g.granter
-		if newGranter.Equals(legacyAddr) {
-			newGranter = newAddr
-		}
-		newGrantee := g.grantee
-		if newGrantee.Equals(legacyAddr) {
-			newGrantee = newAddr
-		}
-
-		// Re-create grant with new addresses.
-		if err := k.authzKeeper.SaveGrant(ctx, newGrantee, newGranter, auth, g.grant.Expiration); err != nil {
-			return err
-		}
+	moves, err := k.buildAuthzPlan(ctx, legacyAddr, newAddr, params.MaxRetainedStateEntries)
+	if err != nil {
+		return err
 	}
-
+	cacheCtx, commit := ctx.CacheContext()
+	plan := retainedStatePlan{authz: moves, legacyAddr: legacyAddr, newAddr: newAddr}
+	if err := k.applyRetainedStatePlan(cacheCtx, plan); err != nil {
+		return err
+	}
+	commit()
 	return nil
 }

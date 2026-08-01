@@ -12,6 +12,7 @@ import (
 	upgrade_v1_10_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_1"
 	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
 	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
+	upgrade_v1_20_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_2"
 )
 
 type StoreLoaderSelection struct {
@@ -34,7 +35,11 @@ func StoreLoaderForUpgrade(
 	// EVM store keys that are absent from committed state and never deletes a
 	// store, so it is safe on mainnet and a no-op on chains that already ran
 	// v1.20.0. See the v1.20.1 case in SetupUpgrades.
-	if upgradeName == upgrade_v1_20_1.UpgradeName {
+	// v1.20.2 carries the same EVM store additions for the same reason: a chain
+	// upgrading straight from 1.12.0 (mainnet's position) has none of the EVM
+	// stores, while one arriving from 1.20.1 has all of them. The add-only loader
+	// makes a single binary correct on both.
+	if upgradeName == upgrade_v1_20_1.UpgradeName || upgradeName == upgrade_v1_20_2.UpgradeName {
 		return StoreLoaderSelection{
 			Loader:   AddOnlyStoreLoader(upgradeHeight, baseUpgrades, logger),
 			LogLabel: "add-only EVM bring-up",

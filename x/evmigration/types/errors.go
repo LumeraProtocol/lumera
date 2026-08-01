@@ -44,4 +44,5 @@ var (
 	// or both multisig); when both multisig, threshold (K) and sub-key count
 	// (N) must match. A 2-of-3 legacy must migrate to a 2-of-3 destination.
 	ErrMirrorSourceMismatch = errors.Register(ModuleName, 1121, "legacy and new proofs violate the mirror-source rule")
+	ErrMigrationNotCanary   = errors.Register(ModuleName, 1122, "legacy address is not enabled for canary migration")
 )

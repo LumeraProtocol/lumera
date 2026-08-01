@@ -13,9 +13,11 @@ import (
 	authzkeeper "github.com/cosmos/cosmos-sdk/x/authz/keeper"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
+	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 
 	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	auditkeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 	snkeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
@@ -48,8 +50,10 @@ type ModuleInputs struct {
 	StakingKeeper      *stakingkeeper.Keeper
 	DistributionKeeper distrkeeper.Keeper
 	AuthzKeeper        authzkeeper.Keeper
+	GovKeeper          *govkeeper.Keeper
 	FeegrantKeeper     feegrantkeeper.Keeper
 	SupernodeKeeper    *snkeeper.Keeper
+	AuditKeeper        auditkeeper.Keeper
 	ActionKeeper       actionkeeper.Keeper
 }
 
@@ -76,8 +80,10 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.StakingKeeper,
 		in.DistributionKeeper,
 		in.AuthzKeeper,
+		in.GovKeeper,
 		in.FeegrantKeeper,
 		in.SupernodeKeeper,
+		in.AuditKeeper,
 		&in.ActionKeeper,
 	)
 	m := NewAppModule(in.Cdc, k)

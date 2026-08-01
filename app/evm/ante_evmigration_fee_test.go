@@ -81,6 +81,7 @@ func TestNewAnteHandlerMigrationOnlyCosmosTxUsesReducedAntePath(t *testing.T) {
 
 	t.Run("migration-only unsigned zero-fee tx is accepted", func(t *testing.T) {
 		msg := validMigrationMsg(t, anteMigrationTestChainID)
+		enableMigrationInCtx(t, app, ctx)
 		seedLegacyAccountInCtx(t, app, ctx, msg.LegacyAddress)
 		tx := newUnsignedMigrationTx(t, app, msg)
 
@@ -93,6 +94,7 @@ func TestNewAnteHandlerMigrationOnlyCosmosTxUsesReducedAntePath(t *testing.T) {
 		// Seed the legacy account so the admission state-check passes and the
 		// corrupted proof is what actually triggers the rejection (the state
 		// check runs before proof verification).
+		enableMigrationInCtx(t, app, ctx)
 		seedLegacyAccountInCtx(t, app, ctx, msg.LegacyAddress)
 		msg.LegacyProof.GetSingle().Signature[0] ^= 0x01
 		tx := newUnsignedMigrationTx(t, app, msg)
@@ -125,7 +127,9 @@ func TestEVMigrationInvalidEmbeddedProofRejectedInCheckTx(t *testing.T) {
 	// Seed the legacy account into the check-tx state so the admission
 	// state-check passes and the corrupted proof is what triggers rejection
 	// (the state check runs before proof verification).
-	seedLegacyAccountInCtx(t, app, app.BaseApp.NewContext(true), msg.LegacyAddress)
+	checkCtx := app.BaseApp.NewContext(true)
+	enableMigrationInCtx(t, app, checkCtx)
+	seedLegacyAccountInCtx(t, app, checkCtx, msg.LegacyAddress)
 	msg.NewProof.GetSingle().Signature[0] ^= 0x01
 
 	tx := newUnsignedMigrationTx(t, app, msg)
@@ -151,6 +155,26 @@ func newUnsignedMigrationTx(t *testing.T, app *lumeraapp.App, msgs ...sdk.Msg) s
 	txBuilder.SetGasLimit(100_000)
 
 	return txBuilder.GetTx()
+}
+
+// enableMigrationInCtx sets EnableMigration=true in the given ctx's state.
+//
+// Since the continuity work landed, evmigration params default to
+// EnableMigration=false (migration must be switched on deliberately by
+// governance). Tests that exercise the ante's PROOF verification therefore have
+// to open the activation gate first, otherwise VerifyMigrationProofsForAnte
+// short-circuits with "migration is disabled" and the proof assertions below
+// silently stop testing what they claim to test.
+//
+// The disabled-by-default behavior itself is pinned separately in
+// x/evmigration/keeper/ante_test.go (TestVerifyMigrationProofsForAnte_AdmissionGate
+// and TestVerifyMigrationProofsForAnte_CanaryGate).
+func enableMigrationInCtx(t *testing.T, app *lumeraapp.App, ctx sdk.Context) {
+	t.Helper()
+
+	params := evmigrationtypes.NewParams(true, 0, 50, 2000, 20)
+	require.NoError(t, params.Validate())
+	require.NoError(t, app.EvmigrationKeeper.Params.Set(ctx, params))
 }
 
 // seedLegacyAccountInCtx creates the legacy base account in the given ctx's

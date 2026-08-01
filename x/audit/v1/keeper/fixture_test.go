@@ -25,6 +25,7 @@ type fixture struct {
 	ctx          sdk.Context
 	keeper       keeper.Keeper
 	addressCodec address.Codec
+	storeKey     *storetypes.KVStoreKey
 
 	supernodeKeeper *supernodemocks.MockSupernodeKeeper
 }
@@ -63,6 +64,7 @@ func initFixture(t *testing.T) *fixture {
 		ctx:             ctx,
 		keeper:          k,
 		addressCodec:    addressCodec,
+		storeKey:        storeKey,
 		supernodeKeeper: snKeeper,
 	}
 }

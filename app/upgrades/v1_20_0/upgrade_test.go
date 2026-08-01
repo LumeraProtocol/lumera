@@ -62,7 +62,7 @@ func TestV1200SetsDevnetMigrationEndTime(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, want, after.MigrationEndTime,
 		"devnet upgrade should set migration_end_time to upgrade block time + 2 days")
-	require.True(t, after.EnableMigration, "enable_migration should remain true (immediate-open)")
+	require.False(t, after.EnableMigration, "fresh upgrade must remain disabled until reviewed governance enablement")
 	require.Equal(t, uint64(2500), after.MaxValidatorDelegations,
 		"max_validator_delegations default should be 2500")
 }

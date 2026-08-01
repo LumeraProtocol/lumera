@@ -156,16 +156,25 @@ func (k Keeper) ApplyReporterCleanEpochRecoveryAtEpochEnd(ctx sdk.Context, epoch
 	}
 	reporterSet := make(map[string]struct{}, len(states))
 	for _, state := range states {
-		if state.ReporterSupernodeAccount != "" {
-			reporterSet[state.ReporterSupernodeAccount] = struct{}{}
+		if state.ReporterSupernodeAccount == "" {
+			continue
 		}
+		current, err := k.CurrentAccount(ctx, state.ReporterSupernodeAccount)
+		if err != nil {
+			return err
+		}
+		reporterSet[current] = struct{}{}
 	}
 	epochReporters, err := k.storageTruthReporterAccountsForEpoch(ctx, epochID)
 	if err != nil {
 		return err
 	}
 	for _, reporter := range epochReporters {
-		reporterSet[reporter] = struct{}{}
+		current, err := k.CurrentAccount(ctx, reporter)
+		if err != nil {
+			return err
+		}
+		reporterSet[current] = struct{}{}
 	}
 	if len(reporterSet) == 0 {
 		return nil
@@ -230,7 +239,11 @@ func (k Keeper) storageTruthReporterAccountsForEpoch(ctx sdk.Context, epochID ui
 // storageTruthReporterEpochPassStats counts PASS results for a reporter in a
 // single epoch and reports whether any of them was overturned by recheck.
 func (k Keeper) storageTruthReporterEpochPassStats(ctx sdk.Context, reporterAccount string, epochID uint64) (uint64, bool, error) {
-	start, end := types.ReporterStorageTruthResultEpochScanRange(reporterAccount, epochID, epochID)
+	logicalReporter, err := k.AccountForEpoch(ctx, reporterAccount, epochID)
+	if err != nil {
+		return 0, false, err
+	}
+	start, end := types.ReporterStorageTruthResultEpochScanRange(logicalReporter, epochID, epochID)
 	it := k.kvStore(ctx).Iterator(start, end)
 	defer func() { _ = it.Close() }()
 	var passes uint64
@@ -261,22 +274,33 @@ func (k Keeper) storageTruthReporterEpochPassStats(ctx sdk.Context, reporterAcco
 
 func (k Keeper) storageTruthReporterDivergenceStats(ctx sdk.Context, reporterAccount string, startEpoch uint64, endEpoch uint64) (storageTruthDivergenceStats, error) {
 	var stats storageTruthDivergenceStats
-	// Bounded epoch scan per CP-NEW-A-11 residue — key shape unchanged,
-	// only iterator bounds use [startEpoch, endEpoch+1).
-	start, end := types.ReporterStorageTruthResultEpochScanRange(reporterAccount, startEpoch, endEpoch)
-	it := k.kvStore(ctx).Iterator(start, end)
-	defer func() { _ = it.Close() }()
-	for ; it.Valid(); it.Next() {
-		var record storageTruthReporterResultRecord
-		if err := json.Unmarshal(it.Value(), &record); err != nil {
+	// The divergence window is bounded by epochs. Resolve the logical account
+	// independently at each epoch so a transition inside the window is one
+	// actor without rewriting either side's historical facts.
+	for epoch := startEpoch; ; epoch++ {
+		logicalReporter, err := k.AccountForEpoch(ctx, reporterAccount, epoch)
+		if err != nil {
 			return stats, err
 		}
-		stats.total++
-		if isStorageTruthFailureClass(types.StorageProofResultClass(record.ResultClass)) {
-			stats.negative++
-			if record.ConfirmedByRecheck {
-				stats.confirmedNegative++
+		start, end := types.ReporterStorageTruthResultEpochScanRange(logicalReporter, epoch, epoch)
+		it := k.kvStore(ctx).Iterator(start, end)
+		for ; it.Valid(); it.Next() {
+			var record storageTruthReporterResultRecord
+			if err := json.Unmarshal(it.Value(), &record); err != nil {
+				_ = it.Close()
+				return stats, err
 			}
+			stats.total++
+			if isStorageTruthFailureClass(types.StorageProofResultClass(record.ResultClass)) {
+				stats.negative++
+				if record.ConfirmedByRecheck {
+					stats.confirmedNegative++
+				}
+			}
+		}
+		_ = it.Close()
+		if epoch == endEpoch {
+			break
 		}
 	}
 	return stats, nil

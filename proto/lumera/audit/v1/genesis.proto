@@ -59,6 +59,8 @@ message GenesisState {
   // Per final-gate F-B4 — per-verifier heal-op votes must survive
   // export/import workflows.
   repeated GenesisHealOpVerification heal_op_verifications = 22 [(gogoproto.nullable) = false];
+
+  repeated AccountTransition account_transitions = 23 [(gogoproto.nullable) = false];
 }
 
 // StorageTruthPostponement records a supernode's storage-truth postponement state

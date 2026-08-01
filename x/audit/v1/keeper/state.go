@@ -11,13 +11,31 @@ import (
 )
 
 func (k Keeper) HasReport(ctx sdk.Context, epochID uint64, reporterSupernodeAccount string) bool {
+	found, err := k.HasReportStrict(ctx, epochID, reporterSupernodeAccount)
+	if err != nil {
+		panic(err)
+	}
+	return found
+}
+
+// HasReportStrict is used by transaction paths, where malformed lineage state
+// must reject the transaction instead of escalating consensus corruption to a panic.
+func (k Keeper) HasReportStrict(ctx sdk.Context, epochID uint64, reporterSupernodeAccount string) (bool, error) {
+	logical, err := k.AccountForEpoch(ctx, reporterSupernodeAccount, epochID)
+	if err != nil {
+		return false, err
+	}
 	store := k.kvStore(ctx)
-	return store.Has(types.ReportKey(epochID, reporterSupernodeAccount))
+	return store.Has(types.ReportKey(epochID, logical)), nil
 }
 
 func (k Keeper) GetReport(ctx sdk.Context, epochID uint64, reporterSupernodeAccount string) (types.EpochReport, bool) {
+	logical, err := k.AccountForEpoch(ctx, reporterSupernodeAccount, epochID)
+	if err != nil {
+		panic(err)
+	}
 	store := k.kvStore(ctx)
-	bz := store.Get(types.ReportKey(epochID, reporterSupernodeAccount))
+	bz := store.Get(types.ReportKey(epochID, logical))
 	if bz == nil {
 		return types.EpochReport{}, false
 	}
@@ -27,6 +45,13 @@ func (k Keeper) GetReport(ctx sdk.Context, epochID uint64, reporterSupernodeAcco
 }
 
 func (k Keeper) SetReport(ctx sdk.Context, r types.EpochReport) error {
+	// Resolve every potentially failing live-state lookup before persisting the
+	// historical report. The report remains keyed by its epoch-logical account;
+	// only the SuperNode side effect targets the live endpoint.
+	liveReporter, err := k.CurrentAccount(ctx, r.SupernodeAccount)
+	if err != nil {
+		return err
+	}
 	store := k.kvStore(ctx)
 	bz, err := k.cdc.Marshal(&r)
 	if err != nil {
@@ -44,7 +69,7 @@ func (k Keeper) SetReport(ctx sdk.Context, r types.EpochReport) error {
 		ctx.EventManager().EmitEvent(sdk.NewEvent("audit_set_report_transition", sdk.NewAttribute("transition_skipped", "true"), sdk.NewAttribute("reason", "invalid_disk_usage_percent")))
 		return nil
 	}
-	reporterSN, found, err := k.supernodeKeeper.GetSuperNodeByAccount(ctx, r.SupernodeAccount)
+	reporterSN, found, err := k.supernodeKeeper.GetSuperNodeByAccount(ctx, liveReporter)
 	if err != nil {
 		return err
 	}

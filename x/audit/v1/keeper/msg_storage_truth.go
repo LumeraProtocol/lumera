@@ -22,9 +22,6 @@ func (m msgServer) SubmitStorageRecheckEvidence(ctx context.Context, req *types.
 	if req.ChallengedSupernodeAccount == "" {
 		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "challenged_supernode_account is required")
 	}
-	if req.ChallengedSupernodeAccount == req.Creator {
-		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "challenged_supernode_account must not equal creator")
-	}
 	if req.TicketId == "" {
 		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "ticket_id is required")
 	}
@@ -40,12 +37,34 @@ func (m msgServer) SubmitStorageRecheckEvidence(ctx context.Context, req *types.
 		return nil, errorsmod.Wrapf(types.ErrInvalidEpochID, "epoch anchor not found for epoch_id %d", req.EpochId)
 	}
 
-	if _, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.Creator); err != nil {
+	currentCreator, err := m.CurrentAccount(sdkCtx, req.Creator)
+	if err != nil {
+		return nil, err
+	}
+	if currentCreator != req.Creator {
+		return nil, errorsmod.Wrap(types.ErrInvalidSigner, "creator is not the current account for its lineage")
+	}
+	logicalCreator, err := m.AccountForEpoch(sdkCtx, currentCreator, req.EpochId)
+	if err != nil {
+		return nil, err
+	}
+	logicalTarget, err := m.AccountForEpoch(sdkCtx, req.ChallengedSupernodeAccount, req.EpochId)
+	if err != nil {
+		return nil, err
+	}
+	currentTarget, err := m.CurrentAccount(sdkCtx, req.ChallengedSupernodeAccount)
+	if err != nil {
+		return nil, err
+	}
+	if logicalCreator == logicalTarget {
+		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "creator must not be in the challenged target lineage")
+	}
+	if _, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, currentCreator); err != nil {
 		return nil, err
 	} else if !found {
 		return nil, errorsmod.Wrap(types.ErrReporterNotFound, "creator is not a registered supernode")
 	}
-	if _, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.ChallengedSupernodeAccount); err != nil {
+	if _, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, currentTarget); err != nil {
 		return nil, err
 	} else if !found {
 		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "challenged_supernode_account is not a registered supernode")
@@ -75,10 +94,14 @@ func (m msgServer) SubmitStorageRecheckEvidence(ctx context.Context, req *types.
 	if challengedRecord.TicketID != req.TicketId {
 		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "challenged result ticket_id does not match request ticket_id")
 	}
-	if challengedRecord.TargetAccount != req.ChallengedSupernodeAccount {
+	if challengedRecord.TargetAccount != logicalTarget {
 		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "challenged result target does not match challenged_supernode_account")
 	}
-	if challengedRecord.ReporterAccount == req.Creator {
+	originalReporterForEpoch, err := m.AccountForEpoch(sdkCtx, challengedRecord.ReporterAccount, challengedRecord.EpochID)
+	if err != nil {
+		return nil, err
+	}
+	if originalReporterForEpoch == logicalCreator {
 		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "creator must be independent from the challenged result reporter")
 	}
 	if !challengedRecord.RecheckEligible {
@@ -86,7 +109,7 @@ func (m msgServer) SubmitStorageRecheckEvidence(ctx context.Context, req *types.
 	}
 
 	// Replay protection: one recheck per (epoch, ticket, creator).
-	if m.HasRecheckEvidence(sdkCtx, req.EpochId, req.TicketId, req.Creator) {
+	if m.HasRecheckEvidence(sdkCtx, req.EpochId, req.TicketId, logicalCreator) {
 		return nil, errorsmod.Wrapf(types.ErrInvalidRecheckEvidence, "recheck evidence already submitted for epoch %d ticket %q by %q", req.EpochId, req.TicketId, req.Creator)
 	}
 	// Link transcript BEFORE persisting the dedup key so that a link failure
@@ -97,12 +120,12 @@ func (m msgServer) SubmitStorageRecheckEvidence(ctx context.Context, req *types.
 		sdkCtx,
 		req.ChallengedResultTranscriptHash,
 		req.RecheckTranscriptHash,
-		req.Creator,
+		logicalCreator,
 		req.RecheckResultClass,
 	); err != nil {
 		return nil, err
 	}
-	m.SetRecheckEvidence(sdkCtx, req.EpochId, req.TicketId, req.Creator)
+	m.SetRecheckEvidence(sdkCtx, req.EpochId, req.TicketId, logicalCreator)
 
 	// Derive current epoch for scoring context.
 	params := m.GetParams(sdkCtx).WithDefaults()
@@ -117,7 +140,7 @@ func (m msgServer) SubmitStorageRecheckEvidence(ctx context.Context, req *types.
 	var overturnOriginalReporter, confirmOriginalReporter string
 	{
 		origReporter := challengedRecord.ReporterAccount
-		if origReporter != "" && origReporter != req.Creator {
+		if origReporter != "" && originalReporterForEpoch != logicalCreator {
 			switch req.RecheckResultClass {
 			case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS:
 				overturnOriginalReporter = origReporter
@@ -127,10 +150,17 @@ func (m msgServer) SubmitStorageRecheckEvidence(ctx context.Context, req *types.
 		}
 	}
 
+	scoringTarget, err := m.AccountForEpoch(sdkCtx, currentTarget, currentEpoch.EpochID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Synthesise a StorageProofResult carrying the recheck outcome and apply scores.
+	// The challenged transcript remains historical, while the new failure fact is
+	// keyed by the target identity logical at the scoring epoch.
 	recheckResult := &types.StorageProofResult{
 		TicketId:               req.TicketId,
-		TargetSupernodeAccount: req.ChallengedSupernodeAccount,
+		TargetSupernodeAccount: scoringTarget,
 		ResultClass:            req.RecheckResultClass,
 		BucketType:             types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK,
 	}

@@ -773,7 +773,7 @@ func seedProofTranscriptsWithClass(
 		strconv.FormatUint(epochID, 10),
 		auditHostReportJSON(portStates),
 		"--from", prober.nodeName,
-		"--gas", "500000",
+		"--gas", "800000", // Raised from 500000: audit account-transition lineage resolution (logical vs current identity) adds gas to every epoch-report submit; observed 500331 used against the old 500000 cap.
 	}
 	for _, obs := range observations {
 		args = append(args, "--storage-challenge-observations", obs)

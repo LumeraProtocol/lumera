@@ -39,6 +39,13 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 	if sdkCtx.BlockHeight() < epoch.StartHeight || sdkCtx.BlockHeight() > epoch.EndHeight {
 		return nil, errorsmod.Wrapf(types.ErrInvalidEpochID, "epoch_id not accepted at height %d", sdkCtx.BlockHeight())
 	}
+	currentCreator, err := m.CurrentAccount(sdkCtx, req.Creator)
+	if err != nil {
+		return nil, err
+	}
+	if currentCreator != req.Creator {
+		return nil, errorsmod.Wrap(types.ErrInvalidSigner, "creator is not the current account for its lineage")
+	}
 
 	sn, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.Creator)
 	if err != nil {
@@ -61,7 +68,39 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		return nil, errorsmod.Wrapf(types.ErrInvalidEpochID, "epoch anchor not found for epoch_id %d", req.EpochId)
 	}
 
-	reporterAccount := req.Creator
+	reporterAccount, err := m.AccountForEpoch(sdkCtx, req.Creator, req.EpochId)
+	if err != nil {
+		return nil, err
+	}
+	anchoredReporter := false
+	for _, account := range anchor.ActiveSupernodeAccounts {
+		if account == reporterAccount {
+			anchoredReporter = true
+			break
+		}
+	}
+	if !anchoredReporter {
+		for _, account := range anchor.TargetSupernodeAccounts {
+			if account == reporterAccount {
+				anchoredReporter = true
+				break
+			}
+		}
+	}
+	anchorHasMigratedIdentity := false
+	for _, account := range append(append([]string(nil), anchor.ActiveSupernodeAccounts...), anchor.TargetSupernodeAccounts...) {
+		liveAccount, err := m.CurrentAccount(sdkCtx, account)
+		if err != nil {
+			return nil, err
+		}
+		if liveAccount != account {
+			anchorHasMigratedIdentity = true
+			break
+		}
+	}
+	if !anchoredReporter && anchorHasMigratedIdentity {
+		return nil, errorsmod.Wrap(types.ErrInvalidReporterState, "reporter identity is not linked to a migrated identity in the epoch anchor")
+	}
 
 	// Keep assignment/gating stable within the epoch by using the params snapshot captured
 	// at epoch start (when available). Fallback to current params for backward compatibility.
@@ -70,7 +109,10 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		assignParams = snap.WithDefaults()
 	}
 
-	eligibleChallengers := m.storageTruthEligibleChallengers(sdkCtx, anchor.ActiveSupernodeAccounts, req.EpochId, assignParams)
+	eligibleChallengers, err := m.storageTruthEligibleChallengers(sdkCtx, anchor.ActiveSupernodeAccounts, req.EpochId, assignParams)
+	if err != nil {
+		return nil, err
+	}
 	allowedTargetsList, isProber, err := computeAuditPeerTargetsForReporter(&assignParams, eligibleChallengers, anchor.TargetSupernodeAccounts, anchor.Seed, reporterAccount)
 	if err != nil {
 		return nil, err
@@ -148,7 +190,11 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		return nil, err
 	}
 
-	if m.HasReport(sdkCtx, req.EpochId, reporterAccount) {
+	hasReport, err := m.HasReportStrict(sdkCtx, req.EpochId, reporterAccount)
+	if err != nil {
+		return nil, err
+	}
+	if hasReport {
 		return nil, errorsmod.Wrap(types.ErrDuplicateReport, "report already submitted for this epoch")
 	}
 
@@ -159,6 +205,7 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		HostReport:                   req.HostReport,
 		StorageChallengeObservations: req.StorageChallengeObservations,
 		StorageProofResults:          req.StorageProofResults,
+		CurrentSubmitter:             req.Creator,
 	}
 
 	if err := m.SetReport(sdkCtx, report); err != nil {

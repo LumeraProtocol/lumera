@@ -100,6 +100,9 @@ func (am AppModule) RegisterServices(cfg module.Configurator) {
 	if err := cfg.RegisterMigration(types.ModuleName, 1, NewMigrateV1ToV2(am.keeper)); err != nil {
 		panic(fmt.Sprintf("failed to register audit v1->v2 migration: %v", err))
 	}
+	if err := cfg.RegisterMigration(types.ModuleName, 2, NewMigrateV2ToV3()); err != nil {
+		panic(fmt.Sprintf("failed to register audit v2->v3 migration: %v", err))
+	}
 }
 
 func (am AppModule) RegisterInvariants(_ sdk.InvariantRegistry) {}

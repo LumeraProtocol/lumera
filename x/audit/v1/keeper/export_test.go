@@ -27,6 +27,14 @@ var ApplyTicketDeteriorationDeltaForTest = func(k Keeper, ctx sdk.Context, epoch
 	return k.applyTicketDeteriorationDelta(ctx, epochID, reporterAccount, result, ticketID, delta, decayPerEpoch, contradictionConfirmed)
 }
 
+var ApplyStorageTruthScoresForTest = func(k Keeper, ctx sdk.Context, epochID uint64, reporterAccount string, results []*types.StorageProofResult) error {
+	return k.applyStorageTruthScores(ctx, epochID, reporterAccount, results)
+}
+
+var PeersPortStateMeetsThresholdForTest = func(k Keeper, ctx sdk.Context, target string, epochID uint64, portIndex int, desired types.PortState, thresholdPercent uint32) (bool, error) {
+	return k.peersPortStateMeetsThreshold(ctx, target, epochID, portIndex, desired, thresholdPercent)
+}
+
 // WriteRawNextHealOpIDForTest writes raw bytes to the next-heal-op-id store key,
 // bypassing the well-formed encoder. Used to test panic-on-malformed (NEW-B-7).
 var WriteRawNextHealOpIDForTest = func(k Keeper, ctx sdk.Context, raw []byte) {

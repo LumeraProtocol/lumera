@@ -128,6 +128,8 @@ type SupernodeKeeper interface {
 	GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (sntypes.SupernodeMetricsState, bool)
 	SetMetricsState(ctx sdk.Context, state sntypes.SupernodeMetricsState) error
 	DeleteMetricsState(ctx sdk.Context, valAddr sdk.ValAddress)
+	BuildIdentityMigrationPlan(ctx sdk.Context, sourceValidator, destinationValidator sdk.ValAddress) (sntypes.IdentityMigrationPlan, error)
+	ApplyIdentityMigrationPlan(ctx sdk.Context, plan sntypes.IdentityMigrationPlan) error
 }
 
 // ActionKeeper defines the expected interface for the x/action module.

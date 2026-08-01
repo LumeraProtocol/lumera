@@ -1109,6 +1109,35 @@ func (m *MockSupernodeKeeper) EXPECT() *MockSupernodeKeeperMockRecorder {
 	return m.recorder
 }
 
+// ApplyIdentityMigrationPlan mocks base method.
+func (m *MockSupernodeKeeper) ApplyIdentityMigrationPlan(ctx types1.Context, plan types0.IdentityMigrationPlan) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyIdentityMigrationPlan", ctx, plan)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyIdentityMigrationPlan indicates an expected call of ApplyIdentityMigrationPlan.
+func (mr *MockSupernodeKeeperMockRecorder) ApplyIdentityMigrationPlan(ctx, plan any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyIdentityMigrationPlan", reflect.TypeOf((*MockSupernodeKeeper)(nil).ApplyIdentityMigrationPlan), ctx, plan)
+}
+
+// BuildIdentityMigrationPlan mocks base method.
+func (m *MockSupernodeKeeper) BuildIdentityMigrationPlan(ctx types1.Context, sourceValidator, destinationValidator types1.ValAddress) (types0.IdentityMigrationPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BuildIdentityMigrationPlan", ctx, sourceValidator, destinationValidator)
+	ret0, _ := ret[0].(types0.IdentityMigrationPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BuildIdentityMigrationPlan indicates an expected call of BuildIdentityMigrationPlan.
+func (mr *MockSupernodeKeeperMockRecorder) BuildIdentityMigrationPlan(ctx, sourceValidator, destinationValidator any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildIdentityMigrationPlan", reflect.TypeOf((*MockSupernodeKeeper)(nil).BuildIdentityMigrationPlan), ctx, sourceValidator, destinationValidator)
+}
+
 // DeleteMetricsState mocks base method.
 func (m *MockSupernodeKeeper) DeleteMetricsState(ctx types1.Context, valAddr types1.ValAddress) {
 	m.ctrl.T.Helper()

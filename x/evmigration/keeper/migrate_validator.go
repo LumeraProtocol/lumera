@@ -281,6 +281,24 @@ func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAdd
 	if err != nil {
 		return err
 	}
+
+	// Build the validator-keyed continuity plan (latest metrics + Everlight
+	// SNDistState) BEFORE any write, so a destination collision or a malformed
+	// source row fails closed rather than destroying state.
+	//
+	// Built unconditionally, NOT gated on a validator-associated SuperNode
+	// primary: validator-keyed distribution residue can exist under `rdist/`
+	// with no primary present, and that residue is exactly the mutable
+	// accounting state (EMA baseline, growth cap, ramp periods) that must not
+	// be orphaned by an operator-address change.
+	identityPlan, err := k.supernodeKeeper.BuildIdentityMigrationPlan(ctx, oldValAddr, newValAddr)
+	if err != nil {
+		return fmt.Errorf("build supernode identity migration: %w", err)
+	}
+	if err := k.supernodeKeeper.ApplyIdentityMigrationPlan(ctx, identityPlan); err != nil {
+		return fmt.Errorf("apply supernode identity migration: %w", err)
+	}
+
 	return k.migrateValidatedValidatorSupernodes(ctx, oldValAddr, newValAddr, legacyAddr, newAddr, plan)
 }
 
@@ -435,15 +453,9 @@ func (k Keeper) migrateValidatedValidatorSupernode(
 		}
 	}
 
-	// Migrate metrics state: write under new key, delete old key.
-	metrics, found := k.supernodeKeeper.GetMetricsState(ctx, oldValAddr)
-	if found {
-		metrics.ValidatorAddress = newValAddr.String()
-		if err := k.supernodeKeeper.SetMetricsState(ctx, metrics); err != nil {
-			return err
-		}
-		k.supernodeKeeper.DeleteMetricsState(ctx, oldValAddr)
-	}
+	// Latest metrics and Everlight SNDistState are moved by the SuperNode-owned
+	// identity migration plan built and applied in MigrateValidatorSupernode,
+	// which validates both source and destination before the first write.
 
 	return k.supernodeKeeper.SetSuperNode(ctx, sn)
 }

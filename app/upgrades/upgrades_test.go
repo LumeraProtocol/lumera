@@ -18,11 +18,13 @@ import (
 	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
 	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
+	upgrade_v1_20_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_2"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
 	upgrade_v1_9_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_9_0"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	evmigrationtypes "github.com/LumeraProtocol/lumera/x/evmigration/types"
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	erc20types "github.com/cosmos/evm/x/erc20/types"
 	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
@@ -47,6 +49,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_12_0.UpgradeName,
 		upgrade_v1_20_0.UpgradeName,
 		upgrade_v1_20_1.UpgradeName,
+		upgrade_v1_20_2.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }
@@ -103,10 +106,12 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 				}
 
 				// Custom upgrades that need keepers are skipped in this lightweight harness.
-				// v1.20.1 is state-driven: with an empty fromVM (no EVM module) it runs
-				// the full v1.20.0 EVM bring-up on ANY network, which needs keepers, so
-				// it is skipped here on all networks (the bring-up path is exercised by
-				// v1_20_0/upgrade_test.go and the migration-only path by a dedicated test).
+				// v1.20.1 and v1.20.2 are state-driven: with an empty fromVM (no EVM
+				// module) they run the full v1.20.0 EVM bring-up on ANY network, which
+				// needs keepers, so they are skipped here on all networks (the bring-up
+				// path is exercised by v1_20_0/upgrade_test.go, and the v1.20.2 arrival
+				// shapes and store wiring by TestV1202RegisteredOnAllNetworks and
+				// app/upgrades/v1_20_2/upgrade_test.go).
 				if upgradeName == upgrade_v1_9_0.UpgradeName ||
 					upgradeName == upgrade_v1_10_0.UpgradeName ||
 					upgradeName == upgrade_v1_10_1.UpgradeName ||
@@ -114,7 +119,8 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 					upgradeName == upgrade_v1_11_1.UpgradeName ||
 					upgradeName == upgrade_v1_12_0.UpgradeName ||
 					upgradeName == upgrade_v1_20_0.UpgradeName ||
-					upgradeName == upgrade_v1_20_1.UpgradeName {
+					upgradeName == upgrade_v1_20_1.UpgradeName ||
+					upgradeName == upgrade_v1_20_2.UpgradeName {
 					continue
 				}
 
@@ -225,6 +231,52 @@ func TestV1201CarriesEVMBringupOnAllNetworks(t *testing.T) {
 	}
 }
 
+// TestV1202RegisteredOnAllNetworks pins v1.20.2 as the coordinated consensus
+// activation boundary for the evmigration ownership/continuity fixes. Those
+// fixes change DeliverTx results for the same migration transaction, so every
+// network must halt and switch binaries together -- there is no network where
+// this upgrade may be skipped or rolled out node-by-node.
+func TestV1202RegisteredOnAllNetworks(t *testing.T) {
+	for _, chainID := range []string{"lumera-mainnet-1", "lumera-testnet-2", "lumera-devnet-1"} {
+		params := newTestUpgradeParams(chainID)
+		config, found := SetupUpgrades(upgrade_v1_20_2.UpgradeName, params)
+		require.True(t, found, "v1.20.2 must be a known upgrade on %s", chainID)
+		require.NotNil(t, config.Handler, "v1.20.2 must register a handler on %s", chainID)
+
+		// Unlike the reverted migration-only draft, v1.20.2 MUST declare store
+		// upgrades: mainnet arrives from 1.12.0 with no EVM stores mounted, and
+		// a nil StoreUpgrade there panics at load.
+		require.NotNil(t, config.StoreUpgrade, "v1.20.2 must declare store upgrades on %s", chainID)
+		require.Contains(t, config.StoreUpgrade.Added, evmigrationtypes.StoreKey,
+			"v1.20.2 must mount the evmigration store on %s", chainID)
+		require.Contains(t, config.StoreUpgrade.Added, feemarkettypes.StoreKey)
+		require.Contains(t, config.StoreUpgrade.Added, precisebanktypes.StoreKey)
+		require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey)
+		require.Contains(t, config.StoreUpgrade.Added, erc20types.StoreKey)
+		require.Empty(t, config.StoreUpgrade.Deleted, "v1.20.2 must not delete any store on %s", chainID)
+	}
+}
+
+// TestV1202UsesAddOnlyStoreLoader guards the routing that makes the mainnet
+// one-hop survivable. Without the add-only loader a direct 1.12.0 -> 1.20.2
+// upgrade panics with "version of store evmigration mismatch root store's
+// version; expected N got 0", which was observed on a mainnet-shaped devnet.
+func TestV1202UsesAddOnlyStoreLoader(t *testing.T) {
+	for _, adaptive := range []bool{false, true} {
+		selection := StoreLoaderForUpgrade(
+			upgrade_v1_20_2.UpgradeName,
+			100,
+			&upgrade_v1_20_0.StoreUpgrades,
+			nil,
+			log.NewNopLogger(),
+			adaptive,
+		)
+		require.NotNil(t, selection.Loader)
+		require.Equal(t, "add-only EVM bring-up", selection.LogLabel,
+			"v1.20.2 must use the add-only store loader regardless of adaptive=%v", adaptive)
+	}
+}
+
 func newTestUpgradeParams(chainID string) appParams.AppUpgradeParams {
 	return appParams.AppUpgradeParams{
 		ChainID:       chainID,
@@ -263,9 +315,10 @@ func expectStoreUpgrade(upgradeName, chainID string) bool {
 	case upgrade_v1_20_0.UpgradeName:
 		// EVM stores are added by v1.20.0 only on the networks that run it.
 		return !IsMainnet(chainID)
-	case upgrade_v1_20_1.UpgradeName:
-		// v1.20.1 declares the EVM store additions on every network; the add-only
-		// store loader mounts only the keys missing from committed state.
+	case upgrade_v1_20_1.UpgradeName, upgrade_v1_20_2.UpgradeName:
+		// v1.20.1 and v1.20.2 declare the EVM store additions on every network;
+		// the add-only store loader mounts only the keys missing from committed
+		// state, so this is a no-op where the stores already exist.
 		return true
 	default:
 		return false

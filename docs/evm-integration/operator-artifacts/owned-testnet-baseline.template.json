@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.0.0",
+  "classification": "SANITIZED_OWNED_TESTNET_BASELINE",
+  "provenance_status": "POSTPONED",
+  "reason": "Replace placeholders only after an owned-testnet rehearsal; never insert credentials or secret values.",
+  "observed_at_utc": null,
+  "operator": {
+    "organization": "REPLACE_WITH_NON_SECRET_OWNER",
+    "environment": "owned-testnet",
+    "evidence_bundle_sha256": null
+  },
+  "network": {
+    "chain_id": null,
+    "evm_chain_id": null,
+    "genesis_sha256": null,
+    "upgrade_name": null,
+    "height_before": null,
+    "height_after": null
+  },
+  "artifacts": {
+    "release_tag": null,
+    "commit": null,
+    "lumerad_version": null,
+    "lumerad_sha256": null,
+    "helper_sha256": null,
+    "compatibility_manifest_sha256": null,
+    "compatibility_manifest_signature_verified": false
+  },
+  "runtime": {
+    "supervisor": null,
+    "service_user_uid": null,
+    "base_directory_redacted": true,
+    "config_sha256_before": null,
+    "config_sha256_after": null,
+    "keyring_backend": null,
+    "keyring_location_redacted": true
+  },
+  "public_addresses": {
+    "legacy": null,
+    "destination": null,
+    "destination_key_type": null,
+    "migration_record_destination": null
+  },
+  "gates": {
+    "process_discovered": "POSTPONED",
+    "config_backup_mode_0600": "POSTPONED",
+    "destination_no_echo_prestage": "POSTPONED",
+    "destination_freshness": "POSTPONED",
+    "service_stopped_verified": "POSTPONED",
+    "dry_run": "POSTPONED",
+    "single_broadcast": "POSTPONED",
+    "public_chain_queries": "POSTPONED",
+    "grpc_health_serving": "POSTPONED",
+    "logs_reviewed": "POSTPONED",
+    "portal_live_browser_evidence": "POSTPONED"
+  },
+  "transaction": {
+    "tx_hash": null,
+    "height": null,
+    "code": null,
+    "broadcast_attempt_count": 0
+  },
+  "result": "POSTPONED",
+  "redaction_attestation": {
+    "mnemonics_absent": true,
+    "private_keys_absent": true,
+    "passphrases_absent": true,
+    "tokens_cookies_auth_headers_absent": true,
+    "raw_environment_absent": true
+  },
+  "notes": [
+    "Use public chain addresses and hashes only.",
+    "Do not include keyring files, Secret objects, mnemonic argv, terminal history, HAR auth headers, or raw logs before redaction.",
+    "POSTPONED is not PASS and must not be used as release approval evidence."
+  ]
+}

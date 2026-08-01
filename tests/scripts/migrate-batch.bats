@@ -119,6 +119,11 @@ if [[ "$*" == *"--help"* ]]; then
   exit 0
 fi
 
+if [[ "$*" == "version --long" ]]; then
+  printf 'version: v1.20.1-test\n'
+  exit 0
+fi
+
 if [[ "${1-}" == "query" && "${2-}" == "evmigration" && "${3-}" == "migration-record" ]]; then
   exit 1
 fi

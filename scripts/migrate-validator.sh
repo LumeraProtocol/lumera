@@ -55,9 +55,9 @@ main() {
 
   parse_common_flags "$@"
   resolve_keyring_backend
+  require_binary
   log_run_summary "Lumera validator migration"
   log_info "[1/7] validating local prerequisites"
-  require_binary
   require_jq
 
   log_info "[2/7] resolving chain ID from RPC endpoint $NODE"

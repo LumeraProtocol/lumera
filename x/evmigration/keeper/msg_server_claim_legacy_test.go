@@ -871,6 +871,45 @@ func expectNoValidatorSupernode(f *msgServerFixture, legacyAddr sdk.AccAddress, 
 		sntypes.SuperNode{}, false, nil,
 	)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
+	expectIdentityMigrationPlanBuilt(f, oldValAddr)
+}
+
+// expectIdentityMigrationPlanBuilt allows the validator-keyed SuperNode
+// continuity plan to be BUILT (pre-V1, against pristine state) and pins the
+// direction of the move: source MUST be the old validator operator address and
+// destination MUST differ from it. Without that assertion a transposed
+// Build(ctx, new, old) would move state the wrong way and still pass.
+//
+// MaxTimes(1) because ownership-rejection tests abort before the build is
+// reached; the cap still fails a regression that builds it more than once.
+//
+// Apply is deliberately NOT expected here. It is asserted separately with an
+// exact Times(1) by expectIdentityMigrationPlanApplied, so that a regression
+// which builds the plan and then silently never applies it -- losing the
+// Everlight SNDistState move -- fails the suite instead of passing. Tests that
+// abort before V5 install no Apply expectation at all, so an early apply is
+// caught as an unexpected call.
+func expectIdentityMigrationPlanBuilt(f *msgServerFixture, expectedSource sdk.ValAddress) {
+	f.supernodeKeeper.EXPECT().
+		BuildIdentityMigrationPlan(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ sdk.Context, source, destination sdk.ValAddress) (sntypes.IdentityMigrationPlan, error) {
+			if !source.Equals(expectedSource) {
+				return nil, fmt.Errorf(
+					"continuity plan built with wrong source: got %s, want %s (source/destination transposed?)",
+					source, expectedSource)
+			}
+			if source.Equals(destination) {
+				return nil, fmt.Errorf("continuity plan source and destination must differ, both were %s", source)
+			}
+			return sntypes.NewIdentityMigrationPlan(source, destination, nil, nil, nil, nil, nil), nil
+		}).MaxTimes(1)
+}
+
+// expectIdentityMigrationPlanApplied asserts the continuity plan is applied
+// exactly once. Call this from every test whose migration reaches step V5.
+func expectIdentityMigrationPlanApplied(f *msgServerFixture) {
+	f.supernodeKeeper.EXPECT().
+		ApplyIdentityMigrationPlan(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 }
 
 func setupPassingValPreChecks(t *testing.T, f *msgServerFixture, ubds ...stakingtypes.UnbondingDelegation) (
@@ -919,6 +958,9 @@ func setupPassingValPreChecksWithOwnership(
 		expectNoValidatorSupernode(f, legacyAddr, oldValAddr)
 	} else {
 		ownership(f, legacyAddr, oldValAddr)
+		// Custom-ownership callers get the same continuity-plan allowance that
+		// expectNoValidatorSupernode installs for the default path.
+		expectIdentityMigrationPlanBuilt(f, oldValAddr)
 	}
 
 	_ = newValAddr // used by callers
@@ -1148,11 +1190,12 @@ func TestMigrateValidator_FailAtValidatorSupernode(t *testing.T) {
 	// Steps V1-V4 succeed.
 	setupV1toV4(f.mockFixture, oldValAddr, newValAddr)
 
-	// Step V5: supernode re-key fails.
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
+
+	// Step V5: supernode re-key fails. The plan (built pre-V1 by the shared
+	// pre-check helper) is applied first, then the primary write fails.
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(
-		sntypes.SupernodeMetricsState{}, false,
-	)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).Return(
 		fmt.Errorf("supernode store write failed"),
 	)
@@ -1171,6 +1214,9 @@ func TestMigrateValidator_FailAtValidatorActions(t *testing.T) {
 
 	// Steps V1-V4 succeed.
 	setupV1toV4(f.mockFixture, oldValAddr, newValAddr)
+
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
 
 	// Step V6: action re-key fails.
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(
@@ -1193,6 +1239,9 @@ func TestMigrateValidator_FailAtAuth(t *testing.T) {
 	setupV1toV4(f.mockFixture, oldValAddr, newValAddr)
 
 	// V5-V6: no supernode, no actions.
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
+
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
 	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 

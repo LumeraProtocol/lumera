@@ -238,6 +238,8 @@ func TestMigrateValidator_Success(t *testing.T) {
 	// Strict execution preflight: the source owns no SuperNode and the validator
 	// has no independently-owned SuperNode record.
 	expectNoValidatorSupernode(f, legacyAddr, oldValAddr)
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
 
 	// Step V1: Withdraw commission and delegation rewards.
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)
@@ -412,6 +414,8 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 
 	// Strict execution preflight: no source-owned or independent validator SN.
 	expectNoValidatorSupernode(f, legacyAddr, oldValAddr)
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
 
 	// Step V1: Withdraw commission + self-delegation rewards.
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)
@@ -608,6 +612,8 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 
 	// Strict execution preflight: no source-owned or independent validator SN.
 	expectNoValidatorSupernode(f, legacyAddr, oldValAddr)
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
 
 	// Step V1: Withdraw commission.
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)

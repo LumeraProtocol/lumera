@@ -102,7 +102,7 @@
                 "asset": "lumera_linux_amd64.tar.gz"
             },
             "supernode": {
-                "tag": "v2.6.0-rc1"
+                "tag": "v2.6.3-testnet"
             },
             "lumera_uploader": {
                 "tag": ""
@@ -115,7 +115,7 @@
                 "asset": "lumera_linux_amd64.tar.gz"
             },
             "supernode": {
-                "tag": "v2.6.0-rc1"
+                "tag": "v2.6.3-testnet"
             },
             "lumera_uploader": {
                 "tag": ""

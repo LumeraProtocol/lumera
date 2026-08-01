@@ -166,24 +166,6 @@ func (f *mockFixture) expectIdentityMigrationPlan(
 		}).Times(1)
 }
 
-// expectIdentityMigrationPlanBuildOnly expects the plan to be built but never
-// applied. Used by tests that assert migration aborts between the pre-write
-// validation and the first write.
-func (f *mockFixture) expectIdentityMigrationPlanBuildOnly(t *testing.T, source, destination sdk.ValAddress) {
-	t.Helper()
-
-	f.supernodeKeeper.EXPECT().
-		BuildIdentityMigrationPlan(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ sdk.Context, gotSource, gotDestination sdk.ValAddress) (sntypes.IdentityMigrationPlan, error) {
-			require.Equal(t, source.String(), gotSource.String())
-			require.Equal(t, destination.String(), gotDestination.String())
-			return sntypes.NewIdentityMigrationPlan(gotSource, gotDestination, nil, nil, nil, nil, nil), nil
-		}).Times(1)
-
-	f.supernodeKeeper.EXPECT().
-		ApplyIdentityMigrationPlan(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-}
-
 func (f *mockFixture) wireScopedMigrationStores() {
 	f.keeper.SetStakingStoreService(f.stakingStore)
 	f.keeper.SetDistributionStoreService(f.distributionStore)

@@ -49,6 +49,39 @@ Before starting:
 - Lumera chain is **EVM-enabled**. The supernode daemon verifies this at boot via `x/upgrade.ModuleVersions(evm)`. If the chain hasn't upgraded yet the daemon fatals with `connected Lumera chain does not have EVM support` — wait for the chain upgrade.
 - You hold the **mnemonic (seed phrase)** for the legacy supernode key.
 - You have access to the host running the supernode daemon and can edit `config.yml`.
+- Your keyring passphrase is **at least 8 characters**. Shorter passphrases are rejected by the keyring backend, which surfaces as a confusing failure part-way through key creation rather than as a clear "passphrase too short" message.
+
+### Upgrade order: the chain goes first, then your supernode
+
+The chain must reach the EVM-enabled release **before** you upgrade your supernode binary past `v2.6.0`. Supernode `v2.6.x` refuses to start against a pre-EVM chain — by design — so upgrading early takes your node offline until the chain catches up:
+
+```text
+connected Lumera chain does not have EVM support (module "evm" not found).
+This supernode binary requires an EVM-enabled Lumera chain.
+Please upgrade your Lumera node or connect to an EVM-enabled chain
+```
+
+So the sequence is always:
+
+```
+1. chain upgrades to the EVM release
+2. you set evm_key_name (Step 2 below)
+3. you upgrade the supernode binary to v2.6.x
+4. the daemon migrates on next boot (Step 3 below)
+```
+
+### `sn-manager` will block the v2.6 upgrade until you set `evm_key_name`
+
+If you run `sn-manager` with automatic updates, it **deliberately refuses** to carry you across the EVM boundary (any upgrade from below `v2.6.0` to `v2.6.0` or above) until the migration is prepared. You will see one of:
+
+```text
+Automatic update to <version> blocked: supernode.evm_key_name is missing or empty
+Automatic update to <version> blocked: cannot read SuperNode evm_key_name: <error>
+```
+
+**This is correct behaviour, not a bug, and it is protecting you.** Do not work around it, downgrade, or disable the updater. Complete Step 1 and Step 2 below — set `evm_key_name` in `config.yml` — and the update will proceed on its own at the next check.
+
+Nodes already on `v2.6.x` are not gated, because a successful migration intentionally clears `evm_key_name`.
 
 ---
 
@@ -152,6 +185,50 @@ grep -E "key_name|identity|evm_key_name" ~/.supernode/config.yml
 
 You should see `key_name: <evm-key-name>`, `identity: <new-evm-address>`, and no `evm_key_name` line.
 
+### Verify against chain state, not just the daemon's logs
+
+Always confirm the outcome on-chain. A successful-looking log line is not proof the transaction was included and executed:
+
+```bash
+lumerad query evmigration migration-records -o json      # full legacy → new mapping
+```
+
+Two things worth understanding about what you'll see:
+
+- **The old address stops resolving, and that is expected.** `prev_supernode_accounts` records your history — it does *not* keep the old address queryable:
+
+  ```text
+  $ lumerad query supernode get-supernode-by-address <OLD address>
+  rpc error: NotFound desc = supernode not found: key not found
+  ```
+
+  Query with the **new** address. If you need the historical link, read the migration record.
+
+- **Migration is not repeatable.** On success the daemon **deletes the legacy key** from the keyring. Re-running a migration therefore only ever retries a *failed* attempt — it cannot be used to "redo" a successful one, and there is no undo. Make sure you have the destination mnemonic safely recorded **before** you start.
+
+### Two keyrings: `key_name` is ambiguous without knowing which one
+
+The supernode daemon uses **its own keyring** (`~/.supernode/keys`), separate from the validator keyring. **The same key name can resolve to two different addresses:**
+
+```bash
+# validator keyring
+lumerad keys show <name> -a --keyring-backend test
+
+# supernode daemon keyring — note --keyring-dir
+lumerad keys show <name> -a --keyring-backend test --keyring-dir ~/.supernode/keys
+```
+
+Whenever an instruction says "use key X", check which keyring it means. A mismatch here — registration pointing at the validator-keyring address while `config.yml` names the daemon-keyring one — prevents the supernode from ever starting, and the symptom looks like a migration problem rather than a keyring problem.
+
+**You cannot move a migrated key between keyrings.** Once migrated the key is `eth_secp256k1`, and while `keys export` appears to succeed, `keys import` rejects it:
+
+```text
+failed to decrypt private key: unmarshal to types.PrivKey failed after 4 bytes
+  (unrecognized prefix bytes ...)
+```
+
+Generate the EVM key **directly in the keyring that will use it** (Step 1 does this for the daemon keyring via `supernode keys recover`) rather than trying to copy one across.
+
 ---
 
 ## Path B — Migrating via Portal + Keplr first
@@ -244,6 +321,12 @@ Same as Path A's [Step 4 — Verify](#step-4--verify). Three queries — migrati
 ---
 
 ## Troubleshooting
+
+> **Before you delete or overwrite any key:** never remove a key until its replacement is proven
+> to exist and resolve to the address you expect. Import under a temporary name, verify the
+> address matches, and only then swap. And never hide errors on a destructive step
+> (`2>/dev/null`) — a suppressed import error is how a recoverable failure becomes permanent key
+> loss. If you are unsure, stop and ask before deleting anything.
 
 ### `evm_key_name "<name>" is not an eth_secp256k1 key`
 

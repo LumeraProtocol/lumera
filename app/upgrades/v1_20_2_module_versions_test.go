@@ -46,12 +46,12 @@ func TestV1202ModuleVersionsMatchLiveChains(t *testing.T) {
 			"initializes it at 1 during the one-hop bring-up")
 }
 
-// TestV1202TestnetRunMigrationsIsANoop proves the testnet path carries nothing.
+// TestV1202TestnetRunMigrationsIsANoop proves the testnet path carries no module
+// migration. The enclosing handler still applies the feemarket base-fee update.
 //
 // Testnet arrives with exactly the versions the new binary declares, so
 // RunMigrations must find no work. Asserting the returned version map equals
-// the binary's own map is what makes "migrations only" a verified claim rather
-// than a comment.
+// the binary's own map verifies that no module consensus migration runs.
 func TestV1202TestnetRunMigrationsIsANoop(t *testing.T) {
 	app := lumeraapp.Setup(t)
 	ctx := app.BaseApp.NewContext(false).WithChainID("lumera-testnet-2")
@@ -67,7 +67,7 @@ func TestV1202TestnetRunMigrationsIsANoop(t *testing.T) {
 	fromVM := app.ModuleManager.GetVersionMap()
 
 	newVM, err := config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, fromVM)
-	require.NoError(t, err, "the testnet migrations-only path must succeed")
+	require.NoError(t, err, "the testnet existing-EVM path must succeed")
 	require.Equal(t, fromVM, newVM,
 		"v1.20.2 on testnet must be a pure no-op at the module-version layer: "+
 			"no module may be migrated by this release")

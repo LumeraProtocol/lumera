@@ -5,12 +5,14 @@ import (
 	"fmt"
 
 	upgradetypes "cosmossdk.io/x/upgrade/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	erc20types "github.com/cosmos/evm/x/erc20/types"
 	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	precisebanktypes "github.com/cosmos/evm/x/precisebank/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 
+	appevm "github.com/LumeraProtocol/lumera/app/evm"
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
 	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
 	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
@@ -45,9 +47,9 @@ const UpgradeName = "v1.20.2"
 // transactions can execute. It needs one named halt height that every validator
 // stops at, exactly like v1.20.0 and v1.20.1.
 //
-// There is no store migration and no module consensus-version bump here. The
-// upgrade exists purely to make the behavior change atomic across the validator
-// set. That is a sufficient and standard reason for a Cosmos upgrade boundary.
+// There is no store migration and no module consensus-version bump here. In
+// addition to making the behavior change atomic across the validator set, the
+// handler applies the release's configured feemarket base fee.
 //
 // # TWO ARRIVAL SHAPES, ONE BINARY
 //
@@ -61,8 +63,8 @@ const UpgradeName = "v1.20.2"
 // Mainnet is still pre-EVM and has executed neither. This one binary must
 // therefore be correct for two very different starting states:
 //
-//	from 1.20.1 (testnet)  EVM stores + modules present -> migrations only
-//	from 1.12.0 (mainnet)  nothing present              -> full EVM bring-up
+//	from 1.20.1 (testnet)  EVM present -> migrations + base-fee update
+//	from 1.12.0 (mainnet)  EVM absent  -> full EVM bring-up + base-fee update
 //
 // Both are decided by inspecting committed STATE (fromVM), never by chain-id,
 // so a network that arrives by an unexpected path still converges on the same
@@ -111,9 +113,9 @@ func evmModuleState(fromVM module.VersionMap) (present, absent []string) {
 // info, seeds the ERC20 registration policy, derives migration_end_time from the
 // upgrade block time, and then runs migrations.
 //
-// When the EVM stack is present this is a plain migrations-only carrier, which
-// is all a chain already on v1.20.1 needs: it inherits the new evmigration
-// DeliverTx behavior from the binary itself at the halt height.
+// When the EVM stack is present this runs migrations without re-running EVM
+// bring-up. Both paths then set the configured feemarket base fee so chains
+// arriving from v1.12.0 and v1.20.1 converge on the same value.
 //
 // Partial EVM state fails closed rather than guessing.
 func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHandler {
@@ -126,16 +128,19 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 				"Starting upgrade %s: EVM not yet initialized, running full v1.20.0 bring-up", UpgradeName))
 		case len(absent) > 0:
 			// Neither branch is safe here: the bring-up would double-initialize
-			// the modules that are present, and the migrations-only path would
+			// the modules that are present, and the existing-EVM path would
 			// skip param finalization for the ones that are absent.
 			return nil, fmt.Errorf(
 				"%s: inconsistent EVM module state, refusing to run — present=%v absent=%v; "+
-					"expected all EVM modules present (migrations only) or all absent (full bring-up)",
+					"expected all EVM modules present or all absent (full bring-up)",
 				UpgradeName, present, absent,
 			)
 		default:
 			p.Logger.Info(fmt.Sprintf(
-				"Starting upgrade %s: EVM already initialized, running migrations only", UpgradeName))
+				"Starting upgrade %s: EVM already initialized, running migrations and updating the feemarket base fee", UpgradeName))
+		}
+		if p.FeeMarketKeeper == nil {
+			return nil, fmt.Errorf("%s upgrade requires the feemarket keeper to be wired", UpgradeName)
 		}
 
 		// Both surviving shapes are exactly what v1.20.1 already implements and
@@ -146,6 +151,14 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 			p.Logger.Error(fmt.Sprintf("Upgrade %s failed", UpgradeName), "error", err)
 			return nil, err
 		}
+
+		ctx := sdk.UnwrapSDKContext(goCtx)
+		feeMarketParams := p.FeeMarketKeeper.GetParams(ctx)
+		feeMarketParams.BaseFee = appevm.LumeraFeemarketGenesisState().Params.BaseFee
+		if err := p.FeeMarketKeeper.SetParams(ctx, feeMarketParams); err != nil {
+			return nil, fmt.Errorf("set v1.20.2 feemarket base fee: %w", err)
+		}
+		p.Logger.Info("Updated feemarket base fee", "base_fee", feeMarketParams.BaseFee.String())
 
 		p.Logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))
 		return newVM, nil

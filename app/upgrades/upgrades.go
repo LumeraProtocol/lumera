@@ -44,7 +44,7 @@ import (
 // | v1.12.0 | custom   | none (Everlight in supernode)     | Runs migrations; Everlight logic embedded in x/supernode
 // | v1.20.0 | custom   | non-mainnet: add feemarket, precisebank, vm, erc20 | EVM bring-up; gated to non-mainnet (mainnet runs it via v1.20.1)
 // | v1.20.1 | custom   | state-driven add-only: feemarket, precisebank, vm, erc20 | EVM bring-up when EVM absent (any network, incl. direct 1.12.0->1.20.1); migrations-only hotfix when EVM already present. Add-only store loader mounts only missing keys.
-// | v1.20.2 | custom   | state-driven add-only: same EVM set as v1.20.1 | Consensus activation boundary for the evmigration ownership/continuity fixes. Same two arrival shapes as v1.20.1 (bring-up when EVM absent, migrations only when present); no store migration, no consensus-version bump.
+// | v1.20.2 | custom   | state-driven add-only: same EVM set as v1.20.1 | Consensus activation boundary for the evmigration ownership/continuity fixes. Brings up EVM when absent; otherwise runs migrations; both paths apply the configured feemarket base fee. No store migration or consensus-version bump.
 // =================================================================================================================================
 
 type UpgradeConfig struct {

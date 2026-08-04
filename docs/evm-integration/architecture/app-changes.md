@@ -23,7 +23,7 @@ Changes:
 - Added`SetBip44CoinType` to set BIP44 purpose 44 and coin type 60 (Ethereum).
 - Added EVM constants:
   - `EVMChainID = 76857769`
-  - `FeeMarketDefaultBaseFee = "0.0025"`
+  - `FeeMarketDefaultBaseFee = "0.0125"`
   - `FeeMarketMinGasPrice = "0.0005"` (floor preventing base fee decay to zero)
   - `FeeMarketBaseFeeChangeDenominator = 16` (gentler ~6.25% adjustment per block)
   - `ChainDefaultConsensusMaxGas = 25_000_000`

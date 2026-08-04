@@ -296,7 +296,7 @@
         "base_fee_change_denominator": 16,
         "elasticity_multiplier": 2,
         "enable_height": "0",
-        "base_fee": "0.002500000000000000",
+        "base_fee": "0.012500000000000000",
         "min_gas_price": "0.000500000000000000",
         "min_gas_multiplier": "0.500000000000000000"
       },

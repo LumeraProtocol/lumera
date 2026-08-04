@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"cosmossdk.io/log"
+	sdkmath "cosmossdk.io/math"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
@@ -89,6 +90,9 @@ func TestV1202MainnetOneHopRunsFullEVMBringup(t *testing.T) {
 
 	require.Equal(t, appevm.LumeraEVMGenesisState().Params, app.EVMKeeper.GetParams(ctx),
 		"v1.20.2 on the mainnet one-hop must apply Lumera EVM params, overwriting upstream aatom defaults")
+	require.True(t,
+		app.FeeMarketKeeper.GetParams(ctx).BaseFee.Equal(sdkmath.LegacyMustNewDecFromStr("0.0125")),
+		"v1.20.2 on the mainnet one-hop must initialize the five-times-higher base fee")
 
 	emParams, err := app.EvmigrationKeeper.Params.Get(ctx)
 	require.NoError(t, err)
@@ -98,13 +102,13 @@ func TestV1202MainnetOneHopRunsFullEVMBringup(t *testing.T) {
 		"enable_migration stays at its module default on this release; it is not forced off by the handler")
 }
 
-// TestV1202TestnetIsMigrationsOnly proves the testnet path.
+// TestV1202TestnetPreservesStateAndUpdatesBaseFee proves the testnet path.
 //
 // Testnet already executed v1.20.0 AND v1.20.1, so both are spent and cannot
-// run again. v1.20.2 must be a pure migrations-only carrier there: it must NOT
-// re-run the bring-up, because doing so would re-initialize EVM params and
-// stomp the live migration_end_time that governance is running against.
-func TestV1202TestnetIsMigrationsOnly(t *testing.T) {
+// run again. v1.20.2 must NOT re-run the bring-up, because doing so would
+// re-initialize unrelated EVM params and stomp the live migration_end_time that
+// governance is running against. It updates only the feemarket base fee.
+func TestV1202TestnetPreservesStateAndUpdatesBaseFee(t *testing.T) {
 	app := lumeraapp.Setup(t)
 	ctx := app.BaseApp.NewContext(false).WithChainID("lumera-testnet-2")
 
@@ -118,6 +122,12 @@ func TestV1202TestnetIsMigrationsOnly(t *testing.T) {
 	emParams.MigrationEndTime = liveDeadline
 	require.NoError(t, app.EvmigrationKeeper.Params.Set(ctx, emParams))
 
+	feeParams := app.FeeMarketKeeper.GetParams(ctx)
+	feeParams.BaseFee = sdkmath.LegacyMustNewDecFromStr("0.0025")
+	require.NoError(t, app.FeeMarketKeeper.SetParams(ctx, feeParams))
+	wantFeeParams := feeParams
+	wantFeeParams.BaseFee = sdkmath.LegacyMustNewDecFromStr("0.0125")
+
 	config, found := upgrades.SetupUpgrades(upgradeNameV1202, params)
 	require.True(t, found)
 	require.NotNil(t, config.Handler)
@@ -129,7 +139,9 @@ func TestV1202TestnetIsMigrationsOnly(t *testing.T) {
 	after, err := app.EvmigrationKeeper.Params.Get(ctx)
 	require.NoError(t, err)
 	require.Equal(t, liveDeadline, after.MigrationEndTime,
-		"the migrations-only path must NOT recompute migration_end_time and stomp the live governance deadline")
+		"the existing-EVM path must NOT recompute migration_end_time and stomp the live governance deadline")
+	require.Equal(t, wantFeeParams, app.FeeMarketKeeper.GetParams(ctx),
+		"v1.20.2 must increase the base fee five times without changing other feemarket params")
 }
 
 // TestV1202StoreUpgradeIsAddOnlyOnBothPaths guards the destructive direction.
@@ -166,6 +178,7 @@ func TestV1202IsIdempotentAcrossReplay(t *testing.T) {
 	require.NoError(t, err)
 
 	firstEVM := app.EVMKeeper.GetParams(ctx)
+	firstFeeMarket := app.FeeMarketKeeper.GetParams(ctx)
 	firstEM, err := app.EvmigrationKeeper.Params.Get(ctx)
 	require.NoError(t, err)
 
@@ -175,6 +188,8 @@ func TestV1202IsIdempotentAcrossReplay(t *testing.T) {
 
 	require.Equal(t, firstEVM, app.EVMKeeper.GetParams(ctx),
 		"replay must not change EVM params")
+	require.Equal(t, firstFeeMarket, app.FeeMarketKeeper.GetParams(ctx),
+		"replay must not change feemarket params")
 	secondEM, err := app.EvmigrationKeeper.Params.Get(ctx)
 	require.NoError(t, err)
 	require.Equal(t, firstEM.EnableMigration, secondEM.EnableMigration,

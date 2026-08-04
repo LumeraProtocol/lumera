@@ -276,7 +276,7 @@ The fee market is configured via genesis parameters (governable on-chain), not `
 
 | Parameter | Lumera Default | Upstream Default | Why |
 |-----------|---------------|-----------------|-----|
-| Base fee | 0.0025 ulume/gas | 1000000000 wei | Calibrated for ulume's 6-decimal precision |
+| Base fee | 0.0125 ulume/gas | 1000000000 wei | Calibrated for ulume's 6-decimal precision |
 | Min gas price | 0.0005 ulume/gas | 0 | Prevents base fee decaying to zero on idle chains |
 | Change denominator | 16 (~6.25%/block) | 8 (~12.5%/block) | Gentler fee swings for a new chain |
 | Max block gas | 25,000,000 | 30,000,000 | Conservative; increase via governance if needed |

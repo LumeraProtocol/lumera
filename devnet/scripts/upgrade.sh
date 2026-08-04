@@ -30,12 +30,38 @@ fi
 BINARIES_DIR="$(cd "${BINARIES_DIR}" && pwd)"
 
 # Detect if chain is already halted for this upgrade (re-run scenario).
-# When the upgrade height is reached, nodes panic and stop serving RPC,
-# so lumerad status fails. Check docker logs for the halt message.
+#
+# Reads the validator log FILE inside the container, not `docker compose logs`.
+# The container entrypoint multiplexes several log files onto stdout via
+# `tail -F /root/logs/validator.log /root/logs/supernode.log ...`, so the
+# supernode's per-block chatter pushes the one-time halt panic far out of a
+# shallow `--tail` window. Observed directly: with the chain genuinely halted,
+# `--tail=40` found 0 matches while `--tail=400` found 3 — and on a node whose
+# supernode is noisier, the marker can be thousands of lines back. Grepping the
+# file is bounded work and cannot be flooded out.
+#
+# Falls back to a deep docker-logs scan if the file is not readable (e.g. a
+# non-standard image layout).
 detect_upgrade_halt() {
+	# The release name in the panic is quote-escaped by the logger:
+	#
+	#   err="failed to apply block; error UPGRADE \"v1.20.2\" NEEDED at height: 2429: "
+	#
+	# so a pattern containing a literal `"v1.20.2"` never matches — the bytes on
+	# disk are `\"v1.20.2\"`. Match the version WITHOUT surrounding quotes and
+	# escape the dots so they are not regex wildcards.
+	local ver_re
+	ver_re="$(printf '%s' "${RELEASE_NAME}" | sed 's/\./\\./g')"
+	local marker="UPGRADE.*${ver_re}.*NEEDED at height"
+
+	if docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+		sh -lc "grep -qE '${marker}' /root/logs/validator.log" 2>/dev/null; then
+		return 0
+	fi
+
 	local logs
-	logs="$(docker compose -f "${COMPOSE_FILE}" logs --tail=100 "${SERVICE}" 2>/dev/null || true)"
-	if echo "${logs}" | grep -qE "UPGRADE.*\"${RELEASE_NAME}\".*NEEDED"; then
+	logs="$(docker compose -f "${COMPOSE_FILE}" logs --tail=5000 "${SERVICE}" 2>/dev/null || true)"
+	if echo "${logs}" | grep -qE "${marker}"; then
 		return 0
 	fi
 	return 1
@@ -173,11 +199,25 @@ fi
 
 # Wait for the chain to HALT for this upgrade. The upgrade fires at the plan
 # height's begin-block, so the chain commits only up to (UPGRADE_HEIGHT - 1) and
-# then panics "UPGRADE NEEDED" — it never commits UPGRADE_HEIGHT itself. So we
-# poll for the halt marker (primary signal) rather than for height >=
-# UPGRADE_HEIGHT (which would never be reached and would time out). We also break
-# if the chain sails PAST the height without halting, leaving the guard below to
+# then panics "UPGRADE NEEDED" — it never commits UPGRADE_HEIGHT itself, so its
+# reported latest_block_height settles AT UPGRADE_HEIGHT and stops there. We poll
+# for the halt marker (primary signal) rather than for height >= UPGRADE_HEIGHT,
+# which is already true in the correct halt state. We also break if the chain
+# sails strictly PAST the height without halting, leaving the guard below to
 # refuse the swap.
+#
+# IMPORTANT — the node keeps serving RPC while halted. It does NOT go dark: it
+# panics in the consensus routine, stops advancing, and continues answering
+# `lumerad status` with `latest_block_height == UPGRADE_HEIGHT` indefinitely.
+# Verified on a real halt: all five validators served height 2429 for the whole
+# halt window with plan height 2429.
+#
+# Therefore `height >= UPGRADE_HEIGHT` is TRUE in the normal, correct halt state,
+# and using it as the "sailed past" test misfires immediately and prints
+# "⚠️ Chain at N passed N without halting" for a perfectly healthy upgrade —
+# a false alarm that tells an operator to distrust a good halt. Only a height
+# STRICTLY GREATER than UPGRADE_HEIGHT means blocks were produced beyond the
+# plan, i.e. the upgrade did not take effect.
 echo "Waiting for the ${RELEASE_NAME} upgrade halt at height ${UPGRADE_HEIGHT}..."
 UPGRADE_WAIT_TIMEOUT="${UPGRADE_WAIT_TIMEOUT:-1800}"
 waited=0
@@ -189,7 +229,7 @@ while true; do
 	CURRENT_HEIGHT_NOW="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
 		lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
 	if [[ "${CURRENT_HEIGHT_NOW}" =~ ^[0-9]+$ ]]; then
-		if ((CURRENT_HEIGHT_NOW >= UPGRADE_HEIGHT)); then
+		if ((CURRENT_HEIGHT_NOW > UPGRADE_HEIGHT)); then
 			echo "⚠️  Chain at ${CURRENT_HEIGHT_NOW} passed ${UPGRADE_HEIGHT} without halting; proceeding to guard."
 			break
 		fi

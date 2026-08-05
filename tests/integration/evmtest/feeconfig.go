@@ -79,13 +79,17 @@ func BaseFeeDrainBlocks(t *testing.T) int {
 	return blocks
 }
 
-// MinCosmosGasPriceWithHeadroom returns a `ulume` gas price string safe to pass
-// to `--gas-prices` for Cosmos-side txs in EVM tests.
+// MinCosmosGasPriceWithHeadroom returns a full coin string (e.g. "0.0125ulume")
+// safe to pass directly to `--gas-prices` for Cosmos-side txs in EVM tests.
 //
 // The global minimum fee scales with the feemarket base fee, so a flat
 // `--fees` literal (e.g. 1000ulume at 200k gas = 0.005ulume/gas) silently falls
 // below the floor whenever the base fee is raised. Using the configured default
-// base fee with headroom keeps these txs accepted across tuning changes.
+// base fee keeps these txs accepted across tuning changes.
+//
+// The denom suffix is mandatory: the Cosmos CLI rejects a bare decimal with
+// "invalid decimal coin expression". Returning only the decimal made this
+// helper unusable for its documented purpose.
 func MinCosmosGasPriceWithHeadroom() string {
-	return lcfg.FeeMarketDefaultBaseFee
+	return lcfg.FeeMarketDefaultBaseFee + lcfg.ChainDenom
 }

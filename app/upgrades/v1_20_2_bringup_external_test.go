@@ -28,10 +28,15 @@ const upgradeNameV1202 = "v1.20.2"
 // newV1202Params builds the real keeper wiring a coordinated upgrade would have.
 func newV1202Params(app *lumeraapp.App, chainID string) appParams.AppUpgradeParams {
 	return appParams.AppUpgradeParams{
-		ChainID:           chainID,
-		Logger:            log.NewNopLogger(),
-		ModuleManager:     module.NewManager(),
-		Configurator:      module.NewConfigurator(nil, nil, nil),
+		ChainID: chainID,
+		Logger:  log.NewNopLogger(),
+		// Use the app's REAL module manager and configurator, not stubs.
+		// v1.20.2 delegates to the v1.20.1 handler, which calls
+		// p.ModuleManager.RunMigrations(ctx, p.Configurator, fromVM). With an
+		// empty module.NewManager() that call is a no-op, so the test would pass
+		// even if the real upgrade failed during migrations or InitGenesis.
+		ModuleManager:     app.ModuleManager,
+		Configurator:      app.Configurator(),
 		BankKeeper:        app.BankKeeper,
 		EVMKeeper:         app.EVMKeeper,
 		FeeMarketKeeper:   &app.FeeMarketKeeper,
@@ -42,14 +47,31 @@ func newV1202Params(app *lumeraapp.App, chainID string) appParams.AppUpgradePara
 }
 
 // allEVMModulesPresent is the fromVM shape a chain already running v1.20.1
-// presents (testnet). Versions mirror what the bring-up registers.
-func allEVMModulesPresent() module.VersionMap {
-	return module.VersionMap{
-		evmtypes.ModuleName:         1,
-		feemarkettypes.ModuleName:   1,
-		precisebanktypes.ModuleName: 1,
-		erc20types.ModuleName:       1,
+// presents (testnet): every module the app knows about, including the EVM stack.
+func allEVMModulesPresent(app *lumeraapp.App) module.VersionMap {
+	return app.ModuleManager.GetVersionMap()
+}
+
+// mainnetPreEVMVersionMap is the fromVM shape mainnet actually presents at
+// v1.12.0: versions for every EXISTING module, with the EVM stack and
+// evmigration absent because they have never been initialized there.
+//
+// An empty VersionMap is not a valid stand-in. RunMigrations auto-runs
+// InitGenesis for every module missing from fromVM, so an empty map makes the
+// handler re-initialize the entire chain and can mask genuine bugs (e.g. an
+// unintended InitGenesis re-run on a module that already holds state).
+func mainnetPreEVMVersionMap(app *lumeraapp.App) module.VersionMap {
+	vm := app.ModuleManager.GetVersionMap()
+	for _, name := range []string{
+		evmtypes.ModuleName,
+		feemarkettypes.ModuleName,
+		precisebanktypes.ModuleName,
+		erc20types.ModuleName,
+		evmigrationtypes.ModuleName,
+	} {
+		delete(vm, name)
 	}
+	return vm
 }
 
 // TestV1202MainnetOneHopRunsFullEVMBringup proves the mainnet path.
@@ -83,8 +105,9 @@ func TestV1202MainnetOneHopRunsFullEVMBringup(t *testing.T) {
 
 	wantEnd := ctx.BlockTime().AddDate(0, 3, 0).Unix()
 
-	// fromVM is EMPTY: mainnet carries no EVM module versions at 1.12.0.
-	newVM, err := config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
+	// fromVM mirrors mainnet at v1.12.0: all pre-existing modules carry their
+	// versions; only the EVM stack and evmigration are absent.
+	newVM, err := config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, mainnetPreEVMVersionMap(app))
 	require.NoError(t, err, "the mainnet 1.12.0 -> 1.20.2 one-hop must succeed")
 	require.NotNil(t, newVM)
 
@@ -132,7 +155,7 @@ func TestV1202TestnetPreservesStateAndUpdatesBaseFee(t *testing.T) {
 	require.True(t, found)
 	require.NotNil(t, config.Handler)
 
-	newVM, err := config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, allEVMModulesPresent())
+	newVM, err := config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, allEVMModulesPresent(app))
 	require.NoError(t, err, "the testnet 1.20.1 -> 1.20.2 upgrade must succeed")
 	require.NotNil(t, newVM)
 
@@ -174,7 +197,11 @@ func TestV1202IsIdempotentAcrossReplay(t *testing.T) {
 	config, found := upgrades.SetupUpgrades(upgradeNameV1202, params)
 	require.True(t, found)
 
-	_, err := config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
+	// Arrive with the realistic mainnet shape. An empty VersionMap would make
+	// RunMigrations re-run InitGenesis for EVERY module (x/group panics with
+	// "sequence: already initialized"), which is an artifact of the fixture, not
+	// a real replay.
+	_, err := config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, mainnetPreEVMVersionMap(app))
 	require.NoError(t, err)
 
 	firstEVM := app.EVMKeeper.GetParams(ctx)
@@ -183,7 +210,7 @@ func TestV1202IsIdempotentAcrossReplay(t *testing.T) {
 	require.NoError(t, err)
 
 	// Replay the SAME arrival shape against the now-upgraded state.
-	_, err = config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, module.VersionMap{})
+	_, err = config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, mainnetPreEVMVersionMap(app))
 	require.NoError(t, err, "replaying the upgrade must not error")
 
 	require.Equal(t, firstEVM, app.EVMKeeper.GetParams(ctx),
@@ -194,4 +221,58 @@ func TestV1202IsIdempotentAcrossReplay(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, firstEM.EnableMigration, secondEM.EnableMigration,
 		"replay must not flip the migration gate")
+}
+
+// TestV1202MainnetSuppressesEVMInitGenesis pins the guard that stops
+// RunMigrations from running InitGenesis for the EVM modules on the mainnet
+// one-hop.
+//
+// The v1.20.0 handler pre-seeds the EVM module versions into fromVM precisely so
+// RunMigrations treats them as already-initialized and applies Lumera's params
+// instead of cosmos/evm's upstream "aatom" defaults. Removing any one of those
+// pre-seeds lets InitGenesis clobber the params the handler just set.
+//
+// Verified by mutation: delete `fromVM[evmtypes.ModuleName] = 1` from
+// app/upgrades/v1_20_0/upgrade.go and the mainnet bring-up test fails.
+//
+// Note the feemarket guard is NOT independently detectable this way, because
+// v1.20.2 deliberately re-applies BaseFee after RunMigrations
+// (v1_20_2/upgrade.go:157). That masking is by design, not a test gap; the
+// version-map parity assertions below are what cover feemarket.
+func TestV1202MainnetSuppressesEVMInitGenesis(t *testing.T) {
+	app := lumeraapp.Setup(t)
+	ctx := app.BaseApp.NewContext(false).WithChainID("lumera-mainnet-1")
+	params := newV1202Params(app, "lumera-mainnet-1")
+
+	config, found := upgrades.SetupUpgrades(upgradeNameV1202, params)
+	require.True(t, found)
+
+	newVM, err := config.Handler(sdk.WrapSDKContext(ctx), upgradetypes.Plan{}, mainnetPreEVMVersionMap(app))
+	require.NoError(t, err)
+
+	// Every EVM module must be present in the resulting version map at the
+	// version the app's module manager declares, i.e. consensus-version parity
+	// with a chain that reached this state incrementally.
+	appVM := app.ModuleManager.GetVersionMap()
+	for _, name := range []string{
+		evmtypes.ModuleName,
+		feemarkettypes.ModuleName,
+		precisebanktypes.ModuleName,
+		erc20types.ModuleName,
+		evmigrationtypes.ModuleName,
+	} {
+		require.Contains(t, newVM, name,
+			"%s must be registered in the post-upgrade version map", name)
+		require.Equal(t, appVM[name], newVM[name],
+			"%s consensus version must match the app's module manager", name)
+	}
+
+	// The decisive assertion: feemarket params must be Lumera's, not upstream
+	// defaults. If InitGenesis ran for feemarket it would install the upstream
+	// base fee and this comparison fails.
+	require.True(t,
+		app.FeeMarketKeeper.GetParams(ctx).BaseFee.Equal(sdkmath.LegacyMustNewDecFromStr("0.0125")),
+		"feemarket InitGenesis must be suppressed so the handler's base fee survives")
+	require.Equal(t, appevm.LumeraEVMGenesisState().Params, app.EVMKeeper.GetParams(ctx),
+		"x/vm InitGenesis must be suppressed so Lumera EVM params survive")
 }

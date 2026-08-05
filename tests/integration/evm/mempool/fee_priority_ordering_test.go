@@ -29,7 +29,20 @@ func testEVMFeePriorityOrderingSameBlock(t *testing.T, node *evmtest.Node) {
 	receiverPriv, receiverAddr := testaccounts.MustGenerateEthKey(t)
 
 	// Wait until gas price is affordable for two 21k txs from the fixed test balance.
-	lowGasPrice := waitForAffordableGasPrice(t, node, big.NewInt(2_200_000_000), 30*time.Second)
+	//
+	// The ceiling must be derived from the configured default base fee, not
+	// hardcoded. A fresh chain starts at FeeMarketDefaultBaseFee and decays
+	// toward FeeMarketMinGasPrice; the previous fixed 2.2 gwei literal was
+	// below the 12.5 gwei start, so this timed out before the fee could ever
+	// decay that far.
+	//
+	// Anchor on the default rather than a small multiple of the floor: earlier
+	// subtests in this suite submit load, which pushes the base fee back up, so
+	// any aggressive ceiling is timing-dependent and flaky. The receiver is
+	// explicitly funded for the resulting cost below, so a higher gas price is
+	// affordable by construction.
+	maxGasPrice := evmtest.DefaultBaseFeeWei(t)
+	lowGasPrice := waitForAffordableGasPrice(t, node, maxGasPrice, 90*time.Second)
 	highGasPrice := new(big.Int).Add(lowGasPrice, big.NewInt(100_000_000))
 
 	highTxCost := new(big.Int).Mul(new(big.Int).Set(highGasPrice), big.NewInt(21_000))
@@ -124,7 +137,9 @@ func fundAccountViaBankSend(t *testing.T, node *evmtest.Node, recipient string, 
 		"--node", node.CometRPCURL(),
 		"--broadcast-mode", "async",
 		"--gas", "200000",
-		"--fees", "1000"+lcfg.ChainDenom,
+		// --gas-prices, not a flat --fees literal: the global minimum fee
+		// scales with the feemarket base fee.
+		"--gas-prices", lcfg.FeeMarketDefaultBaseFee+lcfg.ChainDenom,
 		"--yes",
 		"--output", "json",
 		"--log_no_color",

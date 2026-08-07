@@ -18,7 +18,7 @@ import (
 	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	snkeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 )
 
 var _ depinject.OnePerModuleType = AppModule{}
@@ -49,7 +49,7 @@ type ModuleInputs struct {
 	DistributionKeeper distrkeeper.Keeper
 	AuthzKeeper        authzkeeper.Keeper
 	FeegrantKeeper     feegrantkeeper.Keeper
-	SupernodeKeeper    sntypes.SupernodeKeeper
+	SupernodeKeeper    *snkeeper.Keeper
 	ActionKeeper       actionkeeper.Keeper
 }
 

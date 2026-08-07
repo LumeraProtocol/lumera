@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
@@ -236,6 +235,12 @@ func TestMigrateValidator_Success(t *testing.T) {
 	)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
 
+	// Strict execution preflight: the source owns no SuperNode and the validator
+	// has no independently-owned SuperNode record.
+	expectNoValidatorSupernode(f, legacyAddr, oldValAddr)
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
+
 	// Step V1: Withdraw commission and delegation rewards.
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)
 	// temporaryRedirectWithdrawAddr: withdraw addr = self → no-op.
@@ -302,9 +307,6 @@ func TestMigrateValidator_Success(t *testing.T) {
 	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), newValAddr, legacyAddr, gomock.Any()).Return(nil)
-
-	// Step V5: MigrateValidatorSupernode — not a supernode.
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
 
 	// Step V6: MigrateValidatorActions — no matching actions.
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -410,6 +412,11 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 	)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
 
+	// Strict execution preflight: no source-owned or independent validator SN.
+	expectNoValidatorSupernode(f, legacyAddr, oldValAddr)
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
+
 	// Step V1: Withdraw commission + self-delegation rewards.
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
@@ -462,9 +469,6 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), selfDel).Return(nil)
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), newValAddr, legacyAddr, gomock.Any()).Return(nil)
-
-	// V5: no supernode.
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
 
 	// V6: no actions.
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -606,6 +610,11 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(allDels, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
 
+	// Strict execution preflight: no source-owned or independent validator SN.
+	expectNoValidatorSupernode(f, legacyAddr, oldValAddr)
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
+
 	// Step V1: Withdraw commission.
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)
 
@@ -672,9 +681,6 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 	}
 
 	// Redelegation re-keying — none.
-
-	// Supernode — not found.
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
 
 	// Actions — no action references.
 	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)

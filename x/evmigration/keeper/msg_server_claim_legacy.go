@@ -13,6 +13,7 @@ import (
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // ClaimLegacyAccount migrates on-chain state from a legacy (coin-type-118)
@@ -82,8 +83,21 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 		return nil, err
 	}
 
+	// Resolve SuperNode ownership against the pristine pre-migration state.
+	// Missing index entries, stale indices, malformed records, and duplicate
+	// ownership must abort before migrateAccount performs its first write.
+	supernode, hasSupernode, err := ms.supernodeKeeper.StrictGetSuperNodeByAccount(ctx, legacyAddr.String())
+	if err != nil {
+		return nil, fmt.Errorf("resolve source supernode ownership: %w", err)
+	}
+	if hasSupernode {
+		if err := ms.validateDestinationSupernodeOwnership(ctx, newAddr); err != nil {
+			return nil, err
+		}
+	}
+
 	// --- Execute migration steps ---
-	if err := ms.migrateAccount(ctx, legacyAddr, newAddr, &msg.NewProof); err != nil {
+	if err := ms.migrateAccount(ctx, legacyAddr, newAddr, &msg.NewProof, supernode, hasSupernode); err != nil {
 		return nil, err
 	}
 
@@ -171,7 +185,13 @@ func (ms msgServer) preChecks(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddres
 
 // migrateAccount performs the account-level migration steps shared by both
 // ClaimLegacyAccount and MigrateValidator (Steps 1-8 from the plan).
-func (ms msgServer) migrateAccount(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress, destProof *types.MigrationProof) error {
+func (ms msgServer) migrateAccount(
+	ctx sdk.Context,
+	legacyAddr, newAddr sdk.AccAddress,
+	destProof *types.MigrationProof,
+	supernode sntypes.SuperNode,
+	hasSupernode bool,
+) error {
 	// Snapshot the original withdraw address before MigrateDistribution
 	// may temporarily redirect it to self (see redirectWithdrawAddrIfMigrated).
 	origWithdrawAddr, _ := ms.distributionKeeper.GetDelegatorWithdrawAddr(ctx, legacyAddr)
@@ -214,8 +234,8 @@ func (ms msgServer) migrateAccount(ctx sdk.Context, legacyAddr, newAddr sdk.AccA
 		return fmt.Errorf("migrate feegrant: %w", err)
 	}
 
-	// Step 6: Update supernode account field.
-	if err := ms.MigrateSupernode(ctx, legacyAddr, newAddr); err != nil {
+	// Step 6: Update the prevalidated supernode account field.
+	if err := ms.migrateValidatedSupernode(ctx, newAddr, supernode, hasSupernode); err != nil {
 		return fmt.Errorf("migrate supernode: %w", err)
 	}
 

@@ -49,7 +49,7 @@ This means:
 | Parameter | Value | Purpose |
 | --- | --- | --- |
 | `NoBaseFee` | `false` | Dynamic base fee enabled |
-| `BaseFee` | `0.0025 ulume/gas` | Initial base fee at genesis/upgrade activation |
+| `BaseFee` | `0.0125 ulume/gas` | Initial base fee at genesis/upgrade activation |
 | `MinGasPrice` | `0.0005 ulume/gas` | Floor preventing base fee decay to zero |
 | `BaseFeeChangeDenominator` | `16` | Gentler ~6.25% adjustment per block (upstream default is 8 = ~12.5%) |
 | `ChainDefaultConsensusMaxGas` | `25,000,000` | Block gas limit |

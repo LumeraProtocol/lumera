@@ -60,7 +60,7 @@ EIP-1559 fee market with Lumera-specific tuning.
 
 |     | Item                                           | Files / Notes                                                             |
 | --- | ---------------------------------------------- | ------------------------------------------------------------------------- |
-| [x] | Default base fee: 0.0025 ulume/gas             | `config/evm.go`                                                         |
+| [x] | Default base fee: 0.0125 ulume/gas             | `config/evm.go`                                                         |
 | [x] | Min gas price floor: 0.0005 ulume/gas          | `config/evm.go` — prevents zero-fee spam                               |
 | [x] | Base fee change denominator: 16 (~6.25%/block) | `config/evm.go` — gentler than upstream 8                              |
 | [x] | Consensus max gas: 25,000,000                  | `config/evm.go`                                                         |

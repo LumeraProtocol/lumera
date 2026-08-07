@@ -140,6 +140,30 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		return nil, err
 	}
 
+	// Validate source-account ownership and any validator-keyed SuperNode record
+	// against the pristine pre-migration store. V1 and V2 mutate distribution and
+	// staking state, so this must remain immediately before the first write.
+	validatorSupernodePlan, err := ms.validateValidatorSupernodeOwnership(ctx, oldValAddr, legacyAddr)
+	if err != nil {
+		return nil, err
+	}
+	if validatorSupernodePlan.hasAccountOwned {
+		if err := ms.validateDestinationSupernodeOwnership(ctx, newAddr); err != nil {
+			return nil, err
+		}
+	}
+
+	// Snapshot and validate the validator-keyed SuperNode continuity state
+	// (latest metrics + Everlight SNDistState) here, while the store is still
+	// pristine. Steps V1-V4 below mutate distribution and staking state, so a
+	// destination collision or malformed source row must be detected now, not
+	// after those writes have already landed. The plan itself is applied at
+	// step V5, immediately before the SuperNode primary is re-keyed.
+	identityPlan, err := ms.supernodeKeeper.BuildIdentityMigrationPlan(ctx, oldValAddr, newValAddr)
+	if err != nil {
+		return nil, fmt.Errorf("build supernode identity migration: %w", err)
+	}
+
 	// --- Step V1: Withdraw all commission and delegation rewards ---
 	// Must happen before re-keying so rewards accrue to the correct addresses.
 	if _, err := ms.distributionKeeper.WithdrawValidatorCommission(ctx, oldValAddr); err != nil {
@@ -201,8 +225,16 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		return nil, fmt.Errorf("migrate validator delegations: %w", err)
 	}
 
-	// --- Step V5: Re-key supernode record ---
-	if err := ms.MigrateValidatorSupernode(ctx, oldValAddr, newValAddr, legacyAddr, newAddr); err != nil {
+	// --- Step V5: Mutate both prevalidated SuperNode ownership dimensions ---
+	// Apply the continuity plan first so latest metrics and Everlight
+	// SNDistState land under the new validator key before the primary is
+	// re-keyed. The plan was built and validated pre-V1 against pristine state.
+	if err := ms.supernodeKeeper.ApplyIdentityMigrationPlan(ctx, identityPlan); err != nil {
+		return nil, fmt.Errorf("apply supernode identity migration: %w", err)
+	}
+	if err := ms.migrateValidatedValidatorSupernodes(
+		ctx, oldValAddr, newValAddr, legacyAddr, newAddr, validatorSupernodePlan,
+	); err != nil {
 		return nil, fmt.Errorf("migrate validator supernode: %w", err)
 	}
 

@@ -29,7 +29,7 @@ These are the **highest-impact** parameters from a business perspective. They de
 
 | Attribute | Value |
 |-----------|-------|
-| **Lumera default** | `0.0025 ulume/gas` (~2.5 gwei equivalent in 18-decimal EVM) |
+| **Lumera default** | `0.0125 ulume/gas` (~12.5 gwei equivalent in 18-decimal EVM) |
 | **Where set** | `config/evm.go` → `FeeMarketDefaultBaseFee`, baked into genesis via `app/evm/genesis.go` |
 | **Governance changeable** | Yes (feemarket params proposal) |
 | **Min** | Must be > 0 when `no_base_fee = false` |
@@ -41,14 +41,14 @@ These are the **highest-impact** parameters from a business perspective. They de
 
 | Chain | Base Fee | Notes |
 |-------|----------|-------|
-| **Lumera** | 0.0025 ulume/gas | Conservative starting point |
+| **Lumera** | 0.0125 ulume/gas | Conservative starting point |
 | **Evmos** | 1,000,000,000 aevmos/gas (1 gwei) | Lower start, relies on dynamic adjustment |
 | **Kava** | 1,000,000,000 akava/gas (1 gwei) | Standard Ethereum-like |
 | **Cronos** | 5,000 basecro/gas | Higher, reflecting CRO price |
 | **Canto** | 1,000,000,000 acanto/gas | Standard |
 
 **Tuning guidance:**
-- Calculate the **target simple-transfer cost** in USD: `21,000 gas * base_fee * token_price`. At $0.01/LUME and 0.0025 ulume/gas, a transfer costs ~$0.000000525 — extremely cheap.
+- Calculate the **target simple-transfer cost** in USD: `21,000 gas * base_fee * token_price`. At $0.01/LUME and 0.0125 ulume/gas, a transfer costs ~$0.000002625 — extremely cheap.
 - If LUME price is low at launch, the current value is reasonable. If LUME launches at higher value, consider lowering.
 - The base fee auto-adjusts, so this is mainly about first-block UX. Err on the low side — the market will push it up.
 
@@ -60,7 +60,7 @@ These are the **highest-impact** parameters from a business perspective. They de
 
 | Attribute | Value |
 |-----------|-------|
-| **Lumera default** | `0.0005 ulume/gas` (20% of base_fee) |
+| **Lumera default** | `0.0005 ulume/gas` (4% of base_fee) |
 | **Where set** | `config/evm.go` → `FeeMarketMinGasPrice` |
 | **Governance changeable** | Yes |
 | **Min** | `0` (but 0 allows free txs — dangerous) |
@@ -72,17 +72,17 @@ These are the **highest-impact** parameters from a business perspective. They de
 
 | Chain | Min Gas Price | Ratio to Base Fee |
 |-------|---------------|-------------------|
-| **Lumera** | 0.0005 ulume/gas | 20% of base fee |
+| **Lumera** | 0.0005 ulume/gas | 4% of base fee |
 | **Evmos** | 0 (relies on min-gas-prices in app.toml) | 0% — risky |
 | **Kava** | 0.001 ukava/gas (via validator min) | ~100% of base fee |
 | **Canto** | 0 (was exploited for spam) | 0% — learned the hard way |
 
 **Tuning guidance:**
 - **Never set to 0** — Canto's experience showed that zero-floor chains get spammed during quiet periods.
-- The 20% ratio is healthy. It means even in sustained low activity, txs cost 1/5th of normal.
+- The 4% ratio means sustained low activity can reduce transaction costs substantially while retaining a non-zero anti-spam floor.
 - Calculate minimum acceptable transfer cost: `21,000 * 0.0005 * price`. Ensure this is not literally free.
 
-**Recommendation:** **Keep at 0.0005 or raise slightly.** This is well-designed. The 20% floor ratio is more conservative than most peers.
+**Recommendation:** **Keep at 0.0005 or raise slightly.** The non-zero floor continues to prevent free transactions during quiet periods.
 
 ---
 
@@ -487,7 +487,7 @@ Priority levels: **CRITICAL** = must review before mainnet, **HIGH** = should re
 
 | Priority | Parameter | Current Value | Action |
 |----------|-----------|---------------|--------|
-| **CRITICAL** | `base_fee` | 0.0025 ulume/gas | Re-validate against launch token price |
+| **CRITICAL** | `base_fee` | 0.0125 ulume/gas | Re-validate against launch token price |
 | **CRITICAL** | `min_gas_price` | 0.0005 ulume/gas | Ensure non-zero cost at launch price |
 | **CRITICAL** | `allow-unprotected-txs` | `false` | Verify remains `false` in all configs |
 | **CRITICAL** | `migration_end_time` | `0` (none) | **Set a mainnet deadline** |
@@ -518,31 +518,31 @@ For business stakeholders, here is what users actually pay at various token pric
 
 | LUME Price | Base Fee (ulume/gas) | Cost (ulume) | Cost (USD) |
 |------------|---------------------|--------------|------------|
-| $0.001 | 0.0025 | 52.5 | $0.0000000525 |
-| $0.01 | 0.0025 | 52.5 | $0.000000525 |
-| $0.10 | 0.0025 | 52.5 | $0.00000525 |
-| $1.00 | 0.0025 | 52.5 | $0.0000525 |
-| $10.00 | 0.0025 | 52.5 | $0.000525 |
+| $0.001 | 0.0125 | 262.5 | $0.0000002625 |
+| $0.01 | 0.0125 | 262.5 | $0.000002625 |
+| $0.10 | 0.0125 | 262.5 | $0.00002625 |
+| $1.00 | 0.0125 | 262.5 | $0.0002625 |
+| $10.00 | 0.0125 | 262.5 | $0.002625 |
 
 ### Complex DeFi Transaction (500,000 gas)
 
 | LUME Price | Base Fee (ulume/gas) | Cost (ulume) | Cost (USD) |
 |------------|---------------------|--------------|------------|
-| $0.001 | 0.0025 | 1,250 | $0.00000125 |
-| $0.01 | 0.0025 | 1,250 | $0.0000125 |
-| $0.10 | 0.0025 | 1,250 | $0.000125 |
-| $1.00 | 0.0025 | 1,250 | $0.00125 |
-| $10.00 | 0.0025 | 1,250 | $0.0125 |
+| $0.001 | 0.0125 | 6,250 | $0.00000625 |
+| $0.01 | 0.0125 | 6,250 | $0.0000625 |
+| $0.10 | 0.0125 | 6,250 | $0.000625 |
+| $1.00 | 0.0125 | 6,250 | $0.00625 |
+| $10.00 | 0.0125 | 6,250 | $0.0625 |
 
 ### Smart Contract Deployment (3,000,000 gas)
 
 | LUME Price | Base Fee (ulume/gas) | Cost (ulume) | Cost (USD) |
 |------------|---------------------|--------------|------------|
-| $0.001 | 0.0025 | 7,500 | $0.0000075 |
-| $0.01 | 0.0025 | 7,500 | $0.000075 |
-| $0.10 | 0.0025 | 7,500 | $0.00075 |
-| $1.00 | 0.0025 | 7,500 | $0.0075 |
-| $10.00 | 0.0025 | 7,500 | $0.075 |
+| $0.001 | 0.0125 | 37,500 | $0.0000375 |
+| $0.01 | 0.0125 | 37,500 | $0.000375 |
+| $0.10 | 0.0125 | 37,500 | $0.00375 |
+| $1.00 | 0.0125 | 37,500 | $0.0375 |
+| $10.00 | 0.0125 | 37,500 | $0.375 |
 
 > **Note:** These are base-fee-only costs. Actual costs include priority tips (usually small) and may be higher during congestion (base fee rises).
 

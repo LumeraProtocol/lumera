@@ -167,10 +167,17 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 		return nil, fmt.Errorf("load params for migration estimate: %w", err)
 	}
 
-	// Check if validator.
+	// Check if validator before resolving SuperNode ownership. Validator migration
+	// has two independent SuperNode dimensions; non-validator migration remains
+	// account-owned only.
 	valAddr := sdk.ValAddress(addr)
 	val, valErr := qs.k.stakingKeeper.GetValidator(ctx, valAddr)
 	if valErr == nil {
+		plan, err := qs.k.validateValidatorSupernodeOwnership(ctx, valAddr, addr)
+		if err != nil {
+			return nil, fmt.Errorf("resolve validator supernode ownership for migration estimate: %w", err)
+		}
+		resp.HasSupernode = plan.hasAccountOwned || plan.hasValidatorAssociated
 		resp.IsValidator = true
 		// Count delegations TO this validator.
 		if dels, err := qs.k.stakingKeeper.GetValidatorDelegations(ctx, valAddr); err == nil {
@@ -227,6 +234,11 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 			resp.WouldSucceed = true
 		}
 	} else {
+		_, hasSupernode, err := qs.k.supernodeKeeper.StrictGetSuperNodeByAccount(ctx, req.LegacyAddress)
+		if err != nil {
+			return nil, fmt.Errorf("resolve supernode ownership for migration estimate: %w", err)
+		}
+		resp.HasSupernode = hasSupernode
 		resp.WouldSucceed = true
 	}
 
@@ -285,11 +297,6 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 	balances := qs.k.bankKeeper.GetAllBalances(ctx, addr)
 	if !balances.IsZero() {
 		resp.BalanceSummary = balances.String()
-	}
-
-	// Check supernode registration.
-	if _, found := qs.k.supernodeKeeper.QuerySuperNode(ctx, sdk.ValAddress(addr)); found {
-		resp.HasSupernode = true
 	}
 
 	resp.TotalTouched = resp.DelegationCount + resp.UnbondingCount + resp.RedelegationCount +

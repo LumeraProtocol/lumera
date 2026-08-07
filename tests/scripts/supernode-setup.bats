@@ -95,7 +95,7 @@ teardown() {
       TX_GAS_PRICES=0.03ulume
       lumerad() {
         case "$*" in
-          "q feemarket params --output json") printf "%s\n" "{\"params\":{\"base_fee\":\"0.002500000000000000\",\"min_gas_price\":\"0.000500000000000000\"}}" ;;
+          "q feemarket params --output json") printf "%s\n" "{\"params\":{\"base_fee\":\"0.012500000000000000\",\"min_gas_price\":\"0.000500000000000000\"}}" ;;
           "q evm config --output json") printf "%s\n" "{\"config\":{\"denom\":\"alume\"}}" ;;
         esac
       }
@@ -104,7 +104,7 @@ teardown() {
     ' bash "$SCRIPT"
 
   [ "$status" -eq 0 ]
-  [[ "$output" == "0.005ulume" ]]
+  [[ "$output" == "0.025ulume" ]]
 }
 
 @test "multisig registration feegrant is signed by prepare-funder key" {

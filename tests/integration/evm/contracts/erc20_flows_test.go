@@ -6,6 +6,7 @@ package contracts_test
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"math/big"
 	"strings"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/vm"
 	evmprogram "github.com/ethereum/go-ethereum/core/vm/program"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -209,8 +211,39 @@ func fundAccount(t *testing.T, node *evmtest.Node, addr common.Address) {
 		t.Fatalf("encode bech32: %v", err)
 	}
 
-	amount := big.NewInt(10_000_000_000_000) // Enough for fees.
+	// 1e13 ulume == 1e25 wei, which comfortably covers every call in this test
+	// at any plausible base fee. This value was never the problem: the funding
+	// tx was being REJECTED (flat --fees below the raised global minimum) and
+	// the rejection was swallowed, leaving the account at zero.
+	amount := big.NewInt(10_000_000_000_000)
 	fundAccountViaBankSend(t, node, bech32Addr, amount)
+
+	// Prove the funds actually arrived in EVM state before the caller relies on
+	// them. eth_getBalance is denominated in wei (ulume * 1e12).
+	wantWei := new(big.Int).Mul(amount, big.NewInt(1_000_000_000_000))
+	waitForEVMBalanceAtLeast(t, node, addr, wantWei, 40*time.Second)
+}
+
+// assertBankSendAccepted fails the test if the CLI JSON response reports a
+// non-zero CheckTx code. `lumerad tx ... --broadcast-mode sync` exits 0 even
+// when the tx is rejected, so the response body must be inspected.
+func assertBankSendAccepted(t *testing.T, output, recipient string) string {
+	t.Helper()
+
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(output), &resp); err != nil {
+		t.Fatalf("decode bank send response for %s: %v\n%s", recipient, err, output)
+	}
+	if codeRaw, ok := resp["code"]; ok {
+		if code, ok := codeRaw.(float64); ok && code != 0 {
+			t.Fatalf("bank send to %s rejected with code %.0f: %v", recipient, code, resp["raw_log"])
+		}
+	}
+	txHash, ok := resp["txhash"].(string)
+	if !ok || txHash == "" {
+		t.Fatalf("missing txhash in bank send response for %s: %#v", recipient, resp)
+	}
+	return txHash
 }
 
 // fundAccountViaBankSend sends native funds to a bech32 recipient.
@@ -231,7 +264,10 @@ func fundAccountViaBankSend(t *testing.T, node *evmtest.Node, recipient string, 
 		"--node", node.CometRPCURL(),
 		"--broadcast-mode", "sync",
 		"--gas", "200000",
-		"--fees", "1000"+lcfg.ChainDenom,
+		// --gas-prices, not a flat --fees literal: the global minimum fee
+		// scales with the feemarket base fee, so a constant silently falls
+		// below the floor when the base fee is raised.
+		"--gas-prices", lcfg.FeeMarketDefaultBaseFee+lcfg.ChainDenom,
 		"--yes",
 		"--output", "json",
 		"--log_no_color",
@@ -240,9 +276,45 @@ func fundAccountViaBankSend(t *testing.T, node *evmtest.Node, recipient string, 
 		t.Fatalf("bank send to %s: %v\n%s", recipient, err, output)
 	}
 
-	// Wait for tx to be included in a block.
-	time.Sleep(3 * time.Second)
-	node.WaitForBlockNumberAtLeast(t, node.MustGetBlockNumber(t)+1, 20*time.Second)
+	// A CheckTx rejection exits 0 and reports the failure in the JSON body, so
+	// the exit status alone is not proof of success. Without this check a
+	// rejected funding tx left the account at zero balance and the real
+	// failure surfaced much later as a confusing "insufficient funds" error on
+	// the tx under test.
+	txHash := assertBankSendAccepted(t, output, recipient)
+
+	// CheckTx acceptance is not delivery. Wait for the tx to actually commit so
+	// a DeliverTx-stage failure is attributed here rather than surfacing later
+	// as an unrelated "insufficient funds" error.
+	evmtest.WaitForCosmosTxHeight(t, node, txHash, 40*time.Second)
+}
+
+// waitForEVMBalanceAtLeast blocks until the account's EVM-visible balance
+// reaches want. Funding via `tx bank send` is only observable in the EVM state
+// once the tx is committed AND the balance has been converted into the
+// 18-decimal EVM view, so asserting the balance directly is the only reliable
+// signal that funding succeeded. Without this, an underfunded or lost funding
+// tx surfaces much later as a misleading "insufficient funds" failure on the
+// transaction actually under test.
+func waitForEVMBalanceAtLeast(t *testing.T, node *evmtest.Node, addr common.Address, want *big.Int, timeout time.Duration) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	var last *big.Int
+	for time.Now().Before(deadline) {
+		var balanceHex string
+		node.MustJSONRPC(t, "eth_getBalance", []any{addr.Hex(), "latest"}, &balanceHex)
+		bal, err := hexutil.DecodeBig(balanceHex)
+		if err != nil {
+			t.Fatalf("decode eth_getBalance %q: %v", balanceHex, err)
+		}
+		last = bal
+		if bal.Cmp(want) >= 0 {
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	t.Fatalf("funding did not land for %s: balance %s < required %s", addr.Hex(), last, want)
 }
 
 // ---------------------------------------------------------------------------

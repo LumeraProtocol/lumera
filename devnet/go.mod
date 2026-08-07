@@ -40,7 +40,7 @@ require (
 	github.com/ethereum/go-ethereum v1.17.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/pelletier/go-toml/v2 v2.2.4
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 )
 
 require (

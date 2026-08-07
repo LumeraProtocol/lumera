@@ -18,6 +18,7 @@ teardown() {
 
 @test "external version staging uses downloaded binaries without requiring claims" {
   run make -C "$REPO_ROOT" -n devnet-stage-external-version \
+    MAKE=/bin/true \
     VERSION=v1.12.0 \
     EXTERNAL_GENESIS_FILE="$EXTERNAL_GENESIS"
 
@@ -36,6 +37,7 @@ teardown() {
 
 @test "remote version target syncs staged runtime and runs docker remotely" {
   run make -C "$REPO_ROOT" -n devnet-new-remote-version \
+    MAKE=/bin/true \
     VERSION=v1.12.0 \
     EXTERNAL_GENESIS_FILE="$EXTERNAL_GENESIS" \
     REMOTE_DEVNET_HOST=example-devnet \

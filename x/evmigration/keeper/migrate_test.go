@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 
 	corestore "cosmossdk.io/core/store"
@@ -123,6 +124,46 @@ func initMockFixture(t *testing.T) *mockFixture {
 		supernodeKeeper:    supernodeKeeper,
 		actionKeeper:       actionKeeper,
 	}
+}
+
+// expectIdentityMigrationPlan sets a STRICT expectation that validator
+// migration builds exactly one SuperNode continuity plan for
+// source -> destination and applies exactly that plan.
+//
+// Deliberately not an AnyTimes() blanket stub. The plan now owns the latest
+// metrics and Everlight SNDistState move that migrate_validator.go used to
+// perform inline, so these tests must keep proving that the move is requested
+// exactly once, for the right validator pair, and that the applied plan is the
+// same object that was built. A permissive stub would let a regression that
+// drops or double-applies the plan pass silently.
+//
+// sourceMetrics/movedMetrics mirror what the real keeper would snapshot; pass
+// nil to model "no metrics row present at the source".
+func (f *mockFixture) expectIdentityMigrationPlan(
+	t *testing.T,
+	source, destination sdk.ValAddress,
+	sourceMetrics, movedMetrics []byte,
+) {
+	t.Helper()
+
+	var built sntypes.IdentityMigrationPlan
+
+	f.supernodeKeeper.EXPECT().
+		BuildIdentityMigrationPlan(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ sdk.Context, gotSource, gotDestination sdk.ValAddress) (sntypes.IdentityMigrationPlan, error) {
+			require.Equal(t, source.String(), gotSource.String(), "plan must be built for the source validator")
+			require.Equal(t, destination.String(), gotDestination.String(), "plan must be built for the destination validator")
+			built = sntypes.NewIdentityMigrationPlan(gotSource, gotDestination, sourceMetrics, nil, movedMetrics, nil, nil)
+			return built, nil
+		}).Times(1)
+
+	f.supernodeKeeper.EXPECT().
+		ApplyIdentityMigrationPlan(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ sdk.Context, got sntypes.IdentityMigrationPlan) error {
+			require.NotNil(t, built, "plan must be built before it is applied")
+			require.Equal(t, built, got, "the applied plan must be the plan that was built")
+			return nil
+		}).Times(1)
 }
 
 func (f *mockFixture) wireScopedMigrationStores() {
@@ -1108,8 +1149,8 @@ func TestMigrateFeegrant_NoAllowances(t *testing.T) {
 
 // --- MigrateSupernode tests ---
 
-// TestMigrateSupernode_Found verifies that the supernode account field is updated
-// from legacy to new address and PrevSupernodeAccounts history is maintained.
+// TestMigrateSupernode_Found verifies that migration preserves the complete
+// existing account timeline and appends the new effective account once.
 func TestMigrateSupernode_Found(t *testing.T) {
 	f := initMockFixture(t)
 	legacy := testAccAddr()
@@ -1119,20 +1160,23 @@ func TestMigrateSupernode_Found(t *testing.T) {
 		SupernodeAccount: legacy.String(),
 		ValidatorAddress: sdk.ValAddress(legacy).String(),
 		PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
-			{Account: legacy.String(), Height: 1},
+			{Account: testAccAddr().String(), Height: 1},
+			{Account: legacy.String(), Height: 7},
 		},
 	}
+	originalHistory := []*sntypes.SupernodeAccountHistory{
+		{Account: sn.PrevSupernodeAccounts[0].Account, Height: sn.PrevSupernodeAccounts[0].Height},
+		{Account: sn.PrevSupernodeAccounts[1].Account, Height: sn.PrevSupernodeAccounts[1].Height},
+	}
 
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sn, true, nil)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
-			// Existing legacy entry should be rewritten to new address.
-			require.Len(t, updated.PrevSupernodeAccounts, 2)
-			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[0].Account)
-			require.Equal(t, int64(1), updated.PrevSupernodeAccounts[0].Height)
-			// New migration entry appended.
-			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[1].Account)
+			require.Len(t, updated.PrevSupernodeAccounts, len(originalHistory)+1)
+			require.Equal(t, originalHistory, updated.PrevSupernodeAccounts[:len(originalHistory)])
+			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[2].Account)
+			require.Equal(t, f.ctx.BlockHeight(), updated.PrevSupernodeAccounts[2].Height)
 			return nil
 		})
 
@@ -1146,7 +1190,7 @@ func TestMigrateSupernode_NotFound(t *testing.T) {
 	legacy := testAccAddr()
 	newAddr := testAccAddr()
 
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sntypes.SuperNode{}, false, nil)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sntypes.SuperNode{}, false, nil)
 
 	err := f.keeper.MigrateSupernode(f.ctx, legacy, newAddr)
 	require.NoError(t, err)
@@ -2548,9 +2592,15 @@ func TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic(t *testin
 }
 
 // --- Validator-supernode metrics tests ---
+//
+// Latest metrics are no longer re-keyed inline by migrate_validator.go; the
+// SuperNode-owned identity migration plan owns that move together with the
+// Everlight SNDistState move. These tests therefore assert the plan is built
+// for the right validator pair and carries the metrics payload, instead of
+// asserting a Get/Set/Delete call sequence that no longer exists.
 
 // TestMigrateValidatorSupernode_WithMetrics verifies that metrics state is
-// re-keyed when the supernode has metrics.
+// carried by the continuity plan when the supernode has metrics.
 func TestMigrateValidatorSupernode_WithMetrics(t *testing.T) {
 	f := initMockFixture(t)
 	oldValAddr := sdk.ValAddress(testAccAddr())
@@ -2561,19 +2611,17 @@ func TestMigrateValidatorSupernode_WithMetrics(t *testing.T) {
 		ValidatorAddress: oldValAddr.String(),
 		SupernodeAccount: sdk.AccAddress(oldValAddr).String(),
 	}
-	metrics := sntypes.SupernodeMetricsState{
+	sourceMetrics := f.cdc.MustMarshal(&sntypes.SupernodeMetricsState{
 		ValidatorAddress: oldValAddr.String(),
-	}
+	})
+	movedMetrics := f.cdc.MustMarshal(&sntypes.SupernodeMetricsState{
+		ValidatorAddress: newValAddr.String(),
+	})
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, sourceMetrics, movedMetrics)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(metrics, true)
-	f.supernodeKeeper.EXPECT().SetMetricsState(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ any, updated sntypes.SupernodeMetricsState) error {
-			require.Equal(t, newValAddr.String(), updated.ValidatorAddress)
-			return nil
-		})
-	f.supernodeKeeper.EXPECT().DeleteMetricsState(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
@@ -2585,7 +2633,8 @@ func TestMigrateValidatorSupernode_WithMetrics(t *testing.T) {
 }
 
 // TestMigrateValidatorSupernode_MetricsWriteFails verifies that a failure
-// writing metrics state propagates as an error.
+// applying the continuity plan propagates as an error and aborts the migration
+// before the SuperNode primary is touched.
 func TestMigrateValidatorSupernode_MetricsWriteFails(t *testing.T) {
 	f := initMockFixture(t)
 	oldValAddr := sdk.ValAddress(testAccAddr())
@@ -2596,16 +2645,19 @@ func TestMigrateValidatorSupernode_MetricsWriteFails(t *testing.T) {
 		ValidatorAddress: oldValAddr.String(),
 		SupernodeAccount: sdk.AccAddress(oldValAddr).String(),
 	}
-	metrics := sntypes.SupernodeMetricsState{
-		ValidatorAddress: oldValAddr.String(),
-	}
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
-	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(metrics, true)
-	f.supernodeKeeper.EXPECT().SetMetricsState(gomock.Any(), gomock.Any()).Return(
-		fmt.Errorf("metrics store write failed"),
-	)
+	f.supernodeKeeper.EXPECT().
+		BuildIdentityMigrationPlan(gomock.Any(), oldValAddr, newValAddr).
+		Return(sntypes.NewIdentityMigrationPlan(oldValAddr, newValAddr, nil, nil, nil, nil, nil), nil).Times(1)
+	f.supernodeKeeper.EXPECT().
+		ApplyIdentityMigrationPlan(gomock.Any(), gomock.Any()).
+		Return(fmt.Errorf("metrics store write failed")).Times(1)
+
+	// The SuperNode primary must never be deleted or rewritten once the
+	// continuity move has failed: no DeleteSuperNode / SetSuperNode is
+	// expected, so gomock fails the test if either is called.
 
 	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
 	require.Error(t, err)
@@ -2619,7 +2671,12 @@ func TestMigrateValidatorSupernode_NotFound(t *testing.T) {
 	newValAddr := sdk.ValAddress(testAccAddr())
 	newAddr := sdk.AccAddress(newValAddr)
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
+	// The continuity plan is built and applied even when no SuperNode primary
+	// exists: validator-keyed Everlight residue can outlive the primary, and
+	// leaving it behind is exactly the orphaning this plan prevents.
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
 
 	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
 	require.NoError(t, err)
@@ -2643,9 +2700,10 @@ func TestMigrateValidatorSupernode_EvidenceAddressMigrated(t *testing.T) {
 		},
 	}
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Len(t, updated.Evidence, 2)
@@ -2660,9 +2718,9 @@ func TestMigrateValidatorSupernode_EvidenceAddressMigrated(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMigrateValidatorSupernode_AccountHistoryMigrated verifies that
-// PrevSupernodeAccounts entries matching the old account are updated.
-func TestMigrateValidatorSupernode_AccountHistoryMigrated(t *testing.T) {
+// TestMigrateValidatorSupernode_AccountHistoryPreserved verifies that existing
+// timeline entries remain exact and the new effective account is appended once.
+func TestMigrateValidatorSupernode_AccountHistoryPreserved(t *testing.T) {
 	f := initMockFixture(t)
 	oldValAddr := sdk.ValAddress(testAccAddr())
 	newValAddr := sdk.ValAddress(testAccAddr())
@@ -2674,22 +2732,23 @@ func TestMigrateValidatorSupernode_AccountHistoryMigrated(t *testing.T) {
 		ValidatorAddress: oldValAddr.String(),
 		SupernodeAccount: oldAccountStr,
 		PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
-			{Account: oldAccountStr, Height: 100},
 			{Account: otherAccount, Height: 50},
+			{Account: oldAccountStr, Height: 100},
 		},
 	}
+	originalHistory := []*sntypes.SupernodeAccountHistory{
+		{Account: otherAccount, Height: 50},
+		{Account: oldAccountStr, Height: 100},
+	}
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Len(t, updated.PrevSupernodeAccounts, 3)
-			// Entry matching old account should be updated.
-			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[0].Account)
-			// Entry for a different account should be unchanged.
-			require.Equal(t, otherAccount, updated.PrevSupernodeAccounts[1].Account)
-			// New migration entry appended with new address and current height.
+			require.Equal(t, originalHistory, updated.PrevSupernodeAccounts[:2])
 			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[2].Account)
 			require.Equal(t, f.ctx.BlockHeight(), updated.PrevSupernodeAccounts[2].Height)
 			return nil
@@ -2697,6 +2756,37 @@ func TestMigrateValidatorSupernode_AccountHistoryMigrated(t *testing.T) {
 
 	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
 	require.NoError(t, err)
+}
+
+func TestMigrateValidatorSupernode_AlternateEncodingSelfOwnedMigratesOnce(t *testing.T) {
+	f := initMockFixture(t)
+	legacyAddr := testAccAddr()
+	newAddr := testAccAddr()
+	oldValAddr := sdk.ValAddress(legacyAddr)
+	newValAddr := sdk.ValAddress(newAddr)
+	sn := sntypes.SuperNode{
+		ValidatorAddress: strings.ToUpper(oldValAddr.String()),
+		SupernodeAccount: strings.ToUpper(legacyAddr.String()),
+		PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
+			{Account: strings.ToUpper(legacyAddr.String()), Height: 100},
+		},
+	}
+
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(sn, true, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr).Times(1)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
+	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, updated sntypes.SuperNode) error {
+			require.Equal(t, newValAddr.String(), updated.ValidatorAddress)
+			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
+			require.Len(t, updated.PrevSupernodeAccounts, 2)
+			require.Equal(t, strings.ToUpper(legacyAddr.String()), updated.PrevSupernodeAccounts[0].Account)
+			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[1].Account)
+			return nil
+		}).Times(1)
+
+	require.NoError(t, f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, legacyAddr, newAddr))
 }
 
 // TestMigrateValidatorSupernode_IndependentAccountPreserved verifies that when
@@ -2719,9 +2809,11 @@ func TestMigrateValidatorSupernode_IndependentAccountPreserved(t *testing.T) {
 		},
 	}
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), independentSNAccount).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			// Validator address should be re-keyed.
@@ -2737,6 +2829,70 @@ func TestMigrateValidatorSupernode_IndependentAccountPreserved(t *testing.T) {
 
 	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
 	require.NoError(t, err)
+}
+
+func TestMigrateValidatorSupernode_AccountOwnedUnderAnotherValidator(t *testing.T) {
+	f := initMockFixture(t)
+	legacyAddr := testAccAddr()
+	newAddr := testAccAddr()
+	oldValAddr := sdk.ValAddress(legacyAddr)
+	newValAddr := sdk.ValAddress(newAddr)
+	accountOwnedVal := sdk.ValAddress(testAccAddr())
+	accountOwned := sntypes.SuperNode{
+		ValidatorAddress: accountOwnedVal.String(),
+		SupernodeAccount: legacyAddr.String(),
+	}
+
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(accountOwned, true, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
+	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, updated sntypes.SuperNode) error {
+			require.Equal(t, accountOwnedVal.String(), updated.ValidatorAddress)
+			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
+			require.Len(t, updated.PrevSupernodeAccounts, 1)
+			return nil
+		})
+
+	require.NoError(t, f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, legacyAddr, newAddr))
+}
+
+func TestMigrateValidatorSupernode_TwoDistinctRecords(t *testing.T) {
+	f := initMockFixture(t)
+	legacyAddr := testAccAddr()
+	newAddr := testAccAddr()
+	oldValAddr := sdk.ValAddress(legacyAddr)
+	newValAddr := sdk.ValAddress(newAddr)
+	accountOwnedVal := sdk.ValAddress(testAccAddr())
+	independentAccount := testAccAddr()
+	accountOwned := sntypes.SuperNode{
+		ValidatorAddress: accountOwnedVal.String(),
+		SupernodeAccount: legacyAddr.String(),
+	}
+	validatorAssociated := sntypes.SuperNode{
+		ValidatorAddress: oldValAddr.String(),
+		SupernodeAccount: independentAccount.String(),
+	}
+
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(accountOwned, true, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(validatorAssociated, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), independentAccount.String()).Return(validatorAssociated, true, nil)
+	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, updated sntypes.SuperNode) error {
+			require.Equal(t, accountOwnedVal.String(), updated.ValidatorAddress)
+			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
+			return nil
+		})
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
+	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, updated sntypes.SuperNode) error {
+			require.Equal(t, newValAddr.String(), updated.ValidatorAddress)
+			require.Equal(t, independentAccount.String(), updated.SupernodeAccount)
+			return nil
+		})
+
+	require.NoError(t, f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, legacyAddr, newAddr))
 }
 
 // --- FinalizeVestingAccount tests for all vesting types ---

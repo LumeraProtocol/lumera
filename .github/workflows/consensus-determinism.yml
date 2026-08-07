@@ -65,6 +65,18 @@ jobs:
           OUT="$WORK/testnet"
           CHAIN_ID="testing"
 
+          # Derive the gas price from the chain's own feemarket default rather
+          # than hardcoding a fee. The global minimum fee scales with the
+          # feemarket base fee, so a flat `--fees 500ulume` (0.0025ulume/gas at
+          # 200k gas) silently drops below the floor whenever the default base
+          # fee is retuned, and CheckTx rejects with code 13.
+          GAS_PRICES="$(grep -oP 'FeeMarketDefaultBaseFee\s*=\s*"\K[0-9.]+' config/evm.go)ulume"
+          if [ -z "${GAS_PRICES%ulume}" ]; then
+            echo "could not derive FeeMarketDefaultBaseFee from config/evm.go" >&2
+            exit 1
+          fi
+          echo "Using GAS_PRICES=${GAS_PRICES}"
+
           mkdir -p "$WORK"
           rm -rf "$OUT"
 
@@ -161,7 +173,7 @@ jobs:
               --keyring-backend test \
               --chain-id "$CHAIN_ID" \
               --node tcp://127.0.0.1:26657 \
-              --fees 500ulume \
+              --gas-prices "${GAS_PRICES}" \
               --broadcast-mode sync \
               --yes -o json > "$WORK/${tag}.json"
 

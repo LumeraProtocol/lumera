@@ -48,9 +48,10 @@ type ModuleInputs struct {
 type ModuleOutputs struct {
 	depinject.Out
 
-	SupernodeKeeper types.SupernodeKeeper
-	Module          appmodule.AppModule
-	Hooks           stakingtypes.StakingHooksWrapper
+	SupernodeKeeper         types.SupernodeKeeper
+	SupernodeKeeperConcrete *keeper.Keeper
+	Module                  appmodule.AppModule
+	Hooks                   stakingtypes.StakingHooksWrapper
 }
 
 func ProvideModule(in ModuleInputs) ModuleOutputs {
@@ -79,8 +80,9 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 	)
 
 	return ModuleOutputs{
-		SupernodeKeeper: &k,
-		Module:          m,
-		Hooks:           stakingtypes.StakingHooksWrapper{StakingHooks: k.Hooks()},
+		SupernodeKeeper:         &k,
+		SupernodeKeeperConcrete: &k,
+		Module:                  m,
+		Hooks:                   stakingtypes.StakingHooksWrapper{StakingHooks: k.Hooks()},
 	}
 }

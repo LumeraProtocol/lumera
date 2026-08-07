@@ -196,6 +196,10 @@
       ],
       "send_enabled": []
     },
+    "capability": {
+      "index": "1",
+      "owners": []
+    },
     "circuit": {
       "account_permissions": [],
       "disabled_type_urls": []
@@ -207,10 +211,16 @@
         "max_claims_per_block": "100"
       },
       "claim_records": [],
-      "total_claimable_amount": "102250000",
+      "total_claimable_amount": "0",
       "claims_denom": "ulume"
     },
     "consensus": null,
+    "crisis": {
+      "constant_fee": {
+        "denom": "ulume",
+        "amount": "500000000"
+      }
+    },
     "distribution": {
       "params": {
         "community_tax": "0.020000000000000000",
@@ -230,77 +240,18 @@
       "delegator_starting_infos": [],
       "validator_slash_events": []
     },
-    "erc20": {
-      "params": {
-        "enable_erc20": true,
-        "permissionless_registration": true
-      },
-      "token_pairs": [],
-      "allowances": [],
-      "native_precompiles": [],
-      "dynamic_precompiles": []
-    },
     "evidence": {
       "evidence": []
-    },
-    "evm": {
-      "accounts": [],
-      "params": {
-        "evm_denom": "ulume",
-        "extra_eips": [],
-        "evm_channels": [],
-        "access_control": {
-          "create": {
-            "access_type": "ACCESS_TYPE_PERMISSIONLESS",
-            "access_control_list": []
-          },
-          "call": {
-            "access_type": "ACCESS_TYPE_PERMISSIONLESS",
-            "access_control_list": []
-          }
-        },
-        "active_static_precompiles": [
-          "0x0000000000000000000000000000000000000100",
-          "0x0000000000000000000000000000000000000400",
-          "0x0000000000000000000000000000000000000800",
-          "0x0000000000000000000000000000000000000801",
-          "0x0000000000000000000000000000000000000802",
-          "0x0000000000000000000000000000000000000804",
-          "0x0000000000000000000000000000000000000805",
-          "0x0000000000000000000000000000000000000806"
-        ],
-        "history_serve_window": "8192",
-        "extended_denom_options": {
-          "extended_denom": "alume"
-        }
-      },
-      "preinstalls": []
-    },
-    "evmigration": {
-      "params": {
-        "enable_migration": true,
-        "max_migrations_per_block": "50",
-        "max_validator_delegations": "2000",
-        "max_multisig_sub_keys": 20
-      },
-      "migration_records": [],
-      "total_migrated": "0",
-      "total_validators_migrated": "0"
     },
     "feegrant": {
       "allowances": []
     },
-    "feemarket": {
-      "params": {
-        "no_base_fee": false,
-        "base_fee_change_denominator": 16,
-        "elasticity_multiplier": 2,
-        "enable_height": "0",
-        "base_fee": "0.012500000000000000",
-        "min_gas_price": "0.000500000000000000",
-        "min_gas_multiplier": "0.500000000000000000"
-      },
-      "block_gas": "0"
+    "feeibc": {
+      "identified_fees": [],
+      "fee_enabled_channels": [],
+      "registered_payees": [],
+      "registered_counterparty_payees": [],
+      "forward_relayers": []
     },
     "genutil": {
       "gen_txs": []
@@ -320,7 +271,7 @@
           }
         ],
         "expedited_threshold": "0.667000000000000000",
-        "expedited_voting_period": "4m",
+        "expedited_voting_period": "15s",
         "max_deposit_period": "172800s",
         "min_deposit": [
           {
@@ -335,7 +286,7 @@
         "quorum": "0.334000000000000000",
         "threshold": "0.500000000000000000",
         "veto_threshold": "0.334000000000000000",
-        "voting_period": "5m"
+        "voting_period": "30s"
       },
       "proposals": [],
       "starting_proposal_id": "1",
@@ -423,10 +374,9 @@
         "mint_denom": "ulume"
       }
     },
-    "params": null,
-    "precisebank": {
-      "balances": [],
-      "remainder": "0"
+    "nft": {
+      "classes": [],
+      "entries": []
     },
     "runtime": null,
     "slashing": {
@@ -459,6 +409,14 @@
     },
     "supernode": {
       "params": {
+        "reward_distribution": {
+          "payment_period_blocks": "100800",
+          "registration_fee_share_bps": "200",
+          "min_cascade_bytes_for_payment": "1073741824",
+          "new_sn_ramp_up_periods": "4",
+          "measurement_smoothing_periods": "4",
+          "usage_growth_cap_bps_per_period": "1000"
+        },
         "minimum_stake_for_sn": {
           "denom": "ulume",
           "amount": "25000000000"
@@ -469,7 +427,8 @@
         "slashing_fraction": "",
         "evidence_retention_period": "",
         "metrics_thresholds": ""
-      }
+      },
+      "last_distribution_height": "0"
     },
     "transfer": {
       "port_id": "transfer",
@@ -482,27 +441,6 @@
     },
     "upgrade": {},
     "vesting": {},
-    "capability": {
-      "index": "1",
-      "owners": []
-    },
-    "crisis": {
-      "constant_fee": {
-        "denom": "ulume",
-        "amount": "500000000"
-      }
-    },
-    "feeibc": {
-      "identified_fees": [],
-      "fee_enabled_channels": [],
-      "registered_payees": [],
-      "registered_counterparty_payees": [],
-      "forward_relayers": []
-    },
-    "nft": {
-      "classes": [],
-      "entries": []
-    },
     "wasm": {
       "params": {
         "code_upload_access": {

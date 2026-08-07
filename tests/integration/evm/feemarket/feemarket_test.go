@@ -364,7 +364,17 @@ func testBaseFeeProgressesAcrossMultiBlockLoadPattern(t *testing.T, node *evmtes
 
 	// Precondition to a low-fee baseline so the subsequent high-load phase can
 	// deterministically demonstrate upward pressure.
-	for i := 0; i < 20; i++ {
+	//
+	// The number of empty blocks required scales with the configured default
+	// base fee: each empty block decays the fee by
+	// (denominator-1)/denominator, so draining from FeeMarketDefaultBaseFee to
+	// FeeMarketMinGasPrice takes
+	//   log(default/floor) / log(denominator/(denominator-1))
+	// blocks. Hardcoding this (previously 20) silently under-drains whenever
+	// the default base fee is raised — at 0.0125 it needs ~50 blocks, so the
+	// loop exited at ~3.4x the floor and the subsequent high-load phase had no
+	// headroom left to demonstrate an increase against.
+	for i := 0; i < (evmtest.BaseFeeDrainBlocks(t)*3)/2+2; i++ {
 		h := node.MustGetBlockNumber(t)
 		fee := mustBaseFeeAtHeight(t, node, h)
 		if fee.Cmp(minBaseFeeFloorWei) <= 0 {

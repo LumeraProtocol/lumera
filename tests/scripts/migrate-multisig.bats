@@ -53,6 +53,26 @@ setup() {
   rm -rf "$state_dir"
 }
 
+@test "submit resolves keyring backend from client.toml" {
+  local state_dir; state_dir=$(mktemp -d)
+  local state_file="$state_dir/state"
+  local home; home=$(mktemp -d)
+  mkdir -p "$home/config"
+  printf 'keyring-backend = "file"\n' > "$home/config/client.toml"
+  run env \
+    SHIM_STATE_FILE="$state_file" \
+    SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+      --binary "$SHIM" \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --home "$home" \
+      --yes --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"keyring backend: file (from $home/config/client.toml)"* ]]
+  rm -rf "$state_dir"
+}
+
 @test "submit happy path (broadcast + verify) exits 0" {
   local state_dir; state_dir=$(mktemp -d)
   local state_file="$state_dir/state"

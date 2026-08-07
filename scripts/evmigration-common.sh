@@ -31,6 +31,9 @@ CHAIN_ID="${CHAIN_ID:-}"
 # shellcheck disable=SC2034
 KEYRING_BACKEND="test"
 # shellcheck disable=SC2034
+# 1 once --keyring-backend is passed explicitly; gates resolve_keyring_backend.
+KEYRING_BACKEND_EXPLICIT=0
+# shellcheck disable=SC2034
 KEYRING_DIR=""
 # shellcheck disable=SC2034
 HOME_DIR=""
@@ -155,7 +158,8 @@ Flags:
   --node <url>              RPC endpoint (default \$LUMERA_NODE or tcp://localhost:26657)
                             Mainnet RPC example: https://rpc.lumera.io:443
   --chain-id <id>           Chain ID (${_chain_id_help})
-  --keyring-backend <b>     test|file|os (default test)
+  --keyring-backend <b>     test|file|os (default: \$LUMERA_KEYRING_BACKEND, else
+                            client.toml, else keyring-dir detection, else os)
   --keyring-dir <dir>       Keyring directory (overrides --home for keys)
   --home <dir>              lumerad home directory
   --mnemonic-file <path>    Import both derivations from one mnemonic (mode 0600 or stricter)
@@ -183,6 +187,7 @@ parse_common_flags() {
   # The --chain-id flag (parsed below) overrides whichever default applies.
   CHAIN_ID="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}"
   KEYRING_BACKEND="test"
+  KEYRING_BACKEND_EXPLICIT=0
   KEYRING_DIR=""
   HOME_DIR=""
   MNEMONIC_FILE=""
@@ -198,7 +203,7 @@ parse_common_flags() {
     case "$1" in
       --node)            _require_value "$1" "$#" "${2-}"; NODE="$2"; shift 2 ;;
       --chain-id)        _require_value "$1" "$#" "${2-}"; CHAIN_ID="$2"; shift 2 ;;
-      --keyring-backend) _require_value "$1" "$#" "${2-}"; KEYRING_BACKEND="$2"; shift 2 ;;
+      --keyring-backend) _require_value "$1" "$#" "${2-}"; KEYRING_BACKEND="$2"; KEYRING_BACKEND_EXPLICIT=1; shift 2 ;;
       --keyring-dir)     _require_value "$1" "$#" "${2-}"; KEYRING_DIR="$2"; shift 2 ;;
       --home)            _require_value "$1" "$#" "${2-}"; HOME_DIR="$2"; shift 2 ;;
       --mnemonic-file)   _require_value "$1" "$#" "${2-}"; MNEMONIC_FILE="$2"; shift 2 ;;
@@ -268,6 +273,78 @@ _keyring_flags() {
 
 _read_keyring_flags() {
   mapfile -t _KRF < <(_keyring_flags)
+}
+
+# _keyring_prompts_for_passphrase
+# True (0) when the active backend may write an interactive passphrase prompt
+# to stderr, so callers know to tee stderr back to the terminal instead of
+# capturing it into a file (which hides the prompt and makes the command appear
+# to hang while it silently waits on stdin).
+#
+# Both `file` and `os` prompt: cosmos-sdk's `os` backend config uses the same
+# newRealPrompt as `file` and, crucially, does NOT pin AllowedBackends — so on a
+# headless host with no OS secret service it falls back to the encrypted file
+# store and emits the identical "Enter keyring passphrase (attempt N/3)" prompt.
+# The shell only sees the string "os", so guarding on `== "file"` missed it.
+# Only `test` is silent (its FilePasswordFunc returns a fixed passphrase).
+_keyring_prompts_for_passphrase() {
+  [[ "${KEYRING_BACKEND:-test}" != "test" ]]
+}
+
+# resolve_keyring_backend
+# Pin the effective keyring backend and log its source, when the user did not
+# pass --keyring-backend. Resolution order (first hit wins):
+#   1. explicit --keyring-backend (KEYRING_BACKEND_EXPLICIT=1)
+#   2. $LUMERA_KEYRING_BACKEND — the same env override lumerad itself honors
+#      (and the script convention shared with $LUMERA_NODE / $LUMERA_CHAIN_ID);
+#      must outrank client.toml/disk because the resolved value is passed to
+#      lumerad as an explicit flag, which would otherwise override the env
+#   3. keyring-backend from <home>/config/client.toml (--home selects home;
+#      --keyring-dir does NOT move client.toml)
+#   4. on-disk detection under --keyring-dir (else --home):
+#      keyring-test/ -> test, keyring-file/ -> file (os is not on-disk-detectable)
+#   5. os — the Cosmos SDK default
+# Mirrors resolve_chain_id: logs the decision so the operator sees it before signing.
+resolve_keyring_backend() {
+  if (( KEYRING_BACKEND_EXPLICIT == 1 )); then
+    log_info "keyring backend: $KEYRING_BACKEND (from --keyring-backend)"
+    return 0
+  fi
+
+  if [[ -n "${LUMERA_KEYRING_BACKEND:-}" ]]; then
+    KEYRING_BACKEND="$LUMERA_KEYRING_BACKEND"
+    log_info "keyring backend: $KEYRING_BACKEND (from \$LUMERA_KEYRING_BACKEND)"
+    return 0
+  fi
+
+  # ${HOME:-} — systemd/cron/env -i runs may have no $HOME; under `set -u` a
+  # bare $HOME would abort the script instead of reaching the os fallback.
+  local home="${HOME_DIR:-${HOME:-}/.lumera}"
+  local client_toml="$home/config/client.toml" v
+  if [[ -f "$client_toml" ]]; then
+    v=$(sed -n 's/^[[:space:]]*keyring-backend[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
+        "$client_toml" | head -n1)
+    if [[ -n "$v" ]]; then
+      KEYRING_BACKEND="$v"
+      log_info "keyring backend: $v (from $client_toml)"
+      return 0
+    fi
+  fi
+
+  local kr="${KEYRING_DIR:-$home}"
+  if [[ -d "$kr/keyring-test" ]]; then
+    KEYRING_BACKEND="test"
+    log_info "keyring backend: test (detected keyring-test/ in $kr)"
+    return 0
+  fi
+  if [[ -d "$kr/keyring-file" ]]; then
+    KEYRING_BACKEND="file"
+    log_info "keyring backend: file (detected keyring-file/ in $kr)"
+    return 0
+  fi
+
+  KEYRING_BACKEND="os"
+  log_info "keyring backend: os (SDK default; no --keyring-backend, client.toml, or keyring dir found)"
 }
 
 # The original v1.20.1 migration CLI accepts --tx-timeout=0s, but still enters
@@ -402,9 +479,10 @@ lumerad_tx() {
   # Primary: let the chain simulate the exact gas (migration fees are waived, so
   # the resulting limit is free). Capture stdout (the tx JSON) separately from
   # stderr (gas-estimate notes / errors) so callers receive clean JSON to parse.
-  # For file keyrings, tee stderr back to the terminal because passphrase
-  # prompts are written there; hiding them makes the command appear to hang.
-  # Other backends retain capture-only behavior so errors are not duplicated.
+  # For passphrase-backed keyrings (file/os — see _keyring_prompts_for_passphrase),
+  # tee stderr back to the terminal because the passphrase prompt is written
+  # there; hiding it makes the command appear to hang. The silent `test` backend
+  # retains capture-only behavior so errors are not duplicated.
   local err_file out rc=0 tx_cmd
   err_file="$(mktemp)"
   tx_cmd=("$BIN" tx "$@"
@@ -414,8 +492,8 @@ lumerad_tx() {
     "${_MIGRATION_TX_TIMEOUT_FLAGS[@]}"
     --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT"
     --output json)
-  if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
-    log_info "unlocking file keyring to sign and simulate the migration transaction"
+  if _keyring_prompts_for_passphrase; then
+    log_info "unlocking keyring to sign and simulate the migration transaction"
     log_info "enter the keyring passphrase when prompted; input is hidden while typing"
     out="$("${tx_cmd[@]}" 2> >(tee "$err_file" >&2))" || rc=$?
   else
@@ -470,8 +548,8 @@ preview_tx_body() {
   fi
   _read_keyring_flags
   local generated
-  if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
-    log_info "unlocking file keyring to generate the transaction preview"
+  if _keyring_prompts_for_passphrase; then
+    log_info "unlocking keyring to generate the transaction preview"
     log_info "enter the keyring passphrase when prompted; input is hidden while typing"
   else
     log_info "generating transaction preview"
@@ -511,12 +589,12 @@ preview_tx_body() {
 resolve_address() {
   local key_name="$1"
   local addr
-  if [[ "${KEYRING_BACKEND:-test}" == "file" ]]; then
-    log_info "unlocking file keyring for key $(legacy_value "$key_name") (enter the keyring passphrase when prompted)"
+  if _keyring_prompts_for_passphrase; then
+    log_info "unlocking keyring for key $(legacy_value "$key_name") (enter the keyring passphrase when prompted)"
   else
     log_info "resolving address for key $(legacy_value "$key_name")"
   fi
-  # Do not suppress stderr here. File-backed keyrings write their passphrase
+  # Do not suppress stderr here. Passphrase-backed keyrings (file/os) write their
   # prompt to stderr; redirecting it made the script appear to hang while it
   # was actually waiting for input.
   if ! addr=$(lumerad_keys show "$key_name" -a); then

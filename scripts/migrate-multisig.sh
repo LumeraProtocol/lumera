@@ -36,7 +36,7 @@ _mms_generate() {
   local sig_format="" binary="lumerad"
   local new_sub_pub_keys="" new_threshold="" legacy_key=""
   local new_key=""
-  local keyring_backend="test" keyring_dir="" home_dir=""
+  local keyring_backend="test" keyring_dir="" home_dir="" kb_explicit=0
   while (( $# > 0 )); do
     case "$1" in
       --legacy)           _require_value "$1" "$#" "${2-}"; legacy="$2"; shift 2 ;;
@@ -51,7 +51,7 @@ _mms_generate() {
       --new-threshold)    _require_value "$1" "$#" "${2-}"; new_threshold="$2"; shift 2 ;;
       --legacy-key)       _require_value "$1" "$#" "${2-}"; legacy_key="$2"; shift 2 ;;
       --binary)           _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
-      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; shift 2 ;;
+      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; kb_explicit=1; shift 2 ;;
       --keyring-dir)      _require_value "$1" "$#" "${2-}"; keyring_dir="$2"; shift 2 ;;
       --home)             _require_value "$1" "$#" "${2-}"; home_dir="$2"; shift 2 ;;
       -h|--help)
@@ -116,6 +116,10 @@ G_USAGE
   KEYRING_DIR="$keyring_dir"
   # shellcheck disable=SC2034
   HOME_DIR="$home_dir"
+  # shellcheck disable=SC2034  # consumed by resolve_keyring_backend
+  KEYRING_BACKEND_EXPLICIT="$kb_explicit"
+  resolve_keyring_backend
+  keyring_backend="$KEYRING_BACKEND"
 
   log_info "[generate 1/5] validating prerequisites and connecting to RPC $node"
   require_multisig_binary
@@ -257,7 +261,7 @@ G_USAGE
 }
 _mms_sign() {
   local input="" from="" new_key="" chain_id="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}" out="" binary="lumerad"
-  local node="${LUMERA_NODE:-tcp://localhost:26657}" keyring_backend="test" keyring_dir="" home_dir=""
+  local node="${LUMERA_NODE:-tcp://localhost:26657}" keyring_backend="test" keyring_dir="" home_dir="" kb_explicit=0
   local positional=()
   while (( $# > 0 )); do
     case "$1" in
@@ -267,7 +271,7 @@ _mms_sign() {
       --node)             _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
       --out)              _require_value "$1" "$#" "${2-}"; out="$2"; shift 2 ;;
       --binary)           _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
-      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; shift 2 ;;
+      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; kb_explicit=1; shift 2 ;;
       --keyring-dir)      _require_value "$1" "$#" "${2-}"; keyring_dir="$2"; shift 2 ;;
       --home)             _require_value "$1" "$#" "${2-}"; home_dir="$2"; shift 2 ;;
       -h|--help)
@@ -340,6 +344,10 @@ S_USAGE
   KEYRING_DIR="$keyring_dir"
   # shellcheck disable=SC2034
   HOME_DIR="$home_dir"
+  # shellcheck disable=SC2034  # consumed by resolve_keyring_backend
+  KEYRING_BACKEND_EXPLICIT="$kb_explicit"
+  resolve_keyring_backend
+  keyring_backend="$KEYRING_BACKEND"
 
   log_info "[sign 1/4] validating prerequisites and chain ID"
   require_multisig_binary
@@ -542,7 +550,7 @@ C_USAGE
 }
 _mms_submit() {
   local input="" chain_id="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}" node="${LUMERA_NODE:-tcp://localhost:26657}" binary="lumerad"
-  local keyring_backend="test" keyring_dir="" home_dir=""
+  local keyring_backend="test" keyring_dir="" home_dir="" kb_explicit=0
   local yes=0 dry_run=0 node_stopped=0
   local positional=()
   while (( $# > 0 )); do
@@ -550,7 +558,7 @@ _mms_submit() {
       --chain-id)         _require_value "$1" "$#" "${2-}"; chain_id="$2"; shift 2 ;;
       --node)             _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
       --binary)           _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
-      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; shift 2 ;;
+      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; kb_explicit=1; shift 2 ;;
       --keyring-dir)      _require_value "$1" "$#" "${2-}"; keyring_dir="$2"; shift 2 ;;
       --home)             _require_value "$1" "$#" "${2-}"; home_dir="$2"; shift 2 ;;
       --yes|-y)           yes=1; shift ;;
@@ -622,6 +630,10 @@ SU_USAGE
   KEYRING_DIR="$keyring_dir"
   # shellcheck disable=SC2034
   HOME_DIR="$home_dir"
+  # shellcheck disable=SC2034  # consumed by resolve_keyring_backend
+  KEYRING_BACKEND_EXPLICIT="$kb_explicit"
+  resolve_keyring_backend
+  keyring_backend="$KEYRING_BACKEND"
   # shellcheck disable=SC2034
   YES="$yes"
   # shellcheck disable=SC2034

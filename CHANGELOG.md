@@ -2,6 +2,52 @@
 
 ---
 
+## 1.20.3
+
+Changes included since `v1.20.2` (range: `v1.20.2..v1.20.3`).
+
+A release-tooling-only follow-up to `v1.20.2`. **Validators must use the `v1.20.3` binary for the on-chain upgrade plan named `v1.20.2`.** When using Cosmovisor, install the binary at `cosmovisor/upgrades/v1.20.2/bin/lumerad`.
+
+There are no application-state, consensus, store-migration, or upgrade-handler changes relative to `v1.20.2`. The only source change corrects the version stamped into release binaries.
+
+- Fixed release version stamping: the original `v1.20.2` artifact reports `1.20.2-rc1` even though it was built from the correct `v1.20.2` application commit (`aafc4a28`). The release process now prioritizes the GitHub tag being built, then a final tag pointing at `HEAD`, before falling back to the newest reachable tag plus the commit suffix.
+
+> The original `v1.20.2` artifact is superseded. Do not use it for the mainnet upgrade.
+
+---
+
+## 1.20.2
+
+Changes included since `v1.20.1` (range: `v1.20.1..v1.20.2`).
+
+> **Release artifact notice:** The original `v1.20.2` artifact incorrectly reports its version as `1.20.2-rc1`. It is superseded and must not be used for the mainnet upgrade. Validators must install `v1.20.3`; the on-chain upgrade plan name remains `v1.20.2`.
+
+A coordinated upgrade (plan name `v1.20.2`) that serves as the **consensus activation boundary** for validator-migration correctness fixes in `x/evmigration`: the fixes change DeliverTx outcomes for the same migration transaction, so they must activate atomically across the validator set at one halt height rather than via rolling restarts. The handler is state-driven, like `v1.20.1`, and serves both live arrival shapes from one binary: on testnet (arriving from `v1.20.1`, EVM present) it runs migrations only and leaves the live `migration_end_time` untouched; on mainnet (arriving one-hop from `v1.12.0`, EVM absent) it performs the full EVM bring-up by delegating to the `v1.20.1`/`v1.20.0` path, with add-only store mounting and a fail-closed guard against partial EVM state. No module consensus-version bumps and no destructive store changes.
+
+### Fee market
+
+- **Raised the EIP-1559 default/reset base fee fivefold**: `0.0025` → `0.0125 ulume/gas`. The `min_gas_price` floor is unchanged at `0.0005 ulume/gas`, so an idle chain still decays to the same floor; the upgrade handler re-applies the new base fee on both arrival shapes. Measured supernode fee impact on devnet was ~+28% per epoch (not 5×) because of the unchanged floor.
+
+### Validator migration correctness (`x/evmigration`)
+
+- Fixed loss of Everlight distribution state on validator migration: the validator-keyed `rdist/` accumulator (smoothed-bytes EMA, growth-cap baseline, ramp-up progress, eligibility start) was orphaned under the old operator address, so a migrated validator silently re-entered the new-SN ramp at reduced payout weight and bypassed the growth cap. A SuperNode-owned Build/Apply plan now atomically moves both validator-keyed families it owns (`snm_` latest metrics and `rdist/` distribution state) to the new operator address, failing closed on destination collisions or malformed rows. Payout history (`rhist/`) intentionally stays under the validator that earned it.
+- Added a backward repair for distribution rows corrupted by `v1.20.0`: account migrations under `v1.20.0` stored `DelegatorStartingInfo.Stake` as raw shares instead of tokens, so delegations to ever-slashed validators could panic reward withdrawal during a later validator migration. The repair matches the exact `v1.20.0` fingerprint, replays applicable slash events, and reconstructs the starting stake atomically inside the migration transaction; it is idempotent and a no-op for unaffected rows. (Mainnet is unaffected — it never ran `v1.20.0`.)
+- Hardened supernode re-keying during migration: ownership is now resolved canonically (not by literal address text), verified in a strict preflight before any writes, dual validator/supernode-account relationships are preserved, and destination supernode ownership collisions are rejected. `PrevSupernodeAccounts` history is preserved and appended to instead of being rewritten.
+
+### Migration tooling & operator experience
+
+- Migration scripts now auto-resolve the keyring backend (`--keyring-backend` flag > `LUMERA_KEYRING_BACKEND` > `client.toml` > on-disk keyring detection > SDK default `os`) instead of hardcoding `test`, and show the keyring passphrase prompt for the `os` backend instead of appearing to hang.
+- Hardened the migration CLI and account/validator/multisig scripts: visible prompts and staged progress output, reliable tx confirmation over HTTP-only RPC endpoints, true immediate-return `--tx-timeout 0s`, and idempotent re-runs of interrupted batch migrations. Release tarballs now include and validate all migration scripts.
+- Documentation: stopping the node before validator migration is mandatory (a supervisor-respawned instance can double-sign and tombstone the validator); documented the Keplr cached-chain trap that can silently restore the legacy coin-type-118 profile; folded supernode-migration runbook findings (upgrade order, sn-manager auto-update gate, two-keyring trap, non-repeatability of migration) into the guides.
+
+### Upgrade & operations
+
+- Registered the `v1.20.2` upgrade handler as a state-driven boundary that delegates to the rehearsed `v1.20.1` logic, with add-only store-loader routing on all networks. Module consensus versions are pinned by tests against live mainnet/testnet state, and both arrival shapes (plus idempotent replay after a mid-upgrade crash) are covered by mutation-tested upgrade tests.
+- Devnet: added a `devnet-upgrade-1202` target and mainnet-shaped pre-EVM rehearsal fixtures (a `v1.12.0` genesis/config for the one-hop shape and a `v1.20.1`-shaped EVM genesis for a non-vacuous fee-market gate); fixed upgrade halt detection reporting false alarms on healthy upgrades; fixed two bugs that prevented the lumera-uploader from ever starting; test fee expectations are now derived from `config/evm.go` instead of hardcoded literals.
+- Dependencies: bumped `golang.org/x/crypto` 0.51.0 → 0.52.0 (root, devnet, and systemtests modules).
+
+---
+
 ## 1.20.1
 
 Changes included since `v1.20.0` (range: `v1.20.0..v1.20.1`).

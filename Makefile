@@ -42,7 +42,35 @@ SPACE := $(EMPTY) $(EMPTY)
 COMMA := ,
 BUILD_TAGS_VERSION := $(subst $(SPACE),$(COMMA),$(strip $(BUILD_TAGS)))
 GIT_HEAD_HASH ?= $(strip $(shell git rev-parse HEAD 2>/dev/null))
-VERSION_TAG ?= $(strip $(shell tag_ref=$$(git for-each-ref --merged HEAD --sort=-creatordate --format='%(refname:strip=2)' refs/tags | head -n1); if [ -z "$$tag_ref" ]; then printf ''; else tag_name=$${tag_ref#v}; tag_commit=$$(git rev-list -n1 "$$tag_ref" 2>/dev/null); head_commit=$$(git rev-parse HEAD 2>/dev/null); if [ "$$tag_commit" = "$$head_commit" ]; then printf '%s' "$$tag_name"; else printf '%s-%s' "$$tag_name" "$$(git rev-parse --short=8 HEAD 2>/dev/null)"; fi; fi))
+# Resolve the version stamped into the binary via -ldflags.
+#
+# Priority:
+#   1. GITHUB_REF_NAME on a tag push -- the tag actually being released. This is
+#      authoritative in release CI and immune to any date-based heuristic.
+#   2. Tags pointing exactly at HEAD, preferring a final release over a
+#      prerelease (-rc/-beta/-alpha/-pre/-hotfix), ties broken by `sort -V`.
+#   3. Otherwise the newest reachable tag, suffixed with the short SHA.
+#
+# Step 2 must not sort by `creatordate`: for a LIGHTWEIGHT tag that reports the
+# COMMIT date, not the tagging date, so a lightweight release tag cut days after
+# an annotated -rc on the same commit still sorts older and loses. That is how
+# the v1.20.2 release artifact came to be stamped 1.20.2-rc1.
+VERSION_TAG ?= $(strip $(shell \
+	if [ -n "$$GITHUB_REF_NAME" ] && [ "$$GITHUB_REF_TYPE" = "tag" ]; then \
+		printf '%s' "$${GITHUB_REF_NAME#v}"; \
+	else \
+		at_head=$$(git tag --points-at HEAD 2>/dev/null); \
+		if [ -n "$$at_head" ]; then \
+			best=$$(printf '%s\n' "$$at_head" | grep -vE -- '-(rc|beta|alpha|pre|hotfix)' | sort -V | tail -n1); \
+			if [ -z "$$best" ]; then best=$$(printf '%s\n' "$$at_head" | sort -V | tail -n1); fi; \
+			printf '%s' "$${best#v}"; \
+		else \
+			tag_ref=$$(git for-each-ref --merged HEAD --sort=-creatordate --format='%(refname:strip=2)' refs/tags | head -n1); \
+			if [ -n "$$tag_ref" ]; then \
+				printf '%s-%s' "$${tag_ref#v}" "$$(git rev-parse --short=8 HEAD 2>/dev/null)"; \
+			fi; \
+		fi; \
+	fi))
 RELEASE_VERSION_TAG ?= $(strip $(if $(VERSION_TAG),$(if $(filter v%,$(VERSION_TAG)),$(VERSION_TAG),v$(VERSION_TAG))))
 BUILD_LDFLAGS = \
 	-X github.com/cosmos/cosmos-sdk/version.Name=$(APP_TITLE) \

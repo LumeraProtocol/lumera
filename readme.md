@@ -56,9 +56,9 @@ lumerad start
 
 ## Documentation
 
-- [EVM Integration](docs/evm-integration/main.md) — Cosmos EVM architecture, precompiles, JSON-RPC, migration guides
-- [Devnet](docs/devnet/main.md) — Local Docker test network setup, configuration, upgrade testing
-- [Port Reference](docs/lumera-ports.md) — Network port defaults, config keys, and CLI flags
+- [EVM Integration](guides/evm-integration/main.md) — Cosmos EVM architecture, precompiles, JSON-RPC, migration guides
+- [Devnet](guides/devnet/main.md) — Local Docker test network setup, configuration, upgrade testing
+- [Port Reference](guides/lumera-ports.md) — Network port defaults, config keys, and CLI flags
 
 ## Learn more
 

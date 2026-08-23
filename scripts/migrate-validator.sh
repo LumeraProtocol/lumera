@@ -6,7 +6,7 @@
 #
 # Migrate a single-signature validator operator from legacy to EVM-compatible keys.
 # See docs/design/evmigration-scripts-design.md and
-# docs/evm-integration/user-guides/migration.md.
+# guides/evm-integration/user-guides/migration.md.
 
 set -euo pipefail
 IFS=$'\n\t'

@@ -723,7 +723,7 @@ assert_single_sig() {
     k=$(jq -r '.threshold' <<<"$json")
     n=$(jq -r '.num_signers' <<<"$json")
     log_error "legacy account is a ${k}-of-${n} multisig; use scripts/migrate-multisig.sh instead"
-    log_error "see docs/evm-integration/user-guides/migration-scripts.md#multisig-migration"
+    log_error "see guides/evm-integration/user-guides/migration-scripts.md#multisig-migration"
     exit 3
   fi
 }

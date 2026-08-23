@@ -6,7 +6,7 @@
 # 
 # Migrate a legacy account (coin-type 118, secp256k1) to its EVM-compatible counterpart.
 # See docs/design/evmigration-scripts-design.md and
-# docs/evm-integration/user-guides/migration.md.
+# guides/evm-integration/user-guides/migration.md.
 
 set -euo pipefail
 IFS=$'\n\t'

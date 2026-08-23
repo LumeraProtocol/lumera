@@ -32,7 +32,7 @@ A hotfix that hardens `x/evmigration` for large validators and live-network cond
 
 Changes included since `v1.11.1` (range: `v1.11.1..v1.20.0`).
 
-Full EVM integration documentation: [docs/evm-integration/main.md](docs/evm-integration/main.md)
+Full EVM integration documentation: [guides/evm-integration/main.md](guides/evm-integration/main.md)
 
 This release integrates a full EVM execution layer (Cosmos EVM v0.6.0) alongside the existing CosmWasm runtime, and adds the `x/evmigration` module for migrating legacy accounts to Ethereum-compatible keys.
 

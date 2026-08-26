@@ -30,56 +30,32 @@ func loadStatusRegistryAccounts() ([]statusRegistryAccount, error) {
 	return accounts, nil
 }
 
-func readStatusRegistryMnemonic(name string) string {
+// lookupStatusRegistryMnemonic reports whether `name` is tracked in the
+// status registry, without logging when it isn't. Absence is a normal outcome
+// when probing infrastructure-key candidates that don't apply to this host
+// (e.g. governance_key on a secondary validator).
+func lookupStatusRegistryMnemonic(name string) (string, bool) {
 	accounts, err := loadStatusRegistryAccounts()
 	if err != nil {
 		log.Printf("  WARN: cannot read account registry %s: %v", statusRegistryFile(), err)
-		return ""
+		return "", false
 	}
 	for _, account := range accounts {
 		if account.Name == name {
-			return strings.TrimSpace(account.Mnemonic)
+			return strings.TrimSpace(account.Mnemonic), true
 		}
 	}
-	log.Printf("  WARN: account %q not found in status registry %s", name, statusRegistryFile())
-	return ""
+	return "", false
 }
 
-// appendStatusRegistryAccount adds a {name, address, mnemonic} entry to the
-// shared status registry if it isn't already present. Idempotent by name.
-func appendStatusRegistryAccount(name, address, mnemonic string) {
-	registryFile := statusRegistryFile()
-	data, err := os.ReadFile(registryFile)
-	if err != nil {
-		log.Printf("  WARN: cannot read account registry %s: %v", registryFile, err)
-		return
+// readStatusRegistryMnemonic is the lookup for accounts that are expected to
+// be registered (validator keys); it warns when the entry is missing.
+func readStatusRegistryMnemonic(name string) string {
+	mnemonic, found := lookupStatusRegistryMnemonic(name)
+	if !found {
+		log.Printf("  WARN: account %q not found in status registry %s", name, statusRegistryFile())
 	}
-	var accounts []map[string]any
-	if err := json.Unmarshal(data, &accounts); err != nil {
-		log.Printf("  WARN: cannot parse account registry %s: %v", registryFile, err)
-		return
-	}
-	for _, account := range accounts {
-		if fmtName, _ := account["name"].(string); fmtName == name {
-			return
-		}
-	}
-	accounts = append(accounts, map[string]any{
-		"name":     name,
-		"address":  address,
-		"mnemonic": mnemonic,
-	})
-	encoded, err := json.MarshalIndent(accounts, "", "  ")
-	if err != nil {
-		log.Printf("  WARN: cannot encode updated account registry %s: %v", registryFile, err)
-		return
-	}
-	encoded = append(encoded, '\n')
-	if err := os.WriteFile(registryFile, encoded, 0o644); err != nil {
-		log.Printf("  WARN: failed to append to account registry %s: %v", registryFile, err)
-		return
-	}
-	log.Printf("  appended %s to account registry %s", name, registryFile)
+	return mnemonic
 }
 
 func updateStatusRegistryAddress(name, newAddr string) {
@@ -105,7 +81,9 @@ func updateStatusRegistryAddress(name, newAddr string) {
 		}
 	}
 	if !updated {
-		log.Printf("  WARN: account %q not found in status registry %s", name, registryFile)
+		// Not tracked: the registry only holds infrastructure keys (validator,
+		// governance, funders); generated pre-evm-* fixtures live solely in
+		// accounts-devnet.json, so skipping them silently is the normal case.
 		return
 	}
 

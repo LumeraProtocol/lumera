@@ -177,9 +177,11 @@ func loopbackAddrForPublic(publicAddr string) (string, error) {
 		return "", fmt.Errorf("invalid public JSON-RPC port %q", portText)
 	}
 
-	// Rotate the valid TCP port range by 32768 positions. This is a one-to-one
-	// mapping, so distinct public ports always yield distinct internal ports.
-	internalPort := ((publicPort + 32767) % 65535) + 1
+	// Rotate within the unprivileged TCP port range. Integration fixtures use
+	// ephemeral public ports, so rotating across the full 1..65535 range could
+	// map them below 1024 and fail for non-root processes.
+	const unprivilegedPortCount = 65535 - 1024 + 1
+	internalPort := 1024 + ((publicPort - 1 + 32768) % unprivilegedPortCount)
 	return net.JoinHostPort("127.0.0.1", strconv.Itoa(internalPort)), nil
 }
 

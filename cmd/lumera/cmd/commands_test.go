@@ -9,10 +9,11 @@ func TestLoopbackAddrForPublicIsStableAndUnique(t *testing.T) {
 		public string
 		want   string
 	}{
-		{public: "127.0.0.1:8545", want: "127.0.0.1:41313"},
-		{public: "0.0.0.0:8645", want: "127.0.0.1:41413"},
-		{public: "[::]:8745", want: "127.0.0.1:41513"},
-		{public: "localhost:32768", want: "127.0.0.1:1"},
+		{public: "127.0.0.1:8545", want: "127.0.0.1:42336"},
+		{public: "0.0.0.0:8645", want: "127.0.0.1:42436"},
+		{public: "[::]:8745", want: "127.0.0.1:42536"},
+		{public: "localhost:32768", want: "127.0.0.1:2047"},
+		{public: "127.0.0.1:32863", want: "127.0.0.1:2142"},
 	}
 
 	seen := make(map[string]string, len(tests))

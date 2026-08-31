@@ -308,7 +308,13 @@ add_dir_to_scanner() {
 		return 0
 	fi
 
-	local processed="${dir%/}/processed"
+	# processedPath MUST be a SIBLING of srcPath, not nested inside it.
+	# scanner/scanner.go walks srcPath with filepath.Walk (RECURSIVE) and dedups
+	# on (dir, name). A nested "<srcPath>/processed" therefore gets re-scanned,
+	# and because the move changes `dir` the file looks brand new -> every file
+	# is registered a SECOND time, doubling cascade fees and load.
+	# Observed on devnet: 13 create-metadata calls sourced from .../processed/.
+	local processed="${dir%/}-processed"
 	local tmp="${cfg}.tmp.$$"
 
 	# Collect existing srcPath entries so repeated calls accumulate rather than
@@ -323,7 +329,7 @@ add_dir_to_scanner() {
 		for e in ${existing}; do
 			[ -n "$e" ] || continue
 			printf ',\n  { srcPath = "%s", processedPath = "%s", isPublic = "random" }' \
-				"$e" "${e%/}/processed"
+				"$e" "${e%/}-processed"
 		done
 		printf '\n]\n'
 	} >"${tmp}.block"

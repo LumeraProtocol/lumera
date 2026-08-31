@@ -1,0 +1,117 @@
+name: Gosec Security Scan
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  gosec:
+    name: gosec (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: chain
+            module: .
+          - name: devnet
+            module: devnet
+          - name: systemtests
+            module: tests/systemtests
+
+    steps:
+      - name: Checkout Lumera
+        uses: actions/checkout@v6.0.1
+        with:
+          path: lumera
+
+      # devnet/go.mod resolves sdk-go from ../../sdk-go. Pin the compatible v1.2.0
+      # commit and reproduce that sibling layout on clean GitHub runners.
+      - name: Checkout sdk-go
+        if: ${{ matrix.module == 'devnet' }}
+        uses: actions/checkout@v6.0.1
+        with:
+          repository: LumeraProtocol/sdk-go
+          ref: b4fb54757fbe5431dfc08948a99881646f31036d
+          path: sdk-go
+
+      - name: Set up Go
+        uses: actions/setup-go@v6.2.0
+        with:
+          go-version-file: lumera/go.mod
+          cache: true
+          cache-dependency-path: |
+            lumera/go.sum
+            lumera/devnet/go.sum
+            lumera/tests/systemtests/go.sum
+
+      - name: Download Go modules
+        working-directory: lumera/${{ matrix.module }}
+        run: go mod download
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+
+      - name: Run gosec
+        working-directory: lumera/${{ matrix.module }}
+        run: |
+          gosec \
+            -severity high \
+            -confidence high \
+            -nosec-require-rules \
+            -nosec-require-justification \
+            -fmt sarif \
+            -out gosec.sarif \
+            -stdout \
+            -verbose text \
+            ./...
+
+      - name: Normalize SARIF paths
+        if: ${{ always() && matrix.module != '.' }}
+        env:
+          GOSEC_MODULE: ${{ matrix.module }}
+          GOSEC_SARIF: lumera/${{ matrix.module }}/gosec.sarif
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import PurePosixPath
+          from urllib.parse import urlparse
+
+          sarif_path = os.environ["GOSEC_SARIF"]
+          module = os.environ["GOSEC_MODULE"].strip("/")
+          with open(sarif_path, encoding="utf-8") as sarif_file:
+              sarif = json.load(sarif_file)
+
+          def prefix_artifact_uris(value):
+              if isinstance(value, dict):
+                  artifact = value.get("artifactLocation")
+                  if isinstance(artifact, dict):
+                      uri = artifact.get("uri")
+                      if isinstance(uri, str) and uri and not urlparse(uri).scheme and not uri.startswith("/"):
+                          if not uri.startswith(module + "/"):
+                              artifact["uri"] = str(PurePosixPath(module) / uri)
+                  for child in value.values():
+                      prefix_artifact_uris(child)
+              elif isinstance(value, list):
+                  for child in value:
+                      prefix_artifact_uris(child)
+
+          prefix_artifact_uris(sarif)
+          with open(sarif_path, "w", encoding="utf-8") as sarif_file:
+              json.dump(sarif, sarif_file, separators=(",", ":"))
+          PY
+
+      - name: Upload SARIF
+        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: lumera/${{ matrix.module }}/gosec.sarif
+          checkout_path: ${{ github.workspace }}/lumera
+          category: gosec-${{ matrix.name }}

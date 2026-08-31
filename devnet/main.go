@@ -28,6 +28,7 @@ func main() {
 		if sharedDir == "" {
 			sharedDir = filepath.Join("/tmp", cfg.Chain.ID, generators.SubFolderShared)
 		}
+		// #nosec G703 -- DEVNET_SHARED_DIR is an explicit operator-selected trust boundary.
 		data, err := os.ReadFile(filepath.Join(
 			sharedDir,
 			generators.SubFolderConfig,

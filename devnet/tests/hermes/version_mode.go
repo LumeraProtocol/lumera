@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	pkgversion "github.com/LumeraProtocol/lumera/pkg/version"
-	sdkcrypto "github.com/LumeraProtocol/sdk-go/pkg/crypto"
 )
 
 const (
@@ -32,6 +31,7 @@ func readDevnetChainConfig() devnetChainConfig {
 		if p == "" {
 			continue
 		}
+		// #nosec G703 -- LUMERA_CONFIG_JSON is an explicit operator-selected config path.
 		bz, err := os.ReadFile(p)
 		if err != nil {
 			continue
@@ -73,11 +73,4 @@ func resolveLumeraKeyStyle() string {
 		return "evm"
 	}
 	return "cosmos"
-}
-
-func (s *lumeraHermesSuite) lumeraKeyType() sdkcrypto.KeyType {
-	if strings.EqualFold(s.lumeraKeyStyle, "cosmos") {
-		return sdkcrypto.KeyTypeCosmos
-	}
-	return sdkcrypto.KeyTypeEVM
 }

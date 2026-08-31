@@ -159,6 +159,7 @@ func applyAppTomlPorts(path string, ports *localLumeradPorts) error {
 }
 
 func parseSimpleToml(path string) (map[string]map[string]string, error) {
+	// #nosec G703 -- callers derive path from the operator-selected lumerad home.
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err

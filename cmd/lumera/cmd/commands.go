@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"syscall"
 
 	tmcmd "github.com/cometbft/cometbft/cmd/cometbft/commands"
 	cmttypes "github.com/cometbft/cometbft/types"
@@ -153,19 +154,63 @@ func reserveLoopbackAddr(publicAddr string) (string, error) {
 		return "", err
 	}
 
-	// Verify the derived address is currently available. Closing it before the
-	// native JSON-RPC server binds still leaves a small external-process race,
-	// but unlike port 0 the deterministic mapping prevents sibling lumerad
-	// processes with distinct public ports from selecting the same upstream.
-	ln, err := net.Listen("tcp", internalAddr)
+	_, primaryPortText, err := net.SplitHostPort(internalAddr)
 	if err != nil {
-		return "", fmt.Errorf("reserve internal JSON-RPC address %s: %w", internalAddr, err)
+		return "", err
 	}
-	if closeErr := ln.Close(); closeErr != nil {
-		return "", closeErr
+	primaryPort, err := strconv.Atoi(primaryPortText)
+	if err != nil {
+		return "", err
 	}
-	return internalAddr, nil
+	_, publicPortText, err := net.SplitHostPort(publicAddr)
+	if err != nil {
+		return "", err
+	}
+	publicPort, err := strconv.Atoi(publicPortText)
+	if err != nil {
+		return "", err
+	}
+
+	// Verify a deterministic candidate is currently available. Closing it
+	// before the native JSON-RPC server binds still leaves a small
+	// external-process race, but the deterministic primary prevents sibling
+	// lumerad processes with distinct public ports from selecting the same
+	// upstream. If another service owns that primary, walk a deterministic
+	// permutation of the unprivileged range instead of making an otherwise
+	// valid public listener unusable. The relatively prime step keeps nearby
+	// public ports from immediately falling back onto each other's primaries.
+	const fallbackProbeStep = 7919
+	for attempt := 0; attempt < unprivilegedPortCount; attempt++ {
+		candidatePort := firstUnprivilegedPort +
+			((primaryPort-firstUnprivilegedPort)+(attempt*fallbackProbeStep))%unprivilegedPortCount
+		// The alias proxy needs the operator-configured public port later in
+		// startup, so never consume it as the native server's upstream.
+		if candidatePort == publicPort {
+			continue
+		}
+
+		candidateAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(candidatePort))
+		ln, listenErr := net.Listen("tcp", candidateAddr)
+		if listenErr != nil {
+			if errors.Is(listenErr, syscall.EADDRINUSE) {
+				continue
+			}
+			return "", fmt.Errorf("reserve internal JSON-RPC address %s: %w", candidateAddr, listenErr)
+		}
+		if closeErr := ln.Close(); closeErr != nil {
+			return "", closeErr
+		}
+		return candidateAddr, nil
+	}
+
+	return "", fmt.Errorf("no unprivileged internal JSON-RPC port available for %s", publicAddr)
 }
+
+const (
+	firstUnprivilegedPort = 1024
+	lastUnprivilegedPort  = 65535
+	unprivilegedPortCount = lastUnprivilegedPort - firstUnprivilegedPort + 1
+)
 
 func loopbackAddrForPublic(publicAddr string) (string, error) {
 	_, portText, err := net.SplitHostPort(publicAddr)
@@ -180,8 +225,8 @@ func loopbackAddrForPublic(publicAddr string) (string, error) {
 	// Rotate within the unprivileged TCP port range. Integration fixtures use
 	// ephemeral public ports, so rotating across the full 1..65535 range could
 	// map them below 1024 and fail for non-root processes.
-	const unprivilegedPortCount = 65535 - 1024 + 1
-	internalPort := 1024 + ((publicPort - 1 + 32768) % unprivilegedPortCount)
+	internalPort := firstUnprivilegedPort +
+		((publicPort - 1 + 32768) % unprivilegedPortCount)
 	return net.JoinHostPort("127.0.0.1", strconv.Itoa(internalPort)), nil
 }
 

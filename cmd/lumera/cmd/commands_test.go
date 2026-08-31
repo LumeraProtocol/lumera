@@ -1,6 +1,10 @@
 package cmd
 
-import "testing"
+import (
+	"net"
+	"strconv"
+	"testing"
+)
 
 func TestLoopbackAddrForPublicIsStableAndUnique(t *testing.T) {
 	t.Parallel()
@@ -42,4 +46,56 @@ func TestLoopbackAddrForPublicRejectsInvalidAddress(t *testing.T) {
 			t.Fatalf("loopbackAddrForPublic(%q) unexpectedly succeeded", publicAddr)
 		}
 	}
+}
+
+func TestReserveLoopbackAddrFallsBackWhenPrimaryIsOccupied(t *testing.T) {
+	occupied, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen on occupied primary: %v", err)
+	}
+	t.Cleanup(func() { _ = occupied.Close() })
+
+	occupiedPort := occupied.Addr().(*net.TCPAddr).Port
+	publicAddr := publicAddrForInternalPort(t, occupiedPort)
+	got, err := reserveLoopbackAddr(publicAddr)
+	if err != nil {
+		t.Fatalf("reserveLoopbackAddr(%q): %v", publicAddr, err)
+	}
+	if got == occupied.Addr().String() {
+		t.Fatalf("reserveLoopbackAddr(%q) returned occupied primary %q", publicAddr, got)
+	}
+
+	_, portText, err := net.SplitHostPort(got)
+	if err != nil {
+		t.Fatalf("parse fallback address %q: %v", got, err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < firstUnprivilegedPort || port > lastUnprivilegedPort {
+		t.Fatalf("fallback address %q is not unprivileged", got)
+	}
+
+	probe, err := net.Listen("tcp", got)
+	if err != nil {
+		t.Fatalf("fallback address %q is not available: %v", got, err)
+	}
+	_ = probe.Close()
+}
+
+func publicAddrForInternalPort(t *testing.T, internalPort int) string {
+	t.Helper()
+
+	want := net.JoinHostPort("127.0.0.1", strconv.Itoa(internalPort))
+	for publicPort := firstUnprivilegedPort; publicPort <= lastUnprivilegedPort; publicPort++ {
+		publicAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(publicPort))
+		got, err := loopbackAddrForPublic(publicAddr)
+		if err != nil {
+			t.Fatalf("loopbackAddrForPublic(%q): %v", publicAddr, err)
+		}
+		if got == want {
+			return publicAddr
+		}
+	}
+
+	t.Fatalf("no public port maps to internal port %d", internalPort)
+	return ""
 }

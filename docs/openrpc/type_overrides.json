@@ -1,0 +1,112 @@
+{
+  "types.TraceConfig": {
+    "tracer": {
+      "description": "Name of a built-in tracer (e.g. `callTracer`, `prestateTracer`, `4byteTracer`) or a JavaScript tracer source string. Omit to use the default opcode tracer."
+    },
+    "timeout": {
+      "description": "Maximum wall-clock duration for the trace, e.g. `\"5s\"`, `\"500ms\"`. Default 5s. Applies mainly to JavaScript tracers."
+    },
+    "reexec": {
+      "description": "How many ancestor blocks the node may re-execute to reconstruct the requested pre-state. Higher values allow tracing further back at the cost of CPU."
+    },
+    "disableStack": {
+      "description": "If true, EVM stack snapshots are omitted from the trace output. Reduces payload size significantly."
+    },
+    "disableStorage": {
+      "description": "If true, storage-slot reads/writes are omitted from the trace output. Reduces payload size and avoids storage-trie lookups."
+    },
+    "debug": {
+      "description": "If true, tracer-side diagnostic output is included when the trace ends. Intended for tracer development, not normal use."
+    },
+    "limit": {
+      "description": "Maximum number of trace steps to retain (oldest steps are dropped past the cap). 0 means unlimited."
+    },
+    "overrides": {
+      "description": "Optional chain-config overrides applied only to this trace — lets you simulate execution under future hard-fork rules without forking the chain."
+    },
+    "enableMemory": {
+      "description": "If true, the EVM memory snapshot is included at each captured step. Significantly increases payload size."
+    },
+    "enableReturnData": {
+      "description": "If true, the EVM RETURN/REVERT data buffer is included at each captured step."
+    },
+    "tracerConfig": {
+      "description": "Tracer-specific JSON configuration, passed through to the named `tracer`. Shape depends on the tracer (e.g. `{ \"withLog\": true }` for `callTracer`)."
+    }
+  },
+
+  "types.ChainConfig": {
+    "homestead_block": {
+      "description": "Block height at which the Homestead hard fork activates. `null` = never; `\"0\"` = already active from genesis."
+    },
+    "dao_fork_block": {
+      "description": "Block height of the TheDAO hard-fork. `null` to disable. Lumera does not replay Ethereum's DAO state changes; this controls only fork-rule activation in EVM simulation."
+    },
+    "dao_fork_support": {
+      "description": "Whether this node sides with the DAO hard-fork (`true`) or with the original chain (`false`). Affects header-validity checks during `dao_fork_block`."
+    },
+    "eip150_block": {
+      "description": "Block height activating EIP-150 (gas-cost repricing of IO-heavy opcodes). `null` = never; `\"0\"` = active from genesis."
+    },
+    "eip155_block": {
+      "description": "Block height activating EIP-155 (chain-ID-bound signing, replay-attack protection). `null` = never."
+    },
+    "eip158_block": {
+      "description": "Block height activating EIP-158 (state-clearing of empty accounts). `null` = never."
+    },
+    "byzantium_block": {
+      "description": "Block height of the Byzantium fork (REVERT, RETURNDATA, modexp/bn256 precompiles). `null` = never; `\"0\"` = active from genesis."
+    },
+    "constantinople_block": {
+      "description": "Block height of the Constantinople fork (CREATE2, SHL/SHR/SAR, EXTCODEHASH). `null` = never; `\"0\"` = active from genesis."
+    },
+    "petersburg_block": {
+      "description": "Block height of the Petersburg fork (Constantinople minus EIP-1283 reentrancy issue). `null` reuses the Constantinople block."
+    },
+    "istanbul_block": {
+      "description": "Block height of the Istanbul fork (CHAINID, SELFBALANCE, gas repricing — EIP-1344/1884/2200). `null` = never."
+    },
+    "muir_glacier_block": {
+      "description": "Block height of the Muir Glacier fork — EIP-2384 difficulty-bomb delay. Cosmetic on PoS chains like Lumera; primarily relevant for cross-chain trace fidelity."
+    },
+    "berlin_block": {
+      "description": "Block height of the Berlin fork (EIP-2929 cold/warm access costs, EIP-2930 optional access lists). `null` = never."
+    },
+    "london_block": {
+      "description": "Block height of the London fork (EIP-1559 dynamic base fee, EIP-3198 BASEFEE opcode, EIP-3529 refund cap). `null` = never."
+    },
+    "arrow_glacier_block": {
+      "description": "Block height of the Arrow Glacier fork — EIP-4345 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility."
+    },
+    "gray_glacier_block": {
+      "description": "Block height of the Gray Glacier fork — EIP-5133 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility."
+    },
+    "merge_netsplit_block": {
+      "description": "Virtual block height marking the Paris/Merge transition to proof-of-stake. Used as a network-split sentinel; no consensus rules change at this height on its own."
+    },
+    "chain_id": {
+      "description": "EIP-155 chain identifier baked into transaction signatures. On Lumera the EVM chain ID is `76857769`."
+    },
+    "denom": {
+      "description": "Bank denomination used as the EVM's native gas/value token. On Lumera this is `alume` (the 18-decimal representation of `ulume`)."
+    },
+    "decimals": {
+      "description": "Decimal precision of the configured `denom`. Lumera uses 18 decimals on the EVM side (`alume`) bridged to 6 decimals (`ulume`) via the precisebank module."
+    },
+    "shanghai_time": {
+      "description": "Unix timestamp at which the Shanghai fork activates (EIP-3855 PUSH0, EIP-3651 warm coinbase, EIP-4895 withdrawals). `null` = never; `\"0\"` = active from genesis."
+    },
+    "cancun_time": {
+      "description": "Unix timestamp at which the Cancun fork activates (EIP-4844 blob txs, EIP-1153 transient storage, EIP-5656 MCOPY). `null` = never."
+    },
+    "prague_time": {
+      "description": "Unix timestamp at which the Prague/Pectra fork activates (EIP-7702 set-code authorizations, EIP-2537 BLS12-381 precompiles, etc.). `null` = never."
+    },
+    "verkle_time": {
+      "description": "Unix timestamp at which a Verkle-trees transition activates. `null` = never; on Lumera this is typically `null`."
+    },
+    "osaka_time": {
+      "description": "Unix timestamp at which the Osaka/Fusaka fork activates. `null` = never."
+    }
+  }
+}

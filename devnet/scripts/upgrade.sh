@@ -30,15 +30,53 @@ fi
 BINARIES_DIR="$(cd "${BINARIES_DIR}" && pwd)"
 
 # Detect if chain is already halted for this upgrade (re-run scenario).
-# When the upgrade height is reached, nodes panic and stop serving RPC,
-# so lumerad status fails. Check docker logs for the halt message.
+#
+# Reads the validator log FILE inside the container, not `docker compose logs`.
+# The container entrypoint multiplexes several log files onto stdout via
+# `tail -F /root/logs/validator.log /root/logs/supernode.log ...`, so the
+# supernode's per-block chatter pushes the one-time halt panic far out of a
+# shallow `--tail` window. Observed directly: with the chain genuinely halted,
+# `--tail=40` found 0 matches while `--tail=400` found 3 — and on a node whose
+# supernode is noisier, the marker can be thousands of lines back. Grepping the
+# file is bounded work and cannot be flooded out.
+#
+# Falls back to a deep docker-logs scan if the file is not readable (e.g. a
+# non-standard image layout).
 detect_upgrade_halt() {
+	# The release name in the panic is quote-escaped by the logger:
+	#
+	#   err="failed to apply block; error UPGRADE \"v1.20.2\" NEEDED at height: 2429: "
+	#
+	# so a pattern containing a literal `"v1.20.2"` never matches — the bytes on
+	# disk are `\"v1.20.2\"`. Match the version WITHOUT surrounding quotes and
+	# escape the dots so they are not regex wildcards.
+	local ver_re
+	ver_re="$(printf '%s' "${RELEASE_NAME}" | sed 's/\./\\./g')"
+	local marker="UPGRADE.*${ver_re}.*NEEDED at height"
+
+	if docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+		sh -lc "grep -qE '${marker}' /root/logs/validator.log" 2>/dev/null; then
+		return 0
+	fi
+
 	local logs
-	logs="$(docker compose -f "${COMPOSE_FILE}" logs --tail=100 "${SERVICE}" 2>/dev/null || true)"
-	if echo "${logs}" | grep -qE "UPGRADE.*\"${RELEASE_NAME}\".*NEEDED"; then
+	logs="$(docker compose -f "${COMPOSE_FILE}" logs --tail=5000 "${SERVICE}" 2>/dev/null || true)"
+	if echo "${logs}" | grep -qE "${marker}"; then
 		return 0
 	fi
 	return 1
+}
+
+# duration_to_seconds converts a Go duration string as returned by the chain's
+# gov params (e.g. "10m0s", "600s", "1h30m", "5m") into whole seconds. The chain
+# returns durations in Go format, NOT plain seconds, so naive numeric stripping
+# would read "10m0s" as 10. Unparseable input yields 0.
+duration_to_seconds() {
+	local d="${1:-}" total=0
+	[[ "${d}" =~ ([0-9]+)h ]] && total=$(( total + BASH_REMATCH[1] * 3600 ))
+	[[ "${d}" =~ ([0-9]+)m ]] && total=$(( total + BASH_REMATCH[1] * 60 ))
+	[[ "${d}" =~ ([0-9]+)s ]] && total=$(( total + BASH_REMATCH[1] ))
+	echo "${total}"
 }
 
 RUNNING_VERSION="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
@@ -72,8 +110,31 @@ if [[ "${REQUESTED_HEIGHT}" == "auto-height" ]]; then
 		exit 1
 	fi
 
-	UPGRADE_HEIGHT=$((CURRENT_HEIGHT + AUTO_HEIGHT_OFFSET))
-	echo "Current height is ${CURRENT_HEIGHT}. Scheduling upgrade at height ${UPGRADE_HEIGHT}."
+	# The upgrade plan height MUST be reached only AFTER the proposal passes
+	# (i.e. after the voting period ends). A fixed offset shorter than the voting
+	# period makes the chain sail past the plan height while still voting, after
+	# which x/upgrade cannot schedule an upgrade in the past — the upgrade simply
+	# never executes. So derive the offset from the live voting period and the
+	# measured block time, with a safety buffer.
+	VOTING_DUR="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+		lumerad query gov params --output json 2>/dev/null \
+		| jq -r '(.params.voting_period // .voting_params.voting_period // "600s")' 2>/dev/null)"
+	VOTING_SECS="$(duration_to_seconds "${VOTING_DUR}")"
+	[[ "${VOTING_SECS}" =~ ^[0-9]+$ ]] && (( VOTING_SECS > 0 )) || VOTING_SECS=600
+	echo "Chain voting period: ${VOTING_DUR} (= ${VOTING_SECS}s)"
+	# Measure seconds-per-block over a short sample.
+	sleep 6
+	H2="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+		lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
+	[[ "${H2}" =~ ^[0-9]+$ ]] || H2="${CURRENT_HEIGHT}"
+	DELTA=$(( H2 - CURRENT_HEIGHT )); (( DELTA >= 1 )) || DELTA=1
+	BLOCK_SECS=$(( 6 / DELTA )); (( BLOCK_SECS >= 1 )) || BLOCK_SECS=1
+	VOTING_BLOCKS=$(( VOTING_SECS / BLOCK_SECS ))
+	# offset = voting period in blocks + buffer (default 60 blocks of headroom)
+	DYNAMIC_OFFSET=$(( VOTING_BLOCKS + ${UPGRADE_HEIGHT_BUFFER_BLOCKS:-60} ))
+	(( DYNAMIC_OFFSET > AUTO_HEIGHT_OFFSET )) && AUTO_HEIGHT_OFFSET="${DYNAMIC_OFFSET}"
+	UPGRADE_HEIGHT=$(( H2 + AUTO_HEIGHT_OFFSET ))
+	echo "Voting ~${VOTING_SECS}s (~${VOTING_BLOCKS} blocks @ ${BLOCK_SECS}s/blk); height ${H2}; scheduling upgrade at ${UPGRADE_HEIGHT} (offset ${AUTO_HEIGHT_OFFSET})."
 else
 	UPGRADE_HEIGHT="${REQUESTED_HEIGHT}"
 fi
@@ -91,7 +152,12 @@ echo "Retrieving proposal ID..."
 PROPOSAL_ID="$(docker compose -f "${COMPOSE_FILE}" exec -T supernova_validator_1 \
 	lumerad query gov proposals --output json | jq -r --arg name "${RELEASE_NAME}" '
     .proposals
-    | map(select(.messages[]?.value.plan.name == $name))
+    | map(select(
+        any(.messages[]?; (.value.plan.name // .plan.name // empty) == $name)
+        and ((.status == "PROPOSAL_STATUS_VOTING_PERIOD")
+             or (.status == "PROPOSAL_STATUS_DEPOSIT_PERIOD")
+             or (.status == "PROPOSAL_STATUS_PASSED"))
+      ))
     | sort_by(.id | tonumber)
     | last
     | .id // empty
@@ -111,7 +177,7 @@ PROPOSAL_STATUS=""
 PROPOSAL_HEIGHT=""
 if [[ -n "${PROPOSAL_JSON}" ]]; then
 	PROPOSAL_STATUS="$(echo "${PROPOSAL_JSON}" | jq -r '.proposal.status // .status // empty' 2>/dev/null || true)"
-	PROPOSAL_HEIGHT="$(echo "${PROPOSAL_JSON}" | jq -r '.proposal.messages[]?.value.plan.height // empty' 2>/dev/null | head -n 1 || true)"
+	PROPOSAL_HEIGHT="$(echo "${PROPOSAL_JSON}" | jq -r '.proposal.messages[]? | (.value.plan.height // .plan.height // empty)' 2>/dev/null | head -n 1 || true)"
 fi
 
 if [[ -n "${PROPOSAL_HEIGHT}" && "${PROPOSAL_HEIGHT}" =~ ^[0-9]+$ ]]; then
@@ -131,15 +197,72 @@ else
 	echo "ℹ️  Skipping voting; proposal status is ${PROPOSAL_STATUS:-unknown}."
 fi
 
-echo "Waiting for chain to reach height ${UPGRADE_HEIGHT}..."
-CURRENT_HEIGHT_NOW="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
-	lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
-if [[ "${CURRENT_HEIGHT_NOW}" =~ ^[0-9]+$ ]] && ((CURRENT_HEIGHT_NOW >= UPGRADE_HEIGHT)); then
-	echo "ℹ️  Current height ${CURRENT_HEIGHT_NOW} is already at or above upgrade height ${UPGRADE_HEIGHT}; skipping wait."
-elif ! [[ "${CURRENT_HEIGHT_NOW}" =~ ^[0-9]+$ ]] && detect_upgrade_halt; then
-	echo "ℹ️  Chain is already halted for ${RELEASE_NAME} upgrade; skipping wait."
-else
-	"${SCRIPT_DIR}/wait-for-height.sh" "${UPGRADE_HEIGHT}"
+# Wait for the chain to HALT for this upgrade. The upgrade fires at the plan
+# height's begin-block, so the chain commits only up to (UPGRADE_HEIGHT - 1) and
+# then panics "UPGRADE NEEDED" — it never commits UPGRADE_HEIGHT itself, so its
+# reported latest_block_height settles AT UPGRADE_HEIGHT and stops there. We poll
+# for the halt marker (primary signal) rather than for height >= UPGRADE_HEIGHT,
+# which is already true in the correct halt state. We also break if the chain
+# sails strictly PAST the height without halting, leaving the guard below to
+# refuse the swap.
+#
+# IMPORTANT — the node keeps serving RPC while halted. It does NOT go dark: it
+# panics in the consensus routine, stops advancing, and continues answering
+# `lumerad status` with `latest_block_height == UPGRADE_HEIGHT` indefinitely.
+# Verified on a real halt: all five validators served height 2429 for the whole
+# halt window with plan height 2429.
+#
+# Therefore `height >= UPGRADE_HEIGHT` is TRUE in the normal, correct halt state,
+# and using it as the "sailed past" test misfires immediately and prints
+# "⚠️ Chain at N passed N without halting" for a perfectly healthy upgrade —
+# a false alarm that tells an operator to distrust a good halt. Only a height
+# STRICTLY GREATER than UPGRADE_HEIGHT means blocks were produced beyond the
+# plan, i.e. the upgrade did not take effect.
+echo "Waiting for the ${RELEASE_NAME} upgrade halt at height ${UPGRADE_HEIGHT}..."
+UPGRADE_WAIT_TIMEOUT="${UPGRADE_WAIT_TIMEOUT:-1800}"
+waited=0
+while true; do
+	if detect_upgrade_halt; then
+		echo "✅ Chain halted for ${RELEASE_NAME} upgrade (committed ~$((UPGRADE_HEIGHT - 1)))."
+		break
+	fi
+	CURRENT_HEIGHT_NOW="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+		lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
+	if [[ "${CURRENT_HEIGHT_NOW}" =~ ^[0-9]+$ ]]; then
+		if ((CURRENT_HEIGHT_NOW > UPGRADE_HEIGHT)); then
+			echo "⚠️  Chain at ${CURRENT_HEIGHT_NOW} passed ${UPGRADE_HEIGHT} without halting; proceeding to guard."
+			break
+		fi
+		echo "  height ${CURRENT_HEIGHT_NOW}/${UPGRADE_HEIGHT} (waited ${waited}s)"
+	else
+		echo "  RPC unreachable; re-checking for upgrade-halt marker..."
+	fi
+	if ((waited >= UPGRADE_WAIT_TIMEOUT)); then
+		echo "Timed out after ${UPGRADE_WAIT_TIMEOUT}s waiting for the ${RELEASE_NAME} upgrade halt." >&2
+		break
+	fi
+	sleep 5
+	waited=$((waited + 5))
+done
+
+# Guard: only swap binaries once the chain has actually HALTED for THIS upgrade.
+# If the chain is still producing blocks past the upgrade height, the proposal
+# did not pass / the upgrade did not execute. Swapping the binary now would start
+# the new release on un-upgraded state and panic, e.g.:
+#   "version of store feemarket mismatch ... new stores should be added using
+#    StoreUpgrades"
+# which crash-loops every validator. Refuse rather than brick the devnet.
+if ! detect_upgrade_halt; then
+	LIVE_HEIGHT="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+		lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
+	if [[ "${LIVE_HEIGHT}" =~ ^[0-9]+$ ]]; then
+		echo "ERROR: chain is still producing blocks (height ${LIVE_HEIGHT}) and has NOT halted for the ${RELEASE_NAME} upgrade." >&2
+		echo "       The upgrade did not execute — the proposal likely failed to pass (quorum/threshold)." >&2
+		echo "       Inspect: lumerad query gov proposal ${PROPOSAL_ID}" >&2
+		echo "       Refusing to swap binaries; running ${RELEASE_NAME} on un-upgraded state would crash all nodes." >&2
+		exit 1
+	fi
+	echo "⚠️  No upgrade-halt marker found and RPC is unreachable; assuming a genuine halt and proceeding." >&2
 fi
 
 echo "Upgrading binaries from ${BINARIES_DIR}..."

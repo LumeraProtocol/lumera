@@ -3,6 +3,7 @@ package v1_20_0
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
@@ -24,6 +25,33 @@ import (
 
 // UpgradeName is the on-chain name used for this upgrade.
 const UpgradeName = "v1.20.0"
+
+// Recognized Lumera networks (devnet/testnet/mainnet) derive a finite
+// migration_end_time automatically from the upgrade block time so they run
+// against a real deadline without hardcoding an absolute timestamp. Devnet uses
+// a short fixed window for rehearsals; testnet and mainnet both run against a
+// 3-calendar-month window measured from the upgrade block. Unrecognized chain
+// IDs (custom networks/forks) are left with no deadline.
+const devnetMigrationWindow = 2 * 24 * time.Hour
+
+// autoMigrationEndTime returns the migration_end_time to auto-apply for the
+// given chain ID and upgrade block time, plus whether a deadline should be set
+// at all. Unrecognized chain IDs leave the deadline unset (ok == false).
+//
+// A calendar-month offset (AddDate) is used for testnet/mainnet rather than a
+// fixed time.Duration because "3 months" is not a constant number of hours; it
+// must be applied to the block time directly so month lengths and leap years
+// are handled correctly.
+func autoMigrationEndTime(chainID string, blockTime time.Time) (time.Time, bool) {
+	switch {
+	case lcfg.IsDevnetChainID(chainID):
+		return blockTime.Add(devnetMigrationWindow), true
+	case lcfg.IsTestnetChainID(chainID), lcfg.IsMainnetChainID(chainID):
+		return blockTime.AddDate(0, 3, 0), true
+	default:
+		return time.Time{}, false
+	}
+}
 
 // StoreUpgrades declares store additions for this upgrade.
 var StoreUpgrades = storetypes.StoreUpgrades{
@@ -127,6 +155,37 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 				p.Logger.Info("Initialized ERC20 registration policy", "mode", erc20policytypes.PolicyModeAllowlist,
 					"base_denom_traces", len(erc20policytypes.DefaultAllowedBaseDenomTraces))
 			}
+		}
+
+		// Derive a finite migration_end_time from the upgrade block time so the
+		// network runs against a real deadline without hardcoding an absolute
+		// timestamp. RunMigrations already seeded the evmigration module with
+		// default params (enable_migration=true, migration_end_time=0); here we
+		// only override the deadline. Devnet gets a short rehearsal window;
+		// testnet and mainnet both get a 3-calendar-month window.
+		//
+		// The network is identified from the SDK context (ctx.ChainID()), which
+		// carries the genesis-derived chain ID from the block header. We must not
+		// use the app-level ChainID captured during setupUpgrades: that value
+		// comes from the --chain-id flag, which defaults to the non-empty
+		// "lumera" and so never falls back to genesis, leaving mainnet's deadline
+		// silently unset on the common `lumerad start` path.
+		if endTime, ok := autoMigrationEndTime(ctx.ChainID(), ctx.BlockTime()); ok {
+			if p.EvmigrationKeeper == nil {
+				return nil, fmt.Errorf("%s upgrade requires evmigration keeper to be wired", UpgradeName)
+			}
+			emParams, err := p.EvmigrationKeeper.Params.Get(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("get evmigration params: %w", err)
+			}
+			emParams.MigrationEndTime = endTime.Unix()
+			if err := p.EvmigrationKeeper.Params.Set(ctx, emParams); err != nil {
+				return nil, fmt.Errorf("set evmigration migration_end_time: %w", err)
+			}
+			p.Logger.Info("Set migration_end_time from upgrade block time",
+				"chain_id", ctx.ChainID(),
+				"migration_end_time", emParams.MigrationEndTime,
+			)
 		}
 
 		p.Logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))

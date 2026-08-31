@@ -33,6 +33,12 @@ type localLumeradPorts struct {
 	JSONRPCEnabled bool
 }
 
+type localJSONRPCRateLimitConfig struct {
+	Enabled           bool
+	RequestsPerSecond int
+	Burst             int
+}
+
 func defaultLocalLumeradPorts() localLumeradPorts {
 	return localLumeradPorts{
 		P2P:            defaultP2PPort,
@@ -67,6 +73,38 @@ func loadLocalLumeradPorts() (localLumeradPorts, error) {
 		return ports, errors.New(strings.Join(errs, "; "))
 	}
 	return ports, nil
+}
+
+func loadLocalJSONRPCRateLimitConfig() (localJSONRPCRateLimitConfig, error) {
+	cfg := localJSONRPCRateLimitConfig{
+		RequestsPerSecond: 50,
+		Burst:             100,
+	}
+	daemonHome := strings.TrimSpace(os.Getenv("DAEMON_HOME"))
+	if daemonHome == "" {
+		daemonHome = defaultDaemonHome
+	}
+
+	appTomlPath := filepath.Join(daemonHome, defaultConfigSubdir, defaultAppToml)
+	values, err := parseSimpleToml(appTomlPath)
+	if err != nil {
+		return cfg, fmt.Errorf("parse %s: %w", appTomlPath, err)
+	}
+
+	section := values["lumera.json-rpc-ratelimit"]
+	if section == nil {
+		return cfg, nil
+	}
+	cfg.Enabled = parseBool(section["enable"], cfg.Enabled)
+	cfg.RequestsPerSecond = parseInt(section["requests-per-second"], cfg.RequestsPerSecond)
+	cfg.Burst = parseInt(section["burst"], cfg.Burst)
+	if cfg.RequestsPerSecond <= 0 {
+		cfg.RequestsPerSecond = 50
+	}
+	if cfg.Burst <= 0 {
+		cfg.Burst = 100
+	}
+	return cfg, nil
 }
 
 func applyConfigTomlPorts(path string, ports *localLumeradPorts) error {
@@ -213,4 +251,16 @@ func parseBool(value string, fallback bool) bool {
 	default:
 		return fallback
 	}
+}
+
+func parseInt(value string, fallback int) int {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return n
 }

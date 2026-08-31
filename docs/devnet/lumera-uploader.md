@@ -20,7 +20,7 @@ The binary name is resolved at runtime by `resolve_uploader_name()` in `common.s
 ```json
 "lumera-uploader": {
     "enabled": true,
-    "grpc_port": 50051,
+    "grpc_port": 15051,
     "http_port": 8080,
     "max_accounts": 3,
     "account_balance": "10000000ulume"
@@ -30,7 +30,7 @@ The binary name is resolved at runtime by `resolve_uploader_name()` in `common.s
 | Field               | Type   | Default           | Description                                       |
 | ------------------- | ------ | ----------------- | ------------------------------------------------- |
 | `enabled`         | bool   | `true`          | Global enable flag                                |
-| `grpc_port`       | int    | `50051`         | gRPC listen port                                  |
+| `grpc_port`       | int    | `15051`         | gRPC listen port                                  |
 | `http_port`       | int    | `8080`          | HTTP gateway listen port                          |
 | `max_accounts`    | int    | `1`             | Number of funded accounts to create per validator |
 | `account_balance` | string | `10000000ulume` | Funding amount per account                        |
@@ -45,7 +45,7 @@ Enable the uploader on specific validators:
     "moniker": "supernova_validator_3",
     "lumera-uploader": {
         "enabled": true,
-        "grpc_port": 50051,
+        "grpc_port": 15051,
         "http_port": 8080
     }
 }
@@ -107,7 +107,7 @@ chain_id = "lumera-devnet-1"
 denom = "ulume"
 
 [lumera-uploader]     # section name matches the resolved binary name
-grpc_listen = "0.0.0.0:50051"
+grpc_listen = "0.0.0.0:15051"
 http_gateway_listen = "0.0.0.0:8080"
 
 [keyring]
@@ -135,7 +135,7 @@ When the chain upgrades to v1.20.0+, uploader account keys are migrated from `se
 
 | Service      | Default port | Description                   |
 | ------------ | ------------ | ----------------------------- |
-| gRPC         | 50051        | Uploader gRPC API             |
+| gRPC         | 15051        | Uploader gRPC API             |
 | HTTP gateway | 8080         | Uploader HTTP gateway         |
 | UI (nginx)   | 8088         | Static web UI served by nginx |
 
@@ -149,7 +149,7 @@ If the `uploader-ui/` directory is present in the release, nginx serves the stat
 | --------------------------------- | -------------------------------- | ---------------------------------------------------------------------- |
 | `MONIKER`                       | (required)                       | Validator moniker, set by docker-compose                               |
 | `START_MODE`                    | `run`                          | `run` = full setup + start; `wait` = wait for chain readiness only |
-| `NM_GRPC_PORT`                  | `50051`                        | Override gRPC port                                                     |
+| `NM_GRPC_PORT`                  | `15051`                        | Override gRPC port                                                     |
 | `NM_HTTP_PORT`                  | `8080`                         | Override HTTP gateway port                                             |
 | `NM_LOG`                        | `/root/logs/<binary-name>.log` | Log file path                                                          |
 | `NM_UI_PORT`                    | `8088`                         | Nginx UI port                                                          |

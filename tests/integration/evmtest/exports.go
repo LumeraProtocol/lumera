@@ -34,6 +34,10 @@ func SetMempoolMaxTxsInAppToml(t *testing.T, homeDir string, maxTxs int) {
 	setMempoolMaxTxsInAppToml(t, homeDir, maxTxs)
 }
 
+func WriteLegacyPreEVMAppToml(t *testing.T, homeDir string, maxTxs int) {
+	writeLegacyPreEVMAppToml(t, homeDir, maxTxs)
+}
+
 func SetCometMempoolSize(t *testing.T, homeDir string, size int) {
 	setCometMempoolSize(t, homeDir, size)
 }
@@ -44,6 +48,11 @@ func SetCometTxIndexer(t *testing.T, homeDir, indexer string) {
 
 func EnablePrometheusMetrics(t *testing.T, homeDir string, apiAddress string) {
 	enablePrometheusMetrics(t, homeDir, apiAddress)
+}
+
+func EnableAPIInAppToml(t *testing.T, homeDir string, apiAddress string) {
+	appToml := enableAPIInAppToml(t, homeDir, apiAddress)
+	writeAppToml(t, homeDir, appToml)
 }
 
 func FreePort(t *testing.T) int {

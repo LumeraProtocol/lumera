@@ -28,6 +28,7 @@ import (
 
 	"github.com/LumeraProtocol/lumera/app"
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	evmigrationkeeper "github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
@@ -82,7 +83,7 @@ func signMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr
 	return sig
 }
 
-func signValidatorMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+func signValidatorMigration(t testing.TB, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
 	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:validator:%s:%s", integrationTestChainID, lcfg.EVMChainID, legacyAddr.String(), newAddr.String())
 	hash := sha256.Sum256([]byte(msg))
@@ -91,7 +92,7 @@ func signValidatorMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr
 	return sig
 }
 
-func signNewMigration(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+func signNewMigration(t testing.TB, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
 	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", integrationTestChainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
 	sig, err := privKey.Sign([]byte(msg))
@@ -99,7 +100,7 @@ func signNewMigration(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey
 	return sig
 }
 
-func createNewEVMAddress(t *testing.T) (*evmcryptotypes.PrivKey, sdk.AccAddress) {
+func createNewEVMAddress(t testing.TB) (*evmcryptotypes.PrivKey, sdk.AccAddress) {
 	t.Helper()
 	privKey, err := evmcryptotypes.GenerateKey()
 	require.NoError(t, err)
@@ -124,7 +125,7 @@ func newClaimMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.
 	}
 }
 
-func newValidatorMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.AccAddress, newPrivKey *evmcryptotypes.PrivKey, newAddr sdk.AccAddress) *types.MsgMigrateValidator {
+func newValidatorMsg(t testing.TB, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.AccAddress, newPrivKey *evmcryptotypes.PrivKey, newAddr sdk.AccAddress) *types.MsgMigrateValidator {
 	t.Helper()
 	return &types.MsgMigrateValidator{
 		LegacyAddress: legacyAddr.String(),
@@ -210,6 +211,39 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Success() {
 	count, err := s.keeper.MigrationCounter.Get(s.ctx)
 	s.Require().NoError(err)
 	s.Require().Equal(uint64(1), count, "migration counter should be exactly 1")
+}
+
+// TestClaimLegacyAccount_LeavesClaimRecordUntouched verifies migration does NOT
+// rewrite claim records whose DestAddress points at the legacy address. The
+// claim DB is frozen (claiming ended 2025-01-01) and retained for reference
+// only; the legacy->new mapping lives in MigrationRecords, so the per-migration
+// full scan of the claim store (unscopable — no DestAddress index) was removed
+// from the hot path.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_LeavesClaimRecordUntouched() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
+	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	// Seed a claim record whose DestAddress points at the migrating legacy addr.
+	const oldAddress = "pastel1legacyoldaddress"
+	s.Require().NoError(s.app.ClaimKeeper.SetClaimRecord(s.ctx, claimtypes.ClaimRecord{
+		OldAddress:  oldAddress,
+		DestAddress: legacyAddr.String(),
+	}))
+
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	s.Require().NoError(err)
+
+	// The claim record must be left exactly as-is: still present, DestAddress
+	// unchanged. Migration must not touch the claim store.
+	got, found, err := s.app.ClaimKeeper.GetClaimRecord(s.ctx, oldAddress)
+	s.Require().NoError(err)
+	s.Require().True(found, "claim record should still exist after migration")
+	s.Require().Equal(legacyAddr.String(), got.DestAddress,
+		"migration must not rewrite claim record DestAddress")
 }
 
 // TestClaimLegacyAccount_MigratesAndRevokesFeegrants verifies that feegrant
@@ -683,8 +717,9 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_Success() {
 	s.Require().NotNil(resp)
 
 	// --- Verify validator record re-keyed ---
-	// The old validator key is orphaned (RemoveValidator cannot be used on bonded
-	// validators without destroying distribution state). The new record is canonical.
+	// The old validator record is deleted by V8 (DeleteValidatorRecordNoHooks — a
+	// raw KV delete that avoids RemoveValidator's hooks, which would destroy
+	// distribution state). The new record is canonical.
 	newVal, err := s.app.StakingKeeper.GetValidator(s.ctx, newValAddr)
 	s.Require().NoError(err, "new validator should exist")
 	s.Require().Equal(newValAddr.String(), newVal.OperatorAddress)
@@ -738,6 +773,103 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_Success() {
 	s.Require().Len(extDels, 1, "external delegator should still have one delegation")
 	s.Require().Equal(newValAddr.String(), extDels[0].ValidatorAddress,
 		"external delegation should point to new validator")
+}
+
+// TestMigrateValidator_RepairsLegacyRawShareStartingInfo reproduces the v1.20.0
+// data-corruption bug end-to-end and proves the repair prevents it. v1.20.0
+// re-keyed distribution DelegatorStartingInfo with the delegation's raw *shares*
+// as Stake instead of the token value of those shares. Once the validator has
+// been slashed (exchange rate < 1), the SDK's CalculateDelegationRewards panics
+// when Stake exceeds the current token stake — so WithdrawDelegationRewards
+// inside MigrateValidator aborts the whole migration.
+//
+// The test slashes a real validator, injects the exact v1.20.0 fingerprint on
+// the external delegation (Stake == raw shares, starting height moved past the
+// slash event so the SDK does not replay it), then runs the real MigrateValidator
+// against real staking/distribution keepers. With the repair in place migration
+// succeeds; a regression that drops the repair makes msgServer.MigrateValidator
+// panic in the SDK and turns this test red.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_RepairsLegacyRawShareStartingInfo() {
+	s.enableMigration()
+
+	// Three distinct heights matter here: the delegations are created at 100, the
+	// slash lands at 110, and the corrupt starting row is dated 120. Migration
+	// then runs at 130. CalculateDelegationRewards skips slashes recorded before
+	// the starting height (so the 110 slash is NOT replayed for the corrupt row)
+	// and short-circuits when the starting height equals the current height (so
+	// the row must predate migration for the panic to be reachable).
+	s.ctx = s.ctx.WithBlockHeight(100)
+
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(operatorCoins)
+
+	// Builds a bonded validator with a self-delegation + external delegator,
+	// each with genuine starting info written by the real distribution hooks
+	// at height 100.
+	oldValAddr, extAddr := s.createTestValidator(legacyAddr, selfBondAmt)
+
+	// --- Slash the validator so the token/share exchange rate drops below 1 ---
+	s.ctx = s.ctx.WithBlockHeight(110)
+	val, err := s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	consBz, err := val.GetConsAddr()
+	s.Require().NoError(err)
+	power := val.GetConsensusPower(s.app.StakingKeeper.PowerReduction(s.ctx))
+	_, err = s.app.StakingKeeper.Slash(
+		s.ctx, sdk.ConsAddress(consBz), s.ctx.BlockHeight(), power,
+		sdkmath.LegacyNewDecWithPrec(1, 1), // 10%
+	)
+	s.Require().NoError(err)
+
+	val, err = s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	s.Require().True(val.TokensFromShares(val.DelegatorShares).LT(val.DelegatorShares),
+		"validator must be slashed (token/share rate < 1) to reproduce the bug")
+
+	// --- Inject the v1.20.0 corruption on the EXTERNAL delegation ---
+	// Rewrite its starting info the way v1.20.0 did: Stake = raw shares, dated
+	// past the slash event (110) but before migration, so the SDK neither
+	// replays the slash nor short-circuits on "started this height".
+	extDel, err := s.app.StakingKeeper.GetDelegation(s.ctx, extAddr, oldValAddr)
+	s.Require().NoError(err)
+	extStarting, err := s.app.DistrKeeper.GetDelegatorStartingInfo(s.ctx, oldValAddr, extAddr)
+	s.Require().NoError(err)
+	extStarting.Stake = extDel.Shares
+	extStarting.Height = 120
+	s.Require().NoError(s.app.DistrKeeper.SetDelegatorStartingInfo(s.ctx, oldValAddr, extAddr, extStarting))
+
+	// Migration runs a couple of blocks later.
+	s.ctx = s.ctx.WithBlockHeight(130)
+
+	// Precondition: this is exactly the panicking fingerprint the repair targets.
+	currentStake := val.TokensFromShares(extDel.Shares)
+	s.Require().True(extStarting.Stake.Equal(extDel.Shares), "stored stake must equal raw shares")
+	s.Require().True(currentStake.LT(extDel.Shares), "current token stake must be below raw shares")
+
+	// --- Migrate. Without the repair this panics in CalculateDelegationRewards. ---
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	newValAddr := sdk.ValAddress(newAddr)
+	msg := newValidatorMsg(s.T(), legacyPrivKey, legacyAddr, newPrivKey, newAddr)
+
+	resp, err := s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().NoError(err, "migration must succeed; failure here means the raw-share repair regressed")
+	s.Require().NotNil(resp)
+
+	// Both delegations re-keyed to the new validator.
+	dels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, newValAddr)
+	s.Require().NoError(err)
+	s.Require().Len(dels, 2, "self-delegation + external delegation should follow the validator")
+
+	// The external delegation's starting stake is now the token value (repaired),
+	// not the raw share count that v1.20.0 stored.
+	marginOfErr := sdkmath.LegacySmallestDec().MulInt64(3)
+	extStartingAfter, err := s.app.DistrKeeper.GetDelegatorStartingInfo(s.ctx, newValAddr, extAddr)
+	s.Require().NoError(err)
+	s.Require().True(extStartingAfter.Stake.LTE(currentStake.Add(marginOfErr)),
+		"repaired starting stake must not exceed the current token stake")
+	s.Require().True(extStartingAfter.Stake.LT(extDel.Shares),
+		"repaired starting stake must be below the raw share count v1.20.0 wrote")
 }
 
 // TestClaimLegacyAccount_AfterValidatorMigration verifies that legacy account
@@ -843,6 +975,79 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_JailedValidator() {
 
 	_, err = s.app.StakingKeeper.GetValidator(s.ctx, sdk.ValAddress(newAddr))
 	s.Require().Error(err, "destination validator must not be created")
+}
+
+// TestMigrateValidator_UnbondedNotJailedSucceeds verifies the recovery path for a
+// validator that fell out of the active set purely on stake weight (Unbonded, NOT
+// jailed). Such a validator has no entry in the unbonding-validator queue, so
+// re-keying and deleting the old record cannot orphan a queue entry (the halt risk
+// that keeps Unbonding blocked). Migration must therefore succeed, unblocking the
+// operator to recover keys, funds, and rewards without re-entering the active set.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_UnbondedNotJailedSucceeds() {
+	s.enableMigration()
+
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(operatorCoins)
+	oldValAddr, extDelegatorAddr := s.createTestValidator(legacyAddr, selfBondAmt)
+
+	// Simulate dropping out of the active set on stake weight: Unbonded, NOT
+	// jailed, and removed from the bonded power set (no last-validator-power entry).
+	val, err := s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	s.Require().False(val.Jailed, "precondition: validator is not jailed")
+	s.Require().NoError(s.app.StakingKeeper.DeleteValidatorByPowerIndex(s.ctx, val))
+	s.Require().NoError(s.app.StakingKeeper.DeleteLastValidatorPower(s.ctx, oldValAddr))
+	val.Status = stakingtypes.Unbonded
+	s.Require().NoError(s.app.StakingKeeper.SetValidator(s.ctx, val))
+
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	newValAddr := sdk.ValAddress(newAddr)
+
+	msg := newValidatorMsg(s.T(), legacyPrivKey, legacyAddr, newPrivKey, newAddr)
+	resp, err := s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().NoError(err, "unbonded (non-jailed) validator must be migratable")
+	s.Require().NotNil(resp)
+
+	// Validator record re-keyed to the new operator, still Unbonded.
+	newVal, err := s.app.StakingKeeper.GetValidator(s.ctx, newValAddr)
+	s.Require().NoError(err, "new validator should exist")
+	s.Require().Equal(newValAddr.String(), newVal.OperatorAddress)
+	s.Require().Equal(stakingtypes.Unbonded, newVal.Status)
+
+	// Old validator record is deleted (V8), leaving no orphan.
+	_, err = s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().Error(err, "old validator record should be deleted")
+
+	// Delegations re-keyed to the new validator; none left on the old.
+	dels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, newValAddr)
+	s.Require().NoError(err)
+	s.Require().Len(dels, 2, "self-delegation + external delegation re-keyed")
+	oldDels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	s.Require().Empty(oldDels)
+
+	// Distribution state re-keyed.
+	_, err = s.app.DistrKeeper.GetValidatorCurrentRewards(s.ctx, newValAddr)
+	s.Require().NoError(err, "current rewards should exist for new validator")
+
+	// Bank balances moved.
+	s.Require().True(s.app.BankKeeper.GetAllBalances(s.ctx, legacyAddr).IsZero())
+	s.Require().True(s.app.BankKeeper.GetAllBalances(s.ctx, newAddr).AmountOf("ulume").GT(sdkmath.ZeroInt()))
+
+	// Migration record + validator counter.
+	record, err := s.keeper.MigrationRecords.Get(s.ctx, legacyAddr.String())
+	s.Require().NoError(err)
+	s.Require().Equal(newAddr.String(), record.NewAddress)
+	valCount, err := s.keeper.ValidatorMigrationCounter.Get(s.ctx)
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(1), valCount)
+
+	// External delegator's delegation now points to the new validator.
+	extDels, err := s.app.StakingKeeper.GetDelegatorDelegations(s.ctx, extDelegatorAddr, 10)
+	s.Require().NoError(err)
+	s.Require().Len(extDels, 1)
+	s.Require().Equal(newValAddr.String(), extDels[0].ValidatorAddress)
 }
 
 // TestClaimLegacyAccount_LegacyAccountRemoved verifies that the legacy auth
@@ -1098,9 +1303,10 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_MultisigToMultisig() {
 	s.Require().Equal(newValAddr.String(), newVal.OperatorAddress)
 	s.Require().Equal(stakingtypes.Bonded, newVal.Status)
 
-	// Old operator's validator record is orphaned (no delegations remain);
-	// removing a bonded validator record outright would destroy distribution
-	// state, so the migration leaves it dangling. The new record is canonical.
+	// Old operator's delegations are all re-keyed away (none remain); its validator
+	// record is deleted by V8 (DeleteValidatorRecordNoHooks — a raw KV delete that
+	// avoids RemoveValidator's distribution-destroying hooks), leaving no orphan.
+	// The new record is canonical.
 	oldDels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, oldValAddr)
 	s.Require().NoError(err)
 	s.Require().Empty(oldDels)

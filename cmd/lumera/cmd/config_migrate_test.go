@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -94,6 +95,19 @@ func TestNeedsConfigMigration_FullyMigrated(t *testing.T) {
 	assert.False(t, needsConfigMigration(v), "fully migrated config must not trigger migration")
 }
 
+func TestNeedsConfigMigration_DisabledMempool(t *testing.T) {
+	t.Parallel()
+
+	v := viper.New()
+	v.Set("evm.evm-chain-id", lcfg.EVMChainID)
+	v.Set("json-rpc.enable", true)
+	v.Set("lumera.json-rpc-ratelimit.proxy-address", "0.0.0.0:8547")
+	v.Set("tls.certificate-path", "")
+	v.Set("mempool.max-txs", -1)
+
+	assert.True(t, needsConfigMigration(v), "disabled app mempool must trigger migration repair")
+}
+
 // TestMigrateAppConfig_LegacyTomlOnDisk verifies the full migration flow:
 // start with a legacy pre-EVM app.toml, run the migrator, and confirm both
 // the disk file and in-memory Viper contain the correct EVM config.
@@ -176,4 +190,128 @@ max-txs = 3000
 	// Migration should be a no-op on second call.
 	assert.False(t, needsConfigMigration(v),
 		"after migration, needsConfigMigration must return false")
+}
+
+func TestMigrateAppConfig_FullyMigratedNegativeMaxTxsTriggersRepair(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+	appToml := fmt.Sprintf(`
+[mempool]
+max-txs = -1
+
+[evm]
+evm-chain-id = %d
+
+[json-rpc]
+enable = false
+
+[lumera.json-rpc-ratelimit]
+proxy-address = "0.0.0.0:8547"
+
+[tls]
+certificate-path = ""
+`, lcfg.EVMChainID)
+	appCfgPath := filepath.Join(configDir, "app.toml")
+	require.NoError(t, os.WriteFile(appCfgPath, []byte(appToml), 0o644))
+
+	v := viper.New()
+	v.SetConfigType("toml")
+	v.SetConfigName("app")
+	v.AddConfigPath(configDir)
+	v.Set("chain-id", "lumera-mainnet-1")
+	require.NoError(t, v.MergeInConfig())
+	require.True(t, needsConfigMigration(v), "precondition: disabled mempool must need repair")
+
+	require.NoError(t, doMigrateAppConfig(v, appCfgPath))
+
+	v2 := viper.New()
+	v2.SetConfigType("toml")
+	v2.SetConfigName("app")
+	v2.AddConfigPath(configDir)
+	require.NoError(t, v2.MergeInConfig())
+
+	assert.Equal(t, int64(10000), v.GetInt64("mempool.max-txs"),
+		"in-memory disabled mempool must be repaired")
+	assert.Equal(t, int64(10000), v2.GetInt64("mempool.max-txs"),
+		"disk disabled mempool must be repaired")
+	assert.False(t, v.GetBool("json-rpc.enable"),
+		"explicit operator-disabled json-rpc must remain disabled")
+	assert.False(t, needsConfigMigration(v),
+		"after repair, needsConfigMigration must return false")
+}
+
+func TestMigrateAppConfig_LegacyNegativeMaxTxsUsesNetworkDefault(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name             string
+		chainID          string
+		chainIDInGenesis bool
+		wantMaxTxs       int64
+	}{
+		{name: "devnet from viper", chainID: "lumera-devnet-1", wantMaxTxs: 5000},
+		{name: "devnet from genesis", chainID: "lumera-devnet-1", chainIDInGenesis: true, wantMaxTxs: 5000},
+		{name: "testnet from viper", chainID: "lumera-testnet-2", wantMaxTxs: 10000},
+		{name: "mainnet from viper", chainID: "lumera-mainnet-1", wantMaxTxs: 10000},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tmpDir := t.TempDir()
+			configDir := filepath.Join(tmpDir, "config")
+			require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+			legacyToml := `
+[api]
+enable = true
+
+[mempool]
+max-txs = -1
+`
+			appCfgPath := filepath.Join(configDir, "app.toml")
+			require.NoError(t, os.WriteFile(appCfgPath, []byte(legacyToml), 0o644))
+			if tc.chainIDInGenesis {
+				genesis := `{"chain_id":"` + tc.chainID + `"}`
+				require.NoError(t, os.WriteFile(filepath.Join(configDir, "genesis.json"), []byte(genesis), 0o644))
+			}
+
+			v := viper.New()
+			v.SetConfigType("toml")
+			v.SetConfigName("app")
+			v.AddConfigPath(configDir)
+			if !tc.chainIDInGenesis {
+				v.Set("chain-id", tc.chainID)
+			}
+			require.NoError(t, v.MergeInConfig())
+			require.True(t, needsConfigMigration(v), "precondition: legacy config must need migration")
+
+			require.NoError(t, doMigrateAppConfig(v, appCfgPath))
+
+			v2 := viper.New()
+			v2.SetConfigType("toml")
+			v2.SetConfigName("app")
+			v2.AddConfigPath(configDir)
+			require.NoError(t, v2.MergeInConfig())
+
+			assert.Equal(t, tc.wantMaxTxs, v.GetInt64("mempool.max-txs"),
+				"in-memory legacy no-op mempool must be replaced for %s", tc.chainID)
+			assert.Equal(t, tc.wantMaxTxs, v2.GetInt64("mempool.max-txs"),
+				"disk legacy no-op mempool must be replaced for %s", tc.chainID)
+
+			migratedToml, err := os.ReadFile(appCfgPath)
+			require.NoError(t, err)
+			migratedTomlStr := string(migratedToml)
+			assert.Contains(t, migratedTomlStr, "[evm.mempool]")
+			assert.Contains(t, migratedTomlStr, "global-slots = 5120")
+			assert.Contains(t, migratedTomlStr, "global-queue = 1024")
+			assert.NotContains(t, migratedTomlStr, "insert-queue-size")
+		})
+	}
 }

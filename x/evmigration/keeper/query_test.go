@@ -1,6 +1,7 @@
 package keeper_test
 
 import (
+	"errors"
 	"testing"
 
 	"cosmossdk.io/math"
@@ -203,6 +204,9 @@ func TestQueryMigrationStats(t *testing.T) {
 	require.Equal(t, uint64(3), resp.TotalLegacy)
 	require.Equal(t, uint64(1), resp.TotalLegacyStaked)
 	require.Equal(t, uint64(1), resp.TotalValidatorsLegacy)
+
+	require.Equal(t, uint64(2), resp.TotalLegacyWithPubkey)
+	require.Equal(t, uint64(1), resp.TotalLegacyWithoutPubkey)
 }
 
 // --- MigrationEstimate query tests ---
@@ -247,9 +251,15 @@ func TestQueryMigrationEstimate_NonValidator(t *testing.T) {
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(
 		sdk.NewCoins(sdk.NewCoin("ulume", math.NewInt(5000000000))),
 	)
-	// No supernode.
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), sdk.ValAddress(addr)).Return(
-		sntypes.SuperNode{}, false,
+	// The legacy account owns a SuperNode registered under a different validator
+	// operator address. Execution resolves ownership by SupernodeAccount, so the
+	// estimate must do the same rather than casting the account to ValAddress.
+	separateValidator := sdk.ValAddress(testAccAddr())
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(
+		sntypes.SuperNode{
+			ValidatorAddress: separateValidator.String(),
+			SupernodeAccount: addr.String(),
+		}, true, nil,
 	)
 	// No account stored → multisig preflight skipped.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
@@ -264,7 +274,27 @@ func TestQueryMigrationEstimate_NonValidator(t *testing.T) {
 	require.Equal(t, uint64(2), resp.ActionCount)
 	require.Equal(t, uint64(4), resp.TotalTouched)
 	require.Equal(t, "5000000000ulume", resp.BalanceSummary)
-	require.False(t, resp.HasSupernode)
+	require.True(t, resp.HasSupernode)
+}
+
+func TestQueryMigrationEstimate_StrictSupernodeOwnershipError(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+	addr := testAccAddr()
+
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(addr)).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(
+		sntypes.SuperNode{}, false, errors.New("corrupt supernode ownership state"),
+	)
+
+	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: addr.String(),
+	})
+	require.Nil(t, resp)
+	require.ErrorContains(t, err, "resolve supernode ownership")
+	require.ErrorContains(t, err, "corrupt supernode ownership state")
 }
 
 // TestQueryMigrationEstimate_AlreadyMigrated verifies that already-migrated addresses
@@ -293,8 +323,8 @@ func TestQueryMigrationEstimate_AlreadyMigrated(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), sdk.ValAddress(addr)).Return(
-		sntypes.SuperNode{}, false,
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(
+		sntypes.SuperNode{}, false, nil,
 	)
 	// No account stored → multisig preflight skipped.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
@@ -307,6 +337,190 @@ func TestQueryMigrationEstimate_AlreadyMigrated(t *testing.T) {
 	require.Equal(t, "already migrated", resp.RejectionReason)
 	require.Empty(t, resp.BalanceSummary)
 	require.False(t, resp.HasSupernode)
+}
+
+func TestQueryMigrationEstimate_ValidatorUsesScopedRedelegationIndexesForLimit(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	params := types.NewParams(true, 0, 50, 2, 20)
+	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
+
+	addr := testAccAddr()
+	valAddr := sdk.ValAddress(addr)
+	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
+	delegator := testAccAddr()
+
+	f.writeRedelegation(stakingtypes.Redelegation{
+		DelegatorAddress:    delegator.String(),
+		ValidatorSrcAddress: valAddr.String(),
+		ValidatorDstAddress: sdk.ValAddress(testAccAddr()).String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 10,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(100),
+			SharesDst:      math.LegacyNewDec(100),
+			UnbondingId:    301,
+		}},
+	})
+	f.writeRedelegation(stakingtypes.Redelegation{
+		DelegatorAddress:    delegator.String(),
+		ValidatorSrcAddress: sdk.ValAddress(testAccAddr()).String(),
+		ValidatorDstAddress: valAddr.String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 11,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(200),
+			SharesDst:      math.LegacyNewDec(200),
+			UnbondingId:    302,
+		}},
+	})
+	f.writeRedelegation(stakingtypes.Redelegation{
+		DelegatorAddress:    testAccAddr().String(),
+		ValidatorSrcAddress: sdk.ValAddress(testAccAddr()).String(),
+		ValidatorDstAddress: sdk.ValAddress(testAccAddr()).String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 12,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(300),
+			SharesDst:      math.LegacyNewDec(300),
+			UnbondingId:    303,
+		}},
+	})
+
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{OperatorAddress: valAddr.String(), Status: stakingtypes.Bonded}, nil,
+	)
+	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), valAddr).Return(
+		[]stakingtypes.Delegation{
+			stakingtypes.NewDelegation(delegator.String(), valAddr.String(), math.LegacyNewDec(50)),
+		}, nil,
+	)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), valAddr).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
+	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
+
+	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: addr.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.IsValidator)
+	require.Equal(t, uint64(1), resp.ValDelegationCount)
+	require.Equal(t, uint64(2), resp.ValRedelegationCount)
+	require.Equal(t, uint64(3), resp.TotalTouched)
+	require.False(t, resp.WouldSucceed)
+	require.Equal(t, "too many delegators", resp.RejectionReason)
+}
+
+// TestMigrationEstimate_ValidatorUnbondedNotJailed_WouldSucceed verifies that a
+// validator that fell out of the active set purely on stake weight (Unbonded,
+// NOT jailed) is reported as migratable. An Unbonded validator has already been
+// dequeued from the unbonding-validator queue, so re-keying and deleting the old
+// record cannot orphan a queue entry (the chain-halt risk that keeps Unbonding
+// blocked). The estimate must therefore return would_succeed=true so operators
+// who dropped out are not deadlocked out of recovering keys, funds, and rewards.
+func TestMigrationEstimate_ValidatorUnbondedNotJailed_WouldSucceed(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	addr := testAccAddr()
+	valAddr := sdk.ValAddress(addr)
+	delegator := testAccAddr()
+
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{
+			OperatorAddress: valAddr.String(),
+			Status:          stakingtypes.Unbonded,
+			Jailed:          false,
+		}, nil,
+	)
+	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), valAddr).Return(
+		[]stakingtypes.Delegation{
+			stakingtypes.NewDelegation(delegator.String(), valAddr.String(), math.LegacyNewDec(50)),
+		}, nil,
+	)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), valAddr).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
+	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
+
+	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: addr.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.IsValidator)
+	require.Equal(t, stakingtypes.Unbonded.String(), resp.ValidatorStatus)
+	require.False(t, resp.ValidatorJailed)
+	require.True(t, resp.WouldSucceed, "unbonded (non-jailed) validator must be migratable")
+	require.Empty(t, resp.RejectionReason)
+}
+
+// TestMigrationEstimate_ValidatorUnbonding_WouldFail verifies that a validator
+// still in the unbonding-validator queue (Unbonding) is reported as NOT
+// migratable. The evmigration StakingKeeper interface has no validator-queue
+// methods, so re-keying + deleting the old record would orphan the live queue
+// entry keyed by the old operator address, halting the chain at maturity. The
+// estimate must therefore return would_succeed=false and tell the operator to
+// wait for the unbonding period to complete (after which the validator becomes
+// Unbonded and is migratable).
+func TestMigrationEstimate_ValidatorUnbonding_WouldFail(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	addr := testAccAddr()
+	valAddr := sdk.ValAddress(addr)
+	delegator := testAccAddr()
+
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{
+			OperatorAddress: valAddr.String(),
+			Status:          stakingtypes.Unbonding,
+			Jailed:          false,
+		}, nil,
+	)
+	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), valAddr).Return(
+		[]stakingtypes.Delegation{
+			stakingtypes.NewDelegation(delegator.String(), valAddr.String(), math.LegacyNewDec(50)),
+		}, nil,
+	)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), valAddr).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
+	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
+
+	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: addr.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.IsValidator)
+	require.Equal(t, stakingtypes.Unbonding.String(), resp.ValidatorStatus)
+	require.False(t, resp.WouldSucceed, "unbonding validator must remain blocked")
+	require.Contains(t, resp.RejectionReason, "unbonding period")
 }
 
 // --- LegacyAccounts query tests ---
@@ -628,7 +842,7 @@ func TestMigrationEstimate_Multisig_Supported(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -667,7 +881,7 @@ func TestMigrationEstimate_Multisig_TooManySubKeys(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -703,7 +917,7 @@ func TestMigrationEstimate_Multisig_NonSecp256k1SubKey(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
@@ -744,7 +958,7 @@ func TestMigrationEstimate_Multisig_DuplicateSubKey(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), addr.String()).Return(sntypes.SuperNode{}, false, nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{

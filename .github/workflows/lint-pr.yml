@@ -19,10 +19,6 @@ name: lint-pr
 #     error` so a *new* hard-error inside the diff also surfaces here as a
 #     red check, but the master `lint.yml` is the merge gate).
 #
-# This workflow also runs govulncheck as a separate job — that is a security
-# gate distinct from style/correctness lint, and we want it visible on every
-# PR.
-
 on:
   pull_request:
     branches: [master]
@@ -73,12 +69,8 @@ jobs:
         uses: reviewdog/action-golangci-lint@v2.10.0
         with:
           go_version_file: go.mod
-          # Track the same minor that master's `lint.yml` runs (v2.11.x).
-          # The chain repo's go.mod declares `go 1.25.9`, and golangci-lint
-          # refuses to load configs whose target Go version exceeds the
-          # version it was built with — v2.11.x is built with Go 1.26.1.
-          # The `.golangci.yml` file is v2 schema.
-          golangci_lint_version: v2.11.4
+          # Match the exact version used by master's full-scan lint gate.
+          golangci_lint_version: v2.11.3
           golangci_lint_flags: "--config=.golangci.yml --timeout=5m"
           workdir: .
           # Only annotate lines actually changed by the PR.
@@ -100,7 +92,7 @@ jobs:
         uses: reviewdog/action-golangci-lint@v2.10.0
         with:
           go_version_file: go.mod
-          golangci_lint_version: v2.11.4
+          golangci_lint_version: v2.11.3
           golangci_lint_flags: "--config=.golangci.yml --timeout=5m"
           workdir: .
           filter_mode: added
@@ -108,41 +100,3 @@ jobs:
           fail_level: error
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  govulncheck:
-    name: govulncheck (Go vulnerability scan)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    # ADVISORY-ONLY: govulncheck surfaces vulnerabilities in our dependency
-    # tree, but several findings are in pinned cosmos modules (cosmos-sdk,
-    # cosmos/evm) where no upstream fix is yet released. Bumping those
-    # majors is a deliberate, batched effort — not something a PR author
-    # should be blocked on. Annotations and the check-run summary still
-    # appear (so we never lose visibility), but the job is non-blocking
-    # via `continue-on-error: true`. Reassess once upstream fixes ship.
-    continue-on-error: true
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6.0.1
-
-      # govulncheck-action installs its own Go toolchain via `go-version-file`.
-      # We point it at go.mod so the scan tracks the same toolchain the rest
-      # of CI uses. The action exits non-zero on any finding affecting the
-      # called code; combined with the job-level `continue-on-error: true`
-      # above, that surfaces as a yellow advisory rather than a red gate.
-      - name: Run govulncheck
-        uses: golang/govulncheck-action@v1.0.4
-        with:
-          go-version-file: go.mod
-          # Default scan target is `./...`, which is the full module —
-          # matches the standard `govulncheck ./...` invocation.
-          go-package: ./...
-          # We already checked out the repo in the preceding step. The
-          # action's default `repo-checkout: true` runs a second
-          # actions/checkout, which sets a duplicate `Authorization`
-          # http.extraheader on the local git config and causes the
-          # subsequent fetch to fail with:
-          #   remote: Duplicate header: "Authorization"
-          #   fatal: ... The requested URL returned error: 400
-          # Disable the internal checkout to avoid the conflict.
-          repo-checkout: false

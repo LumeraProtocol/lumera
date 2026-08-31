@@ -1,0 +1,270 @@
+{
+  "debug_blockProfile": {
+    "file": { "description": "Filesystem path on the node where the pprof block-contention profile will be written. Existing files are overwritten." },
+    "nsec": { "description": "Sampling duration in seconds. Profiling runs for this long, then the buffer is flushed to `file`." }
+  },
+  "debug_cpuProfile": {
+    "file": { "description": "Filesystem path on the node where the pprof CPU profile will be written. Existing files are overwritten." },
+    "nsec": { "description": "Profiling duration in seconds. CPU sampling runs for this long before the file is written." }
+  },
+  "debug_goTrace": {
+    "file": { "description": "Filesystem path on the node where the Go execution trace will be written (consume with `go tool trace`)." },
+    "nsec": { "description": "Trace capture duration in seconds." }
+  },
+  "debug_mutexProfile": {
+    "file": { "description": "Filesystem path on the node where the pprof mutex-contention profile will be written." },
+    "nsec": { "description": "Sampling duration in seconds." }
+  },
+  "debug_writeBlockProfile": {
+    "file": { "description": "Filesystem path where the current block-contention profile snapshot will be written." }
+  },
+  "debug_writeMemProfile": {
+    "file": { "description": "Filesystem path where the current heap profile snapshot will be written." }
+  },
+  "debug_writeMutexProfile": {
+    "file": { "description": "Filesystem path where the current mutex profile snapshot will be written." }
+  },
+  "debug_startCPUProfile": {
+    "file": { "description": "Filesystem path that CPU profile samples will stream to until `debug_stopCPUProfile` is called." }
+  },
+  "debug_startGoTrace": {
+    "file": { "description": "Filesystem path that Go execution trace events will stream to until `debug_stopGoTrace` is called." }
+  },
+  "debug_setBlockProfileRate": {
+    "rate": { "description": "Block-profile sampling rate. 0 disables profiling; 1 samples every blocking event; higher values sample 1-in-N." }
+  },
+  "debug_setMutexProfileFraction": {
+    "rate": { "description": "Mutex-profile sampling fraction. 0 disables; N samples 1-in-N contention events." }
+  },
+  "debug_setGCPercent": {
+    "v": { "description": "New `GOGC` value as a percentage. Returns the previous setting. Negative values disable GC." }
+  },
+  "debug_getBlockRlp": {
+    "number": { "description": "Block height to fetch. Returns the RLP-encoded bytes of that block." }
+  },
+  "debug_getHeaderRlp": {
+    "number": { "description": "Block height to fetch. Returns the RLP-encoded bytes of that header." }
+  },
+  "debug_getRawBlock": {
+    "blockNrOrHash": { "description": "Block height tag (hex or `latest`/`earliest`/`pending`/`safe`/`finalized`) or block hash to fetch as raw RLP." }
+  },
+  "debug_printBlock": {
+    "number": { "description": "Block height to dump. Returns a human-readable representation of the block." }
+  },
+  "debug_intermediateRoots": {
+    "hash": { "description": "Hash of the block to re-execute. The endpoint returns the intermediate state roots after each transaction." },
+    "config": { "description": "Optional tracer configuration (tracer name, timeout, reexec depth, state overrides). Pass null for defaults." }
+  },
+  "debug_traceBlock": {
+    "tblockRlp": { "description": "RLP-encoded block bytes to trace. The block is executed against the parent state without committing." },
+    "config": { "description": "Optional tracer configuration. Pass null for the default `callTracer`." }
+  },
+  "debug_traceBlockByHash": {
+    "hash": { "description": "Hash of the canonical block to re-execute and trace." },
+    "config": { "description": "Optional tracer configuration. Pass null for the default `callTracer`." }
+  },
+  "debug_traceBlockByNumber": {
+    "height": { "description": "Block height tag (hex integer or `latest`/`earliest`/`pending`/`safe`/`finalized`) of the block to trace." },
+    "config": { "description": "Optional tracer configuration. Pass null for the default `callTracer`." }
+  },
+  "debug_traceCall": {
+    "args": { "description": "Transaction call object (from, to, gas, gasPrice, value, data, etc.) describing the call to simulate and trace." },
+    "blockNrOrHash": { "description": "Block tag or block hash whose post-state should be used as the starting point for the simulated call." },
+    "config": { "description": "Optional tracer configuration including state overrides. Pass null for defaults." }
+  },
+  "debug_traceTransaction": {
+    "hash": { "description": "Hash of an already-mined transaction to re-execute and trace." },
+    "config": { "description": "Optional tracer configuration. Pass null for the default `callTracer`." }
+  },
+
+  "eth_call": {
+    "args": { "description": "Call object describing the message (from, to, gas, gasPrice/maxFeePerGas, value, data, etc.). Executed as `eth_call` without modifying state." },
+    "blockNrOrHash": { "description": "Block tag or block hash supplying the state context for the call." }
+  },
+  "eth_createAccessList": {
+    "args": { "description": "Call object whose execution is simulated to determine the optimal EIP-2930 access list." },
+    "blockNrOrHash": { "description": "Block tag or block hash supplying the state context for the simulation." }
+  },
+  "eth_estimateGas": {
+    "args": { "description": "Call object to estimate. Optional `from`, `to`, `value`, `data`, `gas`, `gasPrice`. The node finds the minimum gas that makes the call succeed." },
+    "blockNrOptional": { "description": "Optional block tag for the state context. Defaults to `pending` when omitted." }
+  },
+  "eth_feeHistory": {
+    "blockCount": { "description": "Number of historical blocks to include (1–1024). Encoded as a hex or decimal string." },
+    "lastBlock": { "description": "Highest block of the requested range — hex height or tag (`latest`, `pending`, etc.)." },
+    "rewardPercentiles": { "description": "Optional priority-fee percentiles (0–100, monotonically increasing). For each block, the node returns the effective priority fee at each percentile." }
+  },
+  "eth_fillTransaction": {
+    "args": { "description": "Partial transaction object. Missing fields (nonce, gas, gas price/cap) are filled in by the node using current chain state." }
+  },
+  "eth_getBalance": {
+    "address": { "description": "20-byte Ethereum address whose native-token balance is queried." },
+    "blockNrOrHash": { "description": "Block tag or block hash whose post-state balance should be returned." }
+  },
+  "eth_getBlockByHash": {
+    "hash": { "description": "Hash of the block to fetch." },
+    "fullTx": { "description": "If true, the response includes full transaction objects; if false, only the transaction hashes." }
+  },
+  "eth_getBlockByNumber": {
+    "ethBlockNum": { "description": "Block tag (hex height or `latest`/`earliest`/`pending`/`safe`/`finalized`) identifying the block to fetch." },
+    "fullTx": { "description": "If true, the response includes full transaction objects; if false, only the transaction hashes." }
+  },
+  "eth_getBlockReceipts": {
+    "blockNrOrHash": { "description": "Block tag or block hash whose transaction receipts should be returned." }
+  },
+  "eth_getBlockTransactionCountByHash": {
+    "hash": { "description": "Hash of the block whose transaction count is requested." }
+  },
+  "eth_getBlockTransactionCountByNumber": {
+    "blockNum": { "description": "Block tag (hex height or `latest`/`earliest`/`pending`/`safe`/`finalized`) whose transaction count is requested." }
+  },
+  "eth_getCode": {
+    "address": { "description": "20-byte address whose deployed bytecode is requested." },
+    "blockNrOrHash": { "description": "Block tag or block hash whose post-state should be queried." }
+  },
+  "eth_getFilterChanges": {
+    "id": { "description": "Filter ID previously returned by `eth_newFilter`, `eth_newBlockFilter`, or `eth_newPendingTransactionFilter`." }
+  },
+  "eth_getFilterLogs": {
+    "id": { "description": "Filter ID previously returned by `eth_newFilter`. Returns all logs matching the filter since its creation." }
+  },
+  "eth_getHeaderByHash": {
+    "hash": { "description": "Hash of the block whose header is requested." }
+  },
+  "eth_getHeaderByNumber": {
+    "ethBlockNum": { "description": "Block tag (hex height or `latest`/`earliest`/`pending`/`safe`/`finalized`) identifying the header to fetch." }
+  },
+  "eth_getLogs": {
+    "crit": { "description": "Filter criteria: `fromBlock`/`toBlock` range or `blockHash`, optional `address`(es), and optional `topics`. Returns all matching logs." }
+  },
+  "eth_getProof": {
+    "address": { "description": "Account address for which to produce a Merkle-Patricia proof." },
+    "storageKeys": { "description": "Storage slots (32-byte hex strings) to additionally include in the proof." },
+    "blockNrOrHash": { "description": "Block tag or block hash whose state root the proof is rooted at." }
+  },
+  "eth_getStorageAt": {
+    "address": { "description": "Account address whose storage is queried." },
+    "key": { "description": "32-byte storage slot key (hex)." },
+    "blockNrOrHash": { "description": "Block tag or block hash whose post-state should be queried." }
+  },
+  "eth_getTransactionByBlockHashAndIndex": {
+    "hash": { "description": "Block hash containing the transaction." },
+    "idx": { "description": "Zero-based transaction index within the block (hex)." }
+  },
+  "eth_getTransactionByBlockNumberAndIndex": {
+    "blockNum": { "description": "Block tag (hex height or `latest`/`earliest`/`pending`/`safe`/`finalized`) containing the transaction." },
+    "idx": { "description": "Zero-based transaction index within the block (hex)." }
+  },
+  "eth_getTransactionByHash": {
+    "hash": { "description": "Transaction hash to look up." }
+  },
+  "eth_getTransactionCount": {
+    "address": { "description": "Address whose nonce (number of transactions sent) is requested." },
+    "blockNrOrHash": { "description": "Block tag or block hash whose post-state nonce should be returned." }
+  },
+  "eth_getTransactionLogs": {
+    "txHash": { "description": "Transaction hash whose emitted logs are requested." }
+  },
+  "eth_getTransactionReceipt": {
+    "hash": { "description": "Transaction hash whose receipt (status, gas used, logs, contract address) is requested." }
+  },
+  "eth_getUncleByBlockHashAndIndex": {
+    "blockHash": { "description": "Block hash whose uncle is requested. Note: post-merge Ethereum has no uncles; the response is null on Lumera." },
+    "index": { "description": "Zero-based uncle index within the block (hex)." }
+  },
+  "eth_getUncleByBlockNumberAndIndex": {
+    "blockNumber": { "description": "Block height (hex) whose uncle is requested. Note: post-merge Ethereum has no uncles; the response is null on Lumera." },
+    "index": { "description": "Zero-based uncle index within the block (hex)." }
+  },
+  "eth_getUncleCountByBlockHash": {
+    "blockHash": { "description": "Block hash whose uncle count is requested. Always 0 on Lumera (no uncles)." }
+  },
+  "eth_getUncleCountByBlockNumber": {
+    "blockNumber": { "description": "Block height tag whose uncle count is requested. Always 0 on Lumera (no uncles)." }
+  },
+  "eth_newFilter": {
+    "criteria": { "description": "Filter criteria: `fromBlock`/`toBlock`, optional `address`(es), optional `topics`. Returns a filter ID poll-able via `eth_getFilterChanges`." }
+  },
+  "eth_resend": {
+    "args": { "description": "Original transaction object identified by its `from` and `nonce`. The pending transaction is replaced with this content." },
+    "gasPrice": { "description": "New gas price (or `maxFeePerGas`) for the replacement transaction. Typically must be higher than the original to be accepted." },
+    "gasLimit": { "description": "Optional new gas limit. Pass null to keep the original." }
+  },
+  "eth_sendRawTransaction": {
+    "data": { "description": "Signed, RLP-encoded transaction bytes (`0x`-prefixed hex). Returns the transaction hash on successful submission." }
+  },
+  "eth_sendTransaction": {
+    "args": { "description": "Transaction object to sign with one of the node's unlocked accounts and submit. Requires `personal_unlockAccount` first." }
+  },
+  "eth_sign": {
+    "address": { "description": "Address (must be unlocked on the node) whose key signs the data using the Ethereum signed-message prefix." },
+    "data": { "description": "Arbitrary bytes to sign. The node prepends `\\x19Ethereum Signed Message:\\n<len>` before hashing." }
+  },
+  "eth_signTypedData": {
+    "address": { "description": "Address (must be unlocked on the node) whose key signs the EIP-712 typed data." },
+    "typedData": { "description": "EIP-712 typed-data object: `types`, `primaryType`, `domain`, and `message`." }
+  },
+  "eth_uninstallFilter": {
+    "id": { "description": "Filter ID to remove. Returns true if the filter was found and removed." }
+  },
+
+  "miner_setEtherbase": {
+    "etherbase": { "description": "Address that should receive block rewards / coinbase output for this node." }
+  },
+  "miner_setExtra": {
+    "extra": { "description": "Extra-data string included in mined block headers (max 32 bytes)." }
+  },
+  "miner_setGasLimit": {
+    "gasLimit": { "description": "Target gas limit for blocks produced by this node (hex)." }
+  },
+  "miner_setGasPrice": {
+    "gasPrice": { "description": "Minimum gas price (hex) for transactions accepted into this node's mempool/built blocks." }
+  },
+  "miner_start": {
+    "threads": { "description": "Optional number of mining threads to start. Pass null/omit to use the node default." }
+  },
+
+  "personal_ecRecover": {
+    "data": { "description": "Original data that was signed via `personal_sign` (Ethereum signed-message prefix is reapplied during recovery)." },
+    "sig": { "description": "65-byte signature (`r||s||v`) produced by `personal_sign`." }
+  },
+  "personal_importRawKey": {
+    "privkey": { "description": "32-byte secp256k1 private key as hex (no `0x` prefix). Imported into the node's keystore." },
+    "password": { "description": "Passphrase used to encrypt the imported key in the keystore." }
+  },
+  "personal_initializeWallet": {
+    "url": { "description": "Hardware-wallet URL (e.g. `ledger://...`) identifying the device to initialize." }
+  },
+  "personal_lockAccount": {
+    "address": { "description": "Address whose previously unlocked key should be re-encrypted and locked." }
+  },
+  "personal_newAccount": {
+    "password": { "description": "Passphrase used to encrypt the newly generated keystore entry." }
+  },
+  "personal_sendTransaction": {
+    "args": { "description": "Transaction object to sign and submit using a temporarily-unlocked keystore account." },
+    "password": { "description": "Passphrase of the sender's keystore account; used to unlock just for this call." }
+  },
+  "personal_sign": {
+    "data": { "description": "Arbitrary bytes to sign with the Ethereum signed-message prefix." },
+    "addr": { "description": "Address whose keystore key signs the data (unlocked just for this call)." },
+    "password": { "description": "Passphrase of the keystore account." }
+  },
+  "personal_unlockAccount": {
+    "addr": { "description": "Address to unlock for subsequent `eth_sendTransaction` calls." },
+    "password": { "description": "Passphrase of the keystore account." },
+    "duration": { "description": "Optional unlock duration in seconds (default 300, 0 means unlock until process exit). Pass null for the default." }
+  },
+  "personal_unpair": {
+    "url": { "description": "Hardware-wallet URL identifying the device to unpair." },
+    "pin": { "description": "Device PIN required to unpair." }
+  },
+
+  "txpool_contentFrom": {
+    "address": { "description": "Address whose pending and queued transactions should be returned from this node's mempool view." }
+  },
+
+  "web3_sha3": {
+    "input": { "description": "Hex-encoded bytes to Keccak-256 hash. Returns the 32-byte digest as hex." }
+  }
+}

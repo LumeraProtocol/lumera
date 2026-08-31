@@ -166,7 +166,7 @@ func TestEnforceEpochEnd_EmptyActiveSet_NoSelfReport_NoRecover(t *testing.T) {
 
 // TestEnforceEpochEnd_EmptyActiveSet_NonCompliantSelf_NoRecover verifies the
 // bootstrap exception does NOT bypass the self-compliance health checks.
-// A POSTPONED SN that submits a report violating the disk-usage minimum
+// A POSTPONED SN that submits a report violating a non-storage host minimum
 // stays POSTPONED even when the active set is empty.
 func TestEnforceEpochEnd_EmptyActiveSet_NonCompliantSelf_NoRecover(t *testing.T) {
 	f := initFixture(t)
@@ -181,28 +181,19 @@ func TestEnforceEpochEnd_EmptyActiveSet_NonCompliantSelf_NoRecover(t *testing.T)
 	params := types.DefaultParams()
 	params.RequiredOpenPorts = []uint32{4444}
 	params.ConsecutiveEpochsToPostpone = 1
-	// Require at least 20% disk free; sn0 reports 95% usage → 5% free → not compliant.
-	params.MinDiskFreePercent = 20
+	// Require at least 20% CPU free; sn0 reports 95% usage → 5% free → not compliant.
+	params.MinCpuFreePercent = 20
 
 	epochID := uint64(1)
 
 	writeEmptyActiveSetAnchor(t, f, epochID)
-
-	// SetReport with non-zero DiskUsagePercent invokes the STORAGE_FULL
-	// transition source path, which queries supernodeKeeper. Stub these
-	// dependencies so the call lands cleanly without triggering a
-	// transition (we return "not found" → SetReport short-circuits).
-	f.supernodeKeeper.EXPECT().
-		GetSuperNodeByAccount(gomock.AssignableToTypeOf(f.ctx), sn0.SupernodeAccount).
-		Return(sntypes.SuperNode{}, false, nil).
-		Times(1)
 
 	if err := f.keeper.SetReport(f.ctx, types.EpochReport{
 		SupernodeAccount: sn0.SupernodeAccount,
 		EpochId:          epochID,
 		ReportHeight:     f.ctx.BlockHeight(),
 		HostReport: types.HostReport{
-			DiskUsagePercent: 95.0, // 5% free, below the 20% minimum
+			CpuUsagePercent: 95.0, // 5% free, below the 20% minimum
 		},
 	}); err != nil {
 		t.Fatalf("failed to set report: %v", err)

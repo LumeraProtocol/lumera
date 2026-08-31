@@ -28,7 +28,7 @@
 # Environment:
 #   MONIKER            - Validator moniker, set by docker-compose
 #   START_MODE         - "run" (default) or "wait"
-#   NM_GRPC_PORT       - gRPC listen port (default 50051)
+#   NM_GRPC_PORT       - gRPC listen port (default 15051)
 #   NM_HTTP_PORT       - HTTP gateway port (default 8080)
 #
 set -euo pipefail
@@ -51,6 +51,18 @@ CFG_VALS="${CFG_DIR}/validators.json"
 RELEASE_DIR="${SHARED_DIR}/release"
 STATUS_DIR="${SHARED_DIR}/status"
 NODE_STATUS_DIR="${STATUS_DIR}/${MONIKER}"
+
+# Validator key name for this node, derived the same way supernode-setup.sh
+# derives it (supernode-setup.sh:95). This script reads it via
+# validator_funding_address() to locate the genesis account that funds the
+# uploader's own accounts.
+#
+# It must be defined here: this script runs standalone (launched by start.sh),
+# does NOT inherit supernode-setup.sh's shell, and common.sh does not define it.
+# With `set -u` (line 34) an undefined KEY_NAME aborts the whole setup at the
+# first funding lookup with "KEY_NAME: unbound variable", which reads as an
+# uploader bug rather than a missing variable.
+KEY_NAME="${KEY_NAME:-${MONIKER}_key}"
 
 # Network ports (inside container)
 LUMERA_GRPC_PORT="${LUMERA_GRPC_PORT:-9090}"
@@ -92,7 +104,7 @@ NM_FILES_DIR_SHARED="/shared/nm-files"  # Shared scanner directory (across conta
 NM_LOG="${NM_LOG:-/root/logs/${NM}.log}"
 NM_TEMPLATE="${RELEASE_DIR}/uploader-config.toml"  # Config template from host
 NM_CONFIG="${NM_HOME}/config.toml"           # Active config (patched from template)
-NM_GRPC_PORT="${NM_GRPC_PORT:-50051}"
+NM_GRPC_PORT="${NM_GRPC_PORT:-15051}"
 NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"
 
 echo "[UL] Using uploader binary name: ${NM}"
@@ -194,7 +206,7 @@ VAL_REC_JSON="$(jq -c --arg m "$MONIKER" '[.[] | select(.moniker==$m)][0]' "${CF
 NM_ENABLED="$(echo "${VAL_REC_JSON}" | jq -r 'try .["lumera-uploader"].enabled // .["lumera-uploader"] // "false"')"
 NM_GRPC_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["lumera-uploader"].grpc_port // empty')"
 NM_HTTP_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["lumera-uploader"].http_port // empty')"
-if [ -z "${NM_GRPC_PORT}" ] || [ "${NM_GRPC_PORT}" = "null" ]; then NM_GRPC_PORT="${NM_GRPC_PORT:-50051}"; fi
+if [ -z "${NM_GRPC_PORT}" ] || [ "${NM_GRPC_PORT}" = "null" ]; then NM_GRPC_PORT="${NM_GRPC_PORT:-15051}"; fi
 if [ -z "${NM_HTTP_PORT}" ] || [ "${NM_HTTP_PORT}" = "null" ]; then NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"; fi
 
 # ─── Short-Circuit Checks ─────────────────────────────────────────────────────
@@ -262,59 +274,85 @@ stop_uploader_if_running() {
 # ═════════════════════════════════════════════════════════════════════════════
 
 # Add a directory to [scanner].directories in the TOML config.
-# Handles missing sections, non-list values, and duplicate prevention.
+#
+# The uploader's schema is `directories = []ScannerDirectory` (config/scanner.go),
+# i.e. an array of INLINE TABLES, not an array of strings:
+#
+#   directories = [
+#     { srcPath = "...", processedPath = "...", isPublic = "random" }
+#   ]
+#
+# crudini cannot be used here. Two independent reasons, both observed:
+#   1. `crudini --get` returns only the FIRST physical line of a multi-line
+#      value. For the template's multi-line array that is the bare `[`, so the
+#      "strip trailing ]" logic removed a bracket that was never there and
+#      `--set` then wrote a fresh single-line array — leaving the template's own
+#      closing `]` behind as an orphan. Result: `toml: line 89 ... expected '.'
+#      or '=', but got ']'` and the uploader panics at startup.
+#   2. Even with balanced brackets, writing `["\/path"]` produces STRINGS, which
+#      cannot unmarshal into []ScannerDirectory.
+#
+# So rewrite the whole block with awk instead: drop every physical line of the
+# existing `directories = [ ... ]` value and emit a correctly-typed replacement.
 add_dir_to_scanner() {
 	local dir="$1"
 	local cfg="$2"
 
-	# Ensure file exists
 	[ -f "$cfg" ] || {
 		echo "[UL] add_dir_to_scanner: config '$cfg' not found"
 		return 1
 	}
 
-	# Read current value (empty if not set)
-	local current
-	if ! current="$(crudini --get "$cfg" scanner directories 2>/dev/null)"; then
-		current=""
+	# Already present? Nothing to do (idempotent across re-runs).
+	if grep -Fq "srcPath = \"${dir}\"" "$cfg"; then
+		return 0
 	fi
 
-	# If not present, set to ["dir"]
-	if [ -z "$current" ]; then
-		crudini --set "$cfg" scanner directories "[\"$dir\"]"
-		return
+	# processedPath MUST be a SIBLING of srcPath, not nested inside it.
+	# scanner/scanner.go walks srcPath with filepath.Walk (RECURSIVE) and dedups
+	# on (dir, name). A nested "<srcPath>/processed" therefore gets re-scanned,
+	# and because the move changes `dir` the file looks brand new -> every file
+	# is registered a SECOND time, doubling cascade fees and load.
+	# Observed on devnet: 13 create-metadata calls sourced from .../processed/.
+	local processed="${dir%/}-processed"
+	local tmp="${cfg}.tmp.$$"
+
+	# Collect existing srcPath entries so repeated calls accumulate rather than
+	# overwrite each other.
+	local existing
+	existing="$(grep -oE 'srcPath = "[^"]+"' "$cfg" 2>/dev/null | sed 's/srcPath = //' | tr -d '"' || true)"
+
+	{
+		printf 'directories = [\n'
+		printf '  { srcPath = "%s", processedPath = "%s", isPublic = "random" }' "$dir" "$processed"
+		local e
+		for e in ${existing}; do
+			[ -n "$e" ] || continue
+			printf ',\n  { srcPath = "%s", processedPath = "%s", isPublic = "random" }' \
+				"$e" "${e%/}-processed"
+		done
+		printf '\n]\n'
+	} >"${tmp}.block"
+
+	# Replace the full multi-line directories value, preserving everything else.
+	awk -v blockfile="${tmp}.block" '
+		BEGIN { while ((getline line < blockfile) > 0) block = block line "\n" }
+		/^[[:space:]]*directories[[:space:]]*=/ {
+			printf "%s", block
+			# Skip the remainder of the old value: if it opened a multi-line
+			# array, consume lines until the closing bracket.
+			if ($0 !~ /\]/) { while ((getline nxt) > 0) if (nxt ~ /\]/) break }
+			next
+		}
+		{ print }
+	' "$cfg" >"$tmp" && mv -f "$tmp" "$cfg"
+	rm -f "${tmp}.block"
+
+	# Fail loudly rather than starting an uploader that will panic.
+	if ! grep -Fq "srcPath = \"${dir}\"" "$cfg"; then
+		echo "[UL] ERROR: failed to add ${dir} to scanner.directories in ${cfg}"
+		return 1
 	fi
-
-	# If present but not a bracketed list, overwrite safely
-	case "$current" in
-	\[*\]) ;; # looks like a [ ... ]
-	*)
-		crudini --set "$cfg" scanner directories "[\"$dir\"]"
-		return
-		;;
-	esac
-
-	# Extract inner list between the brackets
-	local inner="${current#[}"
-	inner="${inner%]}"
-
-	# Normalize spaces around commas (optional; keeps things tidy)
-	inner="$(printf '%s' "$inner" | sed 's/[[:space:]]*,[[:space:]]*/, /g;s/^[[:space:]]*//;s/[[:space:]]*$//')"
-
-	# If already contains the dir (quoted), do nothing
-	if printf '%s' "$inner" | grep -F -q "\"$dir\""; then
-		return
-	fi
-
-	# Build new list: prepend by default
-	local new_inner
-	if [ -z "$inner" ]; then
-		new_inner="\"$dir\""
-	else
-		new_inner="\"$dir\", $inner"
-	fi
-
-	crudini --set "$cfg" scanner directories "[${new_inner}]"
 }
 
 # Build the active config from the template, then patch in runtime values:

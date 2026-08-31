@@ -135,7 +135,7 @@ fi
 CHAIN_ID="$(jq -r '.chain.id' "${CONFIG_JSON}")"
 echo "[CONFIGURE] Lumera chain ID is $CHAIN_ID"
 
-SHARED_DIR="/tmp/${CHAIN_ID}/shared"
+SHARED_DIR="${DEVNET_SHARED_DIR:-/tmp/${CHAIN_ID}/shared}"
 CFG_DIR="${SHARED_DIR}/config"
 RELEASE_DIR="${SHARED_DIR}/release"
 
@@ -204,7 +204,7 @@ install_sncli() {
 
 # Copy devnet test binaries (used by `make devnet-evmigration-*` etc.)
 install_tests() {
-	local test_bins=("tests_validator" "tests_hermes" "tests_evmigration")
+	local test_bins=("tests_validator" "tests_hermes" "tests_evmigration" "tests-gen-activity")
 	local bin
 	for bin in "${test_bins[@]}"; do
 		if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${bin}" ]; then

@@ -290,6 +290,14 @@ func TestTxTimeoutFlag_CustomValue(t *testing.T) {
 	require.Equal(t, "2m", val)
 }
 
+func TestTxTimeoutFlag_DisabledForHTTPPollingWrapper(t *testing.T) {
+	cmd := cmdMigrateValidator()
+	require.NoError(t, cmd.Flags().Set(flagTxTimeout, "0s"))
+	val, err := cmd.Flags().GetString(flagTxTimeout)
+	require.NoError(t, err)
+	require.Equal(t, "0s", val)
+}
+
 // ---------- gas adjustment tests ----------
 
 func TestGasAdjustment_DefaultOverriddenTo1_5(t *testing.T) {

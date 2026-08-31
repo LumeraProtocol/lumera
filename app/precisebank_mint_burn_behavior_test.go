@@ -219,9 +219,9 @@ func TestPreciseBankBurnExtendedCoinStateTransitions(t *testing.T) {
 			startFractional:          sdkmath.NewInt(500),
 			startRemainder:           cf.Sub(sdkmath.NewInt(100)),
 			startReserveInt:          sdkmath.OneInt(),
-			burnAmount:               sdkmath.NewInt(50),
+			burnAmount:               sdkmath.NewInt(150),
 			expectedModuleInt:        sdkmath.OneInt(),
-			expectedModuleFractional: sdkmath.NewInt(450),
+			expectedModuleFractional: sdkmath.NewInt(350),
 			expectedReserveIntDelta:  sdkmath.NewInt(-1),
 			expectedRemainder:        sdkmath.NewInt(50),
 		},
@@ -233,13 +233,20 @@ func TestPreciseBankBurnExtendedCoinStateTransitions(t *testing.T) {
 			app := Setup(t)
 			ctx := app.BaseApp.NewContext(false)
 
-			moduleAddr := app.AuthKeeper.GetModuleAddress(minttypes.ModuleName)
+			burnModuleName := govtypes.ModuleName
+			moduleAddr := app.AuthKeeper.GetModuleAddress(burnModuleName)
 			reserveAddr := app.AuthKeeper.GetModuleAddress(precisebanktypes.ModuleName)
 
 			if tc.startModuleInt.IsPositive() {
 				require.NoError(t, app.BankKeeper.MintCoins(
 					ctx,
 					minttypes.ModuleName,
+					sdk.NewCoins(sdk.NewCoin(precisebanktypes.IntegerCoinDenom(), tc.startModuleInt)),
+				))
+				require.NoError(t, app.BankKeeper.SendCoinsFromModuleToModule(
+					ctx,
+					minttypes.ModuleName,
+					burnModuleName,
 					sdk.NewCoins(sdk.NewCoin(precisebanktypes.IntegerCoinDenom(), tc.startModuleInt)),
 				))
 			}
@@ -258,17 +265,17 @@ func TestPreciseBankBurnExtendedCoinStateTransitions(t *testing.T) {
 			reserveIntBefore := app.BankKeeper.GetBalance(ctx, reserveAddr, precisebanktypes.IntegerCoinDenom()).Amount
 
 			burnCoins := sdk.NewCoins(sdk.NewCoin(precisebanktypes.ExtendedCoinDenom(), tc.burnAmount))
-			require.NoError(t, app.PreciseBankKeeper.BurnCoins(ctx, minttypes.ModuleName, burnCoins))
+			require.NoError(t, app.PreciseBankKeeper.BurnCoins(ctx, burnModuleName, burnCoins))
 
 			moduleIntAfter := app.BankKeeper.GetBalance(ctx, moduleAddr, precisebanktypes.IntegerCoinDenom()).Amount
 			moduleFracAfter := app.PreciseBankKeeper.GetFractionalBalance(ctx, moduleAddr)
 			reserveIntAfter := app.BankKeeper.GetBalance(ctx, reserveAddr, precisebanktypes.IntegerCoinDenom()).Amount
 			remainderAfter := app.PreciseBankKeeper.GetRemainderAmount(ctx)
 
-			require.True(t, moduleIntAfter.Equal(tc.expectedModuleInt))
-			require.True(t, moduleFracAfter.Equal(tc.expectedModuleFractional))
-			require.True(t, reserveIntAfter.Sub(reserveIntBefore).Equal(tc.expectedReserveIntDelta))
-			require.True(t, remainderAfter.Equal(tc.expectedRemainder))
+			require.Equal(t, tc.expectedModuleInt.String(), moduleIntAfter.String(), "module integer balance")
+			require.Equal(t, tc.expectedModuleFractional.String(), moduleFracAfter.String(), "module fractional balance")
+			require.Equal(t, tc.expectedReserveIntDelta.String(), reserveIntAfter.Sub(reserveIntBefore).String(), "reserve integer delta")
+			require.Equal(t, tc.expectedRemainder.String(), remainderAfter.String(), "remainder")
 		})
 	}
 }

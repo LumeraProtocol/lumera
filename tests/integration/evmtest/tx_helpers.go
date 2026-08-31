@@ -54,7 +54,32 @@ func sendOneLegacyTx(t *testing.T, rpcURL string, keyInfo testaccounts.TestKeyIn
 func sendOneCosmosBankTx(t *testing.T, node *evmNode) string {
 	t.Helper()
 
-	return sendOneCosmosBankTxWithFees(t, node, "1000"+lcfg.ChainDenom)
+	// Use an empty fee string so the caller falls through to --gas-prices,
+	// which scales with the feemarket base fee. A flat "1000ulume" over 200k
+	// gas is 0.005ulume/gas; once the default base fee was raised the global
+	// minimum fee exceeded that and CheckTx rejected the tx with code 13
+	// ("gas prices too low"). Fees that must clear a dynamic floor cannot be
+	// expressed as a constant.
+	return sendOneCosmosBankTxWithFees(t, node, "")
+}
+
+// feeFlag selects --fees when the caller supplied explicit fee coins, and
+// --gas-prices otherwise. Callers that pin an exact fee (e.g. asserting
+// rejection below the floor) keep their literal; the default path scales.
+func feeFlag(fees string) string {
+	if strings.TrimSpace(fees) == "" {
+		return "--gas-prices"
+	}
+	return "--fees"
+}
+
+// feeValue returns the configured default base fee as a gas price when no
+// explicit fee was supplied, otherwise the caller's literal.
+func feeValue(fees string) string {
+	if strings.TrimSpace(fees) == "" {
+		return lcfg.FeeMarketDefaultBaseFee + lcfg.ChainDenom
+	}
+	return fees
 }
 
 // sendOneCosmosBankTxWithFees broadcasts bank MsgSend with explicit fee coins.
@@ -85,7 +110,7 @@ func sendOneCosmosBankTxWithFeesResult(t *testing.T, node *evmNode, fees string)
 			"--node", node.cometRPCURL,
 			"--broadcast-mode", "sync",
 			"--gas", "200000",
-			"--fees", fees,
+			feeFlag(fees), feeValue(fees),
 			"--yes",
 			"--output", "json",
 			"--log_no_color",

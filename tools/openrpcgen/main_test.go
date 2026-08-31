@@ -15,6 +15,10 @@ type testAPI struct{}
 func (*testAPI) Echo(input string) string { return input }
 func (*testAPI) Ping() string             { return "pong" }
 
+type combinedTypeOverrideFixture struct {
+	Payload string `json:"payload"`
+}
+
 func TestCollectMethodsPrefersOverrideExamples(t *testing.T) {
 	t.Parallel()
 
@@ -32,7 +36,7 @@ func TestCollectMethodsPrefersOverrideExamples(t *testing.T) {
 
 	methods := collectMethods([]serviceSpec{
 		{Namespace: "test", Type: reflect.TypeOf((*testAPI)(nil))},
-	}, override)
+	}, override, nil, nil)
 
 	var echo methodObject
 	found := false
@@ -102,7 +106,7 @@ func TestCollectMethodsExamplesAlwaysIncludeParamsField(t *testing.T) {
 
 	methods := collectMethods([]serviceSpec{
 		{Namespace: "test", Type: reflect.TypeOf((*testAPI)(nil))},
-	}, nil)
+	}, nil, nil, nil)
 
 	var ping methodObject
 	found := false
@@ -141,7 +145,7 @@ func TestCollectMethodsUsesCuratedTransactionArgsSchema(t *testing.T) {
 
 	methods := collectMethods([]serviceSpec{
 		{Namespace: "eth", Type: reflect.TypeOf((*evmeth.PublicAPI)(nil))},
-	}, nil)
+	}, nil, nil, nil)
 
 	var call methodObject
 	found := false
@@ -199,7 +203,7 @@ func TestCollectMethodsUsesCuratedFilterCriteriaSchema(t *testing.T) {
 
 	methods := collectMethods([]serviceSpec{
 		{Namespace: "eth", Type: reflect.TypeOf((*evmfilters.PublicFilterAPI)(nil))},
-	}, nil)
+	}, nil, nil, nil)
 
 	var getLogs methodObject
 	found := false
@@ -244,7 +248,7 @@ func TestCollectMethodsUsesCuratedStateOverrideSchema(t *testing.T) {
 
 	methods := collectMethods([]serviceSpec{
 		{Namespace: "eth", Type: reflect.TypeOf((*evmeth.PublicAPI)(nil))},
-	}, nil)
+	}, nil, nil, nil)
 
 	var call methodObject
 	found := false
@@ -276,5 +280,116 @@ func TestCollectMethodsUsesCuratedStateOverrideSchema(t *testing.T) {
 	}
 	if _, ok := schema["additionalProperties"].(map[string]any); !ok {
 		t.Fatalf("expected account override schema in additionalProperties, got %#v", schema["additionalProperties"])
+	}
+}
+
+func TestCollectMethodsAppliesParamOverride(t *testing.T) {
+	t.Parallel()
+
+	requiredTrue := true
+	paramOverrides := paramOverrideFile{
+		"test_echo": {
+			"input": {
+				Description: "Curated echo input.",
+				Schema:      map[string]any{"type": "string", "format": "hex"},
+				Required:    &requiredTrue,
+			},
+		},
+	}
+
+	methods := collectMethods([]serviceSpec{
+		{Namespace: "test", Type: reflect.TypeOf((*testAPI)(nil))},
+	}, nil, paramOverrides, nil)
+
+	var echo methodObject
+	for _, m := range methods {
+		if m.Name == "test_echo" {
+			echo = m
+			break
+		}
+	}
+	if echo.Name == "" {
+		t.Fatalf("expected test_echo method in generated list")
+	}
+	if len(echo.Params) != 1 {
+		t.Fatalf("expected 1 param, got %d", len(echo.Params))
+	}
+	p := echo.Params[0]
+	if p.Description != "Curated echo input." {
+		t.Fatalf("expected curated description, got %q", p.Description)
+	}
+	if got := p.Schema["format"]; got != "hex" {
+		t.Fatalf("expected curated schema format=hex, got %#v", got)
+	}
+	if !p.Required {
+		t.Fatalf("expected required=true from override")
+	}
+}
+
+func TestCollectMethodsAppliesResultOverride(t *testing.T) {
+	t.Parallel()
+
+	resultOverrides := resultOverrideFile{
+		"test_echo": {
+			Description: "Echoed payload.",
+			Schema:      map[string]any{"type": "string", "format": "hex"},
+		},
+	}
+
+	methods := collectMethods([]serviceSpec{
+		{Namespace: "test", Type: reflect.TypeOf((*testAPI)(nil))},
+	}, nil, nil, resultOverrides)
+
+	var echo methodObject
+	for _, m := range methods {
+		if m.Name == "test_echo" {
+			echo = m
+			break
+		}
+	}
+	if echo.Name == "" {
+		t.Fatalf("expected test_echo method in generated list")
+	}
+	if echo.Result.Description != "Echoed payload." {
+		t.Fatalf("expected curated result description, got %q", echo.Result.Description)
+	}
+	if got := echo.Result.Schema["format"]; got != "hex" {
+		t.Fatalf("expected curated result schema format=hex, got %#v", got)
+	}
+}
+
+func TestTypeOverrideSchemaPreservesCuratedDescription(t *testing.T) {
+	previous := activeTypeOverrides
+	t.Cleanup(func() {
+		activeTypeOverrides = previous
+	})
+
+	typeName := reflect.TypeOf(combinedTypeOverrideFixture{}).String()
+	activeTypeOverrides = typeOverrideFile{
+		typeName: {
+			"payload": {
+				Description: "Curated payload description.",
+				Schema: map[string]any{
+					"type":   "string",
+					"format": "hex",
+				},
+			},
+		},
+	}
+
+	schema := schemaForType(reflect.TypeOf(combinedTypeOverrideFixture{}))
+	props, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected object properties, got %#v", schema["properties"])
+	}
+	payload, ok := props["payload"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected payload property schema, got %#v", props["payload"])
+	}
+	if got := payload["description"]; got != "Curated payload description." {
+		t.Fatalf("expected curated description to survive schema override, got %#v", got)
+	}
+	if got := payload["format"]; got != "hex" {
+		t.Fatalf("expected schema override format, got %#v", got)
 	}
 }

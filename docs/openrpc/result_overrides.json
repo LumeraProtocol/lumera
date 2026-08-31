@@ -1,0 +1,257 @@
+{
+  "debug_gcStats": {
+    "description": "Go runtime garbage-collector statistics: last/2nd-last GC times, total pause durations, pause histogram, and pause-end timestamps."
+  },
+  "debug_getBlockRlp": {
+    "description": "RLP-encoded bytes of the requested block (hex)."
+  },
+  "debug_getHeaderRlp": {
+    "description": "RLP-encoded bytes of the requested header (hex)."
+  },
+  "debug_getRawBlock": {
+    "description": "RLP-encoded bytes of the requested block (hex). Equivalent to `debug_getBlockRlp`."
+  },
+  "debug_intermediateRoots": {
+    "description": "Ordered list of intermediate state roots — one per transaction in the block — produced while re-executing it. Index N is the root after applying tx N."
+  },
+  "debug_memStats": {
+    "description": "Go runtime memory-allocator statistics: heap size, allocation counts, GC overhead, and span-class breakdown."
+  },
+  "debug_printBlock": {
+    "description": "Human-readable string dump of the block (header fields, transactions, uncles)."
+  },
+  "debug_setGCPercent": {
+    "description": "Previous `GOGC` value before this call applied the new one."
+  },
+  "debug_stacks": {
+    "description": "All goroutine stack traces from the running node, formatted as a single text blob (same shape as `go tool pprof`'s goroutine dump)."
+  },
+  "debug_traceBlock": {
+    "description": "Per-transaction trace results for the supplied RLP-encoded block. Each entry contains the tx hash and the tracer-specific result (or an error)."
+  },
+  "debug_traceBlockByHash": {
+    "description": "Per-transaction trace results for the canonical block identified by hash. Each entry contains the tx hash and the tracer-specific result (or an error)."
+  },
+  "debug_traceBlockByNumber": {
+    "description": "Per-transaction trace results for the canonical block at the given height. Each entry contains the tx hash and the tracer-specific result (or an error)."
+  },
+  "debug_traceCall": {
+    "description": "Tracer output for a simulated call. Shape depends on the tracer: opcode tracer returns step-by-step EVM state, `callTracer` returns the call tree, `prestateTracer` returns touched accounts, etc."
+  },
+  "debug_traceTransaction": {
+    "description": "Tracer output for an already-mined transaction, re-executed against its parent state. Shape depends on the tracer (same options as `debug_traceCall`)."
+  },
+
+  "eth_accounts": {
+    "description": "List of 20-byte addresses currently held in the node's keystore. Empty on nodes without unlocked accounts (which is the typical Lumera deployment)."
+  },
+  "eth_blockNumber": {
+    "description": "Height of the latest committed block on this node, as a hex-encoded integer."
+  },
+  "eth_call": {
+    "description": "Return data from the simulated message call (hex). Empty bytes if the call returned nothing; reverts surface as a JSON-RPC error with the revert payload."
+  },
+  "eth_chainId": {
+    "description": "EIP-155 chain ID as hex. On Lumera mainnet this is `0x494c1a9` (76857769)."
+  },
+  "eth_createAccessList": {
+    "description": "Optimal EIP-2930 access list for the call plus the gas it would consume with that access list applied. Includes any error returned by the simulated execution."
+  },
+  "eth_estimateGas": {
+    "description": "Minimum gas (hex) that makes the supplied call succeed against the chosen block's post-state."
+  },
+  "eth_feeHistory": {
+    "description": "Per-block base fees, gas-used ratios, blob base fees, and (if `rewardPercentiles` was supplied) priority-fee percentiles across the requested range."
+  },
+  "eth_fillTransaction": {
+    "description": "The fully-populated transaction object (nonce, gas, fees set by the node) along with its RLP-encoded raw form ready to sign and broadcast."
+  },
+  "eth_gasPrice": {
+    "description": "Suggested legacy gas price as hex wei. Reflects `baseFee + suggested priority fee` on London-and-later chains."
+  },
+  "eth_getBalance": {
+    "description": "Account balance in wei (hex). Lumera's EVM uses 18-decimal `alume` bridged from 6-decimal `ulume`."
+  },
+  "eth_getBlockByHash": {
+    "description": "Block object: header fields, transactions (full objects or hashes per the `fullTx` flag), and uncles array (always empty on Lumera). `null` if the block is unknown."
+  },
+  "eth_getBlockByNumber": {
+    "description": "Block object: header fields, transactions (full objects or hashes per the `fullTx` flag), and uncles array (always empty on Lumera). `null` if the height is not yet mined."
+  },
+  "eth_getBlockReceipts": {
+    "description": "Receipts for every transaction in the requested block, in execution order. Each entry has status, gas used, cumulative gas used, logs, and (for contract creations) the new contract address."
+  },
+  "eth_getBlockTransactionCountByHash": {
+    "description": "Number of transactions in the block (hex). `null` if the block hash is unknown."
+  },
+  "eth_getBlockTransactionCountByNumber": {
+    "description": "Number of transactions in the block (hex). `null` if the height is not yet mined."
+  },
+  "eth_getCode": {
+    "description": "Deployed contract bytecode at the address (hex). Empty `0x` for externally-owned accounts and for not-yet-deployed contracts."
+  },
+  "eth_getFilterChanges": {
+    "description": "Polling result for an active filter. Logs filter → array of log objects; block filter → array of block hashes; pending-tx filter → array of transaction hashes. Empty array if nothing new since the last poll."
+  },
+  "eth_getFilterLogs": {
+    "description": "All log objects matching the filter's criteria since it was installed. Unlike `eth_getFilterChanges`, this returns the full history rather than only new entries."
+  },
+  "eth_getHeaderByHash": {
+    "description": "Block header fields only — no transactions or uncles. `null` if the hash is unknown."
+  },
+  "eth_getHeaderByNumber": {
+    "description": "Block header fields only — no transactions or uncles. `null` if the height is not yet mined."
+  },
+  "eth_getLogs": {
+    "description": "Log objects matching the criteria. Each log carries the emitting address, indexed topics, raw `data` bytes, and block/tx identifiers."
+  },
+  "eth_getProof": {
+    "description": "Merkle-Patricia proof bundle: account proof, balance, code hash, nonce, storage hash, and one storage proof per requested key. Rooted at the chosen block's state root."
+  },
+  "eth_getStorageAt": {
+    "description": "32-byte value (hex) stored at the requested slot, or `0x000...00` if unset."
+  },
+  "eth_getTransactionByBlockHashAndIndex": {
+    "description": "Transaction object at the given position in the block, or `null` if the index is out of range."
+  },
+  "eth_getTransactionByBlockNumberAndIndex": {
+    "description": "Transaction object at the given position in the block, or `null` if the index is out of range."
+  },
+  "eth_getTransactionByHash": {
+    "description": "Transaction object as it lives on-chain or in the mempool, or `null` if unknown. Includes `from`/`to`/value/input plus EIP-1559 fee fields and (for confirmed txs) `blockNumber`/`blockHash`/`transactionIndex`."
+  },
+  "eth_getTransactionCount": {
+    "description": "Number of transactions sent from the address (i.e. the next nonce), hex-encoded. Reflects the chosen block's post-state."
+  },
+  "eth_getTransactionLogs": {
+    "description": "All log objects emitted by the transaction, in emission order. Empty array if the transaction emitted no events."
+  },
+  "eth_getTransactionReceipt": {
+    "description": "Receipt object: status (`0x0` failure, `0x1` success), gas used, cumulative gas, logs, logs bloom, effective gas price, and (for contract creations) the new contract address. `null` if the tx is still pending."
+  },
+  "eth_getUncleByBlockHashAndIndex": {
+    "description": "Always `null` on Lumera — post-merge chains have no uncles."
+  },
+  "eth_getUncleByBlockNumberAndIndex": {
+    "description": "Always `null` on Lumera — post-merge chains have no uncles."
+  },
+  "eth_getUncleCountByBlockHash": {
+    "description": "Always `0x0` on Lumera — post-merge chains have no uncles."
+  },
+  "eth_getUncleCountByBlockNumber": {
+    "description": "Always `0x0` on Lumera — post-merge chains have no uncles."
+  },
+  "eth_maxPriorityFeePerGas": {
+    "description": "Suggested priority-fee (tip) in wei (hex), based on recent block tips. Use as `maxPriorityFeePerGas` for EIP-1559 transactions."
+  },
+  "eth_newBlockFilter": {
+    "description": "Filter ID. Poll via `eth_getFilterChanges` to receive block hashes as new blocks are committed."
+  },
+  "eth_newFilter": {
+    "description": "Filter ID. Poll via `eth_getFilterChanges` for incremental matches or `eth_getFilterLogs` for the full history."
+  },
+  "eth_newPendingTransactionFilter": {
+    "description": "Filter ID. Poll via `eth_getFilterChanges` to receive pending-transaction hashes as they enter the mempool."
+  },
+  "eth_protocolVersion": {
+    "description": "Ethereum wire-protocol version implemented by the node (hex). Largely historical on Cosmos EVM."
+  },
+  "eth_resend": {
+    "description": "Hash of the newly submitted replacement transaction."
+  },
+  "eth_sendRawTransaction": {
+    "description": "Hash of the submitted transaction. Inclusion in a block is not yet guaranteed at the time of return."
+  },
+  "eth_sendTransaction": {
+    "description": "Hash of the submitted transaction. Requires an unlocked sender account on the node."
+  },
+  "eth_sign": {
+    "description": "65-byte signature (hex) over `keccak256(\\x19Ethereum Signed Message:\\n<len>data)` using the address's key. Layout: `r||s||v`."
+  },
+  "eth_signTypedData": {
+    "description": "65-byte EIP-712 signature (hex) over the typed-data domain-separated digest. Layout: `r||s||v`."
+  },
+  "eth_syncing": {
+    "description": "`false` when the node is fully synced, otherwise an object with `startingBlock`/`currentBlock`/`highestBlock` describing sync progress."
+  },
+  "eth_uninstallFilter": {
+    "description": "`true` if the filter was found and removed; `false` if it had already expired or never existed."
+  },
+
+  "miner_getHashrate": {
+    "description": "Reported mining hashrate. Effectively meaningless on Cosmos EVM (no proof-of-work)."
+  },
+  "miner_setEtherbase": {
+    "description": "Always `true` on Lumera — block rewards are distributed by the Cosmos staking module, not by the EVM coinbase address."
+  },
+  "miner_setExtra": {
+    "description": "Always `true` on Lumera — block production is driven by CometBFT, not by EVM miner settings."
+  },
+  "miner_setGasLimit": {
+    "description": "Always `true` on Lumera — block gas limit is set by the consensus params, not by an EVM miner config."
+  },
+  "miner_setGasPrice": {
+    "description": "Always `true` on Lumera — local minimum gas prices are configured via app.toml / mempool settings, not via this method."
+  },
+
+  "net_listening": {
+    "description": "`true` while the node is actively listening for peers."
+  },
+  "net_peerCount": {
+    "description": "Number of currently-connected peers (decimal integer)."
+  },
+  "net_version": {
+    "description": "Network ID as a decimal string. Equal to the EVM chain ID on Lumera (`\"76857769\"`)."
+  },
+
+  "personal_ecRecover": {
+    "description": "Address that produced the signature, recovered using the Ethereum signed-message prefix."
+  },
+  "personal_importRawKey": {
+    "description": "Address derived from the imported private key."
+  },
+  "personal_initializeWallet": {
+    "description": "Recovery mnemonic / status string returned by the hardware wallet driver after initialization."
+  },
+  "personal_listAccounts": {
+    "description": "All addresses held in the node's keystore."
+  },
+  "personal_listWallets": {
+    "description": "Detailed entries for each detected wallet backend (keystore, USB hardware wallet, etc.) including its status and contained accounts."
+  },
+  "personal_lockAccount": {
+    "description": "`true` if a previously unlocked key was locked; `false` if no key was unlocked for that address."
+  },
+  "personal_newAccount": {
+    "description": "Address of the newly generated keystore account."
+  },
+  "personal_sendTransaction": {
+    "description": "Hash of the submitted transaction."
+  },
+  "personal_sign": {
+    "description": "65-byte signature (hex) layout `r||s||v` over the Ethereum-prefixed digest of `data`."
+  },
+  "personal_unlockAccount": {
+    "description": "`true` if the passphrase was correct and the key was unlocked; `false` otherwise."
+  },
+
+  "txpool_content": {
+    "description": "Full mempool dump grouped as `{ pending|queued: { address: { nonce: transaction } } }`."
+  },
+  "txpool_contentFrom": {
+    "description": "Mempool entries for one address grouped as `{ pending|queued: { nonce: transaction } }`."
+  },
+  "txpool_inspect": {
+    "description": "Compact mempool dump grouped as `{ pending|queued: { address: { nonce: summary-string } } }`. The summary string has the form `to: value wei + gas × gasPrice wei`."
+  },
+  "txpool_status": {
+    "description": "Counts of pending and queued transactions in the mempool (hex)."
+  },
+
+  "web3_clientVersion": {
+    "description": "Human-readable node identification string (client name, version, OS, Go version)."
+  },
+  "web3_sha3": {
+    "description": "Keccak-256 digest of the input bytes as 32 hex bytes."
+  }
+}

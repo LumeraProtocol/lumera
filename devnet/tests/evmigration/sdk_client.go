@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"gen/tests/common"
+
 	txtypes "cosmossdk.io/api/cosmos/tx/v1beta1"
 	sdkblockchain "github.com/LumeraProtocol/sdk-go/blockchain"
 	sdkbase "github.com/LumeraProtocol/sdk-go/blockchain/base"
@@ -403,7 +405,7 @@ func runSDKActionWithSequenceRetry(
 		}
 
 		lastErr = err
-		expectedSeq, gotSeq, ok := parseIncorrectAccountSequence(err)
+		expectedSeq, gotSeq, ok := common.ParseIncorrectAccountSequence(err)
 		if !ok || attempt == 2 {
 			return err
 		}

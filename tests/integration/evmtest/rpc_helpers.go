@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -241,6 +242,10 @@ func startProcess(t *testing.T, ctx context.Context, workDir, bin string, args .
 	waitCh := make(chan error, 1)
 	go func() {
 		waitCh <- cmd.Wait()
+		// Close so a second receive (e.g. stopProcess after a startup probe
+		// already drained the exit value) returns immediately instead of
+		// blocking forever on an empty channel.
+		close(waitCh)
 	}()
 
 	return cmd, waitCh, &output
@@ -262,27 +267,39 @@ func stopProcess(t *testing.T, cancel context.CancelFunc, cmd *exec.Cmd, waitCh 
 	}
 }
 
-// waitForJSONRPC waits until web3_clientVersion returns a non-empty value.
-func waitForJSONRPC(t *testing.T, rpcURL string, waitCh <-chan error, output *bytes.Buffer) {
-	t.Helper()
-
+// waitForJSONRPCResult waits until web3_clientVersion returns a non-empty value.
+// It returns an error (rather than failing the test) so callers can distinguish
+// a recoverable startup failure — e.g. a port conflict — from success and retry.
+func waitForJSONRPCResult(rpcURL string, waitCh <-chan error, output *bytes.Buffer) error {
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		select {
-		case err := <-waitCh:
-			t.Fatalf("node exited before json-rpc became ready: %v\n%s", err, output.String())
+		case err, ok := <-waitCh:
+			if !ok {
+				return fmt.Errorf("node wait channel closed before json-rpc became ready")
+			}
+			if err == nil {
+				return fmt.Errorf("node exited before json-rpc became ready")
+			}
+			return fmt.Errorf("node exited before json-rpc became ready: %w", err)
 		default:
 		}
 
 		var clientVersion string
 		err := testjsonrpc.Call(context.Background(), rpcURL, "web3_clientVersion", []any{}, &clientVersion)
 		if err == nil && strings.TrimSpace(clientVersion) != "" {
-			return
+			return nil
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	t.Fatalf("json-rpc server did not become ready in time\n%s", output.String())
+	return fmt.Errorf("json-rpc server did not become ready within 20s")
+}
+
+// isAddrInUse reports whether captured node output indicates a port-binding
+// conflict, which is transient and worth retrying with freshly reserved ports.
+func isAddrInUse(output string) bool {
+	return strings.Contains(output, "address already in use")
 }
 
 // mustJSONRPC is a fail-fast wrapper around JSON-RPC calls.
@@ -454,17 +471,40 @@ func cometTxHashesFromBase64(t *testing.T, txs []string) []string {
 	return hashes
 }
 
-// freePort reserves one ephemeral local TCP port.
+var (
+	issuedPortsMu sync.Mutex
+	issuedPorts   = map[int]struct{}{}
+)
+
+// freePort reserves one ephemeral local TCP port. The kernel can hand the same
+// ephemeral port back on a subsequent call once our probe listener is closed,
+// so we track every port handed out this process and never return a duplicate.
+// This eliminates intra-process collisions (e.g. two ports of one node, or a
+// node port clashing with a test-allocated API port); cross-process or
+// TIME_WAIT races are handled by retrying node startup in StartAndWaitRPC.
 func freePort(t *testing.T) int {
 	t.Helper()
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("failed to allocate port: %v", err)
-	}
-	defer l.Close()
+	issuedPortsMu.Lock()
+	defer issuedPortsMu.Unlock()
 
-	return l.Addr().(*net.TCPAddr).Port
+	for attempt := 0; attempt < 100; attempt++ {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("failed to allocate port: %v", err)
+		}
+		port := l.Addr().(*net.TCPAddr).Port
+		_ = l.Close()
+
+		if _, used := issuedPorts[port]; used {
+			continue
+		}
+		issuedPorts[port] = struct{}{}
+		return port
+	}
+
+	t.Fatal("failed to allocate a unique free port after 100 attempts")
+	return 0
 }
 
 // mustFindRepoRoot walks upward from CWD until go.mod is found.

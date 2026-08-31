@@ -11,6 +11,8 @@ import (
 
 	upgrade_v1_10_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_1"
 	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
+	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
+	upgrade_v1_20_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_2"
 )
 
 type StoreLoaderSelection struct {
@@ -28,6 +30,23 @@ func StoreLoaderForUpgrade(
 	logger log.Logger,
 	adaptive bool,
 ) StoreLoaderSelection {
+	// v1.20.1 and v1.20.2 always use the add-only store loader, on every network
+	// and regardless of the adaptive-store-manager env flag. It mounts the
+	// declared EVM store keys that are absent from committed state and never
+	// deletes a store, so it is safe on mainnet and a no-op on chains that
+	// already ran v1.20.0. See the matching cases in SetupUpgrades.
+	//
+	// v1.20.2 must be listed here explicitly: it is the arrival point for a
+	// direct 1.12.0 -> 1.20.2 one-hop, and without the add-only loader that
+	// upgrade panics at load with "version of store evmigration mismatch root
+	// store's version; expected N got 0".
+	if upgradeName == upgrade_v1_20_1.UpgradeName || upgradeName == upgrade_v1_20_2.UpgradeName {
+		return StoreLoaderSelection{
+			Loader:   AddOnlyStoreLoader(upgradeHeight, baseUpgrades, logger),
+			LogLabel: "add-only EVM bring-up",
+		}
+	}
+
 	if adaptive {
 		if upgradeName == upgrade_v1_10_1.UpgradeName {
 			return StoreLoaderSelection{

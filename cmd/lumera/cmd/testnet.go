@@ -454,7 +454,7 @@ func initTestnetFiles(
 	err := collectGenFiles(
 		clientCtx, nodeConfig, args.chainID, nodeIDs, valPubKeys, args.numValidators,
 		args.outputDir, args.nodeDirPrefix, args.nodeDaemonHome, genBalIterator, valAddrCodec,
-		rpcPort, p2pPortStart, args.singleMachine,
+		rpcPort, p2pPortStart, pprofPort, args.singleMachine,
 	)
 	if err != nil {
 		return err
@@ -557,7 +557,7 @@ func collectGenFiles(
 	clientCtx client.Context, nodeConfig *cmtconfig.Config, chainID string,
 	nodeIDs []string, valPubKeys []cryptotypes.PubKey, numValidators int,
 	outputDir, nodeDirPrefix, nodeDaemonHome string, genBalIterator banktypes.GenesisBalancesIterator, valAddrCodec runtime.ValidatorAddressCodec,
-	rpcPortStart, p2pPortStart int,
+	rpcPortStart, p2pPortStart, pprofPortStart int,
 	singleMachine bool,
 ) error {
 	var appState json.RawMessage
@@ -574,6 +574,7 @@ func collectGenFiles(
 		gentxsDir := filepath.Join(outputDir, "gentxs")
 		nodeConfig.Moniker = nodeDirName
 		nodeConfig.RPC.ListenAddress = fmt.Sprintf("tcp://0.0.0.0:%d", rpcPortStart+portOffset)
+		nodeConfig.RPC.PprofListenAddress = fmt.Sprintf("localhost:%d", pprofPortStart+portOffset)
 		nodeConfig.P2P.ListenAddress = fmt.Sprintf("tcp://0.0.0.0:%d", p2pPortStart+portOffset)
 
 		nodeConfig.SetRoot(nodeDir)

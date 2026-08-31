@@ -34,6 +34,28 @@ func TestStorageTruthAssignmentUsesOneThirdCoverage(t *testing.T) {
 	require.Len(t, assignedTargets, 2)
 }
 
+func TestStorageTruthAssignmentIncludesPostponedTargets(t *testing.T) {
+	params := types.DefaultParams().WithDefaults()
+	params.StorageTruthEnforcementMode = types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_FULL
+	params.StorageTruthChallengeTargetDivisor = 1
+
+	active := []string{"sn-a", "sn-b"}
+	targets := []string{"sn-postponed"}
+	seed := []byte("01234567890123456789012345678901")
+
+	assigned := false
+	for _, reporter := range active {
+		reporterTargets, isProber, err := computeAuditPeerTargetsForReporter(&params, active, targets, seed, reporter)
+		require.NoError(t, err)
+		require.True(t, isProber)
+		if containsString(reporterTargets, "sn-postponed") {
+			assigned = true
+		}
+	}
+
+	require.True(t, assigned, "active challengers must be able to target postponed supernodes for storage-truth recovery")
+}
+
 func TestStorageTruthAssignmentDisabledUsesLegacyCoverage(t *testing.T) {
 	params := types.DefaultParams().WithDefaults()
 	params.StorageTruthEnforcementMode = types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED

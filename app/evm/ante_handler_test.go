@@ -98,6 +98,13 @@ func TestNewAnteHandlerRequiredDependencies(t *testing.T) {
 			},
 			expectError: "evm account keeper is required for ante builder",
 		},
+		{
+			name: "missing evmigration keeper",
+			mutate: func(opts *appevm.HandlerOptions) {
+				opts.EVMigrationKeeper = nil
+			},
+			expectError: "evmigration keeper is required for ante builder",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -318,9 +325,16 @@ func newValidAnteHandlerOptions(t *testing.T) appevm.HandlerOptions {
 		EVMAccountKeeper:      accountKeeper,
 		FeeMarketKeeper:       monoMockFeeMarketKeeper{},
 		EvmKeeper:             newExtendedEVMKeeper(),
+		EVMigrationKeeper:     noopEVMigrationProofVerifier{},
 		MaxTxGasWanted:        0,
 		DynamicFeeChecker:     true,
 	}
+}
+
+type noopEVMigrationProofVerifier struct{}
+
+func (noopEVMigrationProofVerifier) VerifyMigrationProofsForAnte(_ sdk.Context, _ sdk.Msg) error {
+	return nil
 }
 
 func newEthereumExtensionTxWithoutMsgs(t *testing.T) sdk.Tx {

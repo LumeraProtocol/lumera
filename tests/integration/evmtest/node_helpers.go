@@ -30,6 +30,7 @@ type nodePorts struct {
 	CometRPC  int // CometBFT RPC (default 26657)
 	GRPC      int // gRPC (default 9090)
 	GRPCWeb   int // gRPC-Web (default 9091)
+	API       int // Cosmos REST API (default 1317)
 	ABCI      int // ABCI (default 26658)
 	P2P       int // P2P (default 26656)
 }
@@ -42,10 +43,14 @@ type evmNode struct {
 	chainID  string                   // Chain ID used for this node fixture.
 	keyInfo  testaccounts.TestKeyInfo // Validator key generated during setup.
 
+	haltHeight     int      // Halt height passed to `lumerad start`.
+	extraStartArgs []string // Caller-appended args, preserved across port re-reservation.
+
 	rpcURL      string   // HTTP JSON-RPC endpoint.
 	wsURL       string   // WebSocket JSON-RPC endpoint.
+	apiURL      string   // Cosmos REST API endpoint.
 	cometRPCURL string   // Comet RPC endpoint for Cosmos CLI commands.
-	startArgs   []string // Cached `lumerad start` arguments.
+	startArgs   []string // Cached `lumerad start` arguments (base args + extraStartArgs).
 
 	cancel context.CancelFunc // Process cancellation hook.
 	cmd    *exec.Cmd          // Running node process handle.
@@ -76,11 +81,27 @@ func newEVMNode(t *testing.T, chainID string, haltHeight int) *evmNode {
 		homeDir:     homeDir,
 		chainID:     chainID,
 		keyInfo:     keyInfo,
+		haltHeight:  haltHeight,
 		rpcURL:      fmt.Sprintf("http://127.0.0.1:%d", ports.JSONRPC),
 		wsURL:       fmt.Sprintf("ws://127.0.0.1:%d", ports.JSONWSRPC),
+		apiURL:      fmt.Sprintf("http://127.0.0.1:%d", ports.API),
 		cometRPCURL: fmt.Sprintf("tcp://127.0.0.1:%d", ports.CometRPC),
 		startArgs:   buildStartArgs(homeDir, ports, haltHeight),
 	}
+}
+
+// refreshPorts re-reserves a fresh set of node ports and rebuilds startArgs,
+// preserving any caller-appended args. Used to retry startup after a transient
+// "address already in use" race (a previously-reserved port being grabbed by
+// another process, or lingering in TIME_WAIT from a prior node's teardown).
+func (n *evmNode) refreshPorts() {
+	n.t.Helper()
+	ports := reserveNodePorts(n.t)
+	n.rpcURL = fmt.Sprintf("http://127.0.0.1:%d", ports.JSONRPC)
+	n.wsURL = fmt.Sprintf("ws://127.0.0.1:%d", ports.JSONWSRPC)
+	n.apiURL = fmt.Sprintf("http://127.0.0.1:%d", ports.API)
+	n.cometRPCURL = fmt.Sprintf("tcp://127.0.0.1:%d", ports.CometRPC)
+	n.startArgs = append(buildStartArgs(n.homeDir, ports, n.haltHeight), n.extraStartArgs...)
 }
 
 // Start launches `lumerad start` with precomputed args and captures logs.
@@ -98,11 +119,32 @@ func (n *evmNode) Start() {
 	n.output = output
 }
 
-// StartAndWaitRPC starts the node and blocks until JSON-RPC responds.
+// StartAndWaitRPC starts the node and blocks until JSON-RPC responds. If the
+// node exits during startup because a reserved port was already in use (a race
+// against another process or a prior node still releasing its sockets), it
+// re-reserves fresh ports and retries a few times before failing.
 func (n *evmNode) StartAndWaitRPC() {
 	n.t.Helper()
-	n.Start()
-	waitForJSONRPC(n.t, n.rpcURL, n.waitCh, n.output)
+
+	const maxAttempts = 3
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		n.Start()
+		err := waitForJSONRPCResult(n.rpcURL, n.waitCh, n.output)
+		if err == nil {
+			return
+		}
+
+		out := n.output.String()
+		if attempt < maxAttempts && isAddrInUse(out) {
+			n.t.Logf("node startup attempt %d/%d hit a port conflict, retrying with fresh ports: %v",
+				attempt, maxAttempts, err)
+			n.Stop()
+			n.refreshPorts()
+			continue
+		}
+
+		n.t.Fatalf("json-rpc server did not become ready: %v\n%s", err, out)
+	}
 }
 
 // Stop gracefully terminates the running node process.
@@ -138,6 +180,10 @@ func (n *evmNode) RPCURL() string { return n.rpcURL }
 
 func (n *evmNode) WSURL() string { return n.wsURL }
 
+func (n *evmNode) APIURL() string { return n.apiURL }
+
+func (n *evmNode) APIListenAddress() string { return strings.Replace(n.apiURL, "http://", "tcp://", 1) }
+
 func (n *evmNode) CometRPCURL() string { return n.cometRPCURL }
 
 func (n *evmNode) HomeDir() string { return n.homeDir }
@@ -159,6 +205,7 @@ func (n *evmNode) StartArgs() []string {
 }
 
 func (n *evmNode) AppendStartArgs(args ...string) {
+	n.extraStartArgs = append(n.extraStartArgs, args...)
 	n.startArgs = append(n.startArgs, args...)
 }
 
@@ -240,6 +287,7 @@ func reserveNodePorts(t *testing.T) nodePorts {
 		CometRPC:  freePort(t),
 		GRPC:      freePort(t),
 		GRPCWeb:   freePort(t),
+		API:       freePort(t),
 		ABCI:      freePort(t),
 		P2P:       freePort(t),
 	}
@@ -326,7 +374,7 @@ func setupGenesisWithGentx(t *testing.T, repoRoot, binPath, homeDir, chainID str
 		t.Fatalf("json-rpc defaults not written to app.toml:\n%s", appTomlStr)
 	}
 	if !strings.Contains(appTomlStr, "[mempool]") ||
-		!strings.Contains(appTomlStr, "max-txs = 5000") {
+		!strings.Contains(appTomlStr, "max-txs = 10000") {
 		t.Fatalf("app-side mempool defaults not written to app.toml:\n%s", appTomlStr)
 	}
 
@@ -437,6 +485,30 @@ func setMempoolMaxTxsInAppToml(t *testing.T, homeDir string, maxTxs int) {
 	}
 }
 
+// writeLegacyPreEVMAppToml replaces app.toml with the minimal shape an
+// upgraded pre-EVM home can have: normal SDK sections, but no [evm],
+// [evm.mempool], [json-rpc], [tls], or [lumera.*] sections.
+func writeLegacyPreEVMAppToml(t *testing.T, homeDir string, maxTxs int) {
+	t.Helper()
+
+	appTomlPath := filepath.Join(homeDir, "config", "app.toml")
+	legacyToml := fmt.Sprintf(`
+[api]
+enable = true
+address = "tcp://127.0.0.1:1317"
+
+[grpc]
+enable = false
+
+[mempool]
+max-txs = %d
+`, maxTxs)
+
+	if err := os.WriteFile(appTomlPath, []byte(legacyToml), 0o644); err != nil {
+		t.Fatalf("write legacy app.toml: %v", err)
+	}
+}
+
 // setCometMempoolSize sets `size` under the `[mempool]` section in config.toml.
 // This controls how many txs CometBFT accepts into its mempool before rejecting.
 func setCometMempoolSize(t *testing.T, homeDir string, size int) {
@@ -469,6 +541,20 @@ func setCometMempoolSize(t *testing.T, homeDir string, size int) {
 func enablePrometheusMetrics(t *testing.T, homeDir string, apiAddress string) {
 	t.Helper()
 
+	s := enableAPIInAppToml(t, homeDir, apiAddress)
+
+	// Enable telemetry (section-aware to avoid matching other "enabled" keys).
+	s = regexp.MustCompile(`(?m)(^\[telemetry\]\n(?:[^\[].*\n)*?)^enabled = (true|false)`).
+		ReplaceAllString(s, "${1}enabled = true")
+	s = regexp.MustCompile(`(?m)^prometheus-retention-time = [0-9]+`).
+		ReplaceAllString(s, "prometheus-retention-time = 60")
+
+	writeAppToml(t, homeDir, s)
+}
+
+func enableAPIInAppToml(t *testing.T, homeDir string, apiAddress string) string {
+	t.Helper()
+
 	appTomlPath := filepath.Join(homeDir, "config", "app.toml")
 	appToml, err := os.ReadFile(appTomlPath)
 	if err != nil {
@@ -476,25 +562,23 @@ func enablePrometheusMetrics(t *testing.T, homeDir string, apiAddress string) {
 	}
 	s := string(appToml)
 
-	// Enable the API server (hosts /metrics).
-	s = regexp.MustCompile(`(?m)(^\[api\]\n(?:.*\n)*?)^enable = false`).
+	updated := regexp.MustCompile(`(?m)(^\[api\]\n(?:[^\[].*\n)*?)^enable = (true|false)`).
 		ReplaceAllString(s, "${1}enable = true")
+	updated = regexp.MustCompile(`(?m)(^\[api\]\n(?:[^\[].*\n)*?)^address = "[^"]+"`).
+		ReplaceAllString(updated, fmt.Sprintf(`${1}address = "%s"`, apiAddress))
 
-	// Set API listen address to the allocated port.
-	s = regexp.MustCompile(`(?m)^address = "tcp://localhost:1317"`).
-		ReplaceAllString(s, fmt.Sprintf(`address = "%s"`, apiAddress))
-
-	// Enable telemetry (section-aware to avoid matching other "enabled" keys).
-	s = regexp.MustCompile(`(?m)(^\[telemetry\]\n(?:.*\n)*?)^enabled = false`).
-		ReplaceAllString(s, "${1}enabled = true")
-	s = regexp.MustCompile(`(?m)^prometheus-retention-time = [0-9]+`).
-		ReplaceAllString(s, "prometheus-retention-time = 60")
-
-	if s == string(appToml) {
-		t.Fatalf("failed to enable Prometheus metrics in app.toml")
+	if updated == s {
+		t.Fatalf("failed to enable API in app.toml")
 	}
 
-	if err := os.WriteFile(appTomlPath, []byte(s), 0o644); err != nil {
+	return updated
+}
+
+func writeAppToml(t *testing.T, homeDir string, content string) {
+	t.Helper()
+
+	appTomlPath := filepath.Join(homeDir, "config", "app.toml")
+	if err := os.WriteFile(appTomlPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("write app.toml: %v", err)
 	}
 }

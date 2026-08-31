@@ -13,6 +13,7 @@ import (
 
 	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	auditmodulekeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
+	evmigrationmodulekeeper "github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -36,4 +37,5 @@ type AppUpgradeParams struct {
 	FeeMarketKeeper       *feemarketkeeper.Keeper
 	Erc20Keeper           *erc20keeper.Keeper
 	Erc20StoreKey         *storetypes.KVStoreKey
+	EvmigrationKeeper     *evmigrationmodulekeeper.Keeper
 }

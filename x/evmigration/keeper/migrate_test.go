@@ -1,12 +1,17 @@
 package keeper_test
 
 import (
+	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"testing"
 
+	corestore "cosmossdk.io/core/store"
 	"cosmossdk.io/math"
 	storetypes "cosmossdk.io/store/types"
 	"cosmossdk.io/x/feegrant"
+	"github.com/cosmos/cosmos-sdk/codec"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
 	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -25,7 +30,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	"github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	evmigrationmocks "github.com/LumeraProtocol/lumera/x/evmigration/mocks"
 	module "github.com/LumeraProtocol/lumera/x/evmigration/module"
@@ -37,6 +41,9 @@ import (
 type mockFixture struct {
 	ctx                sdk.Context
 	keeper             keeper.Keeper
+	cdc                codec.Codec
+	stakingStore       corestore.KVStoreService
+	distributionStore  corestore.KVStoreService
 	accountKeeper      *evmigrationmocks.MockAccountKeeper
 	bankKeeper         *evmigrationmocks.MockBankKeeper
 	stakingKeeper      *evmigrationmocks.MockStakingKeeper
@@ -45,7 +52,6 @@ type mockFixture struct {
 	feegrantKeeper     *evmigrationmocks.MockFeegrantKeeper
 	supernodeKeeper    *evmigrationmocks.MockSupernodeKeeper
 	actionKeeper       *evmigrationmocks.MockActionKeeper
-	claimKeeper        *evmigrationmocks.MockClaimKeeper
 }
 
 func initMockFixture(t *testing.T) *mockFixture {
@@ -61,13 +67,24 @@ func initMockFixture(t *testing.T) *mockFixture {
 	feegrantKeeper := evmigrationmocks.NewMockFeegrantKeeper(ctrl)
 	supernodeKeeper := evmigrationmocks.NewMockSupernodeKeeper(ctrl)
 	actionKeeper := evmigrationmocks.NewMockActionKeeper(ctrl)
-	claimKeeper := evmigrationmocks.NewMockClaimKeeper(ctrl)
 
 	encCfg := moduletestutil.MakeTestEncodingConfig(module.AppModule{})
 	addrCodec := addresscodec.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix())
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
+	stakingStoreKey := storetypes.NewKVStoreKey(stakingtypes.StoreKey)
+	distributionStoreKey := storetypes.NewKVStoreKey(distrtypes.StoreKey)
 	storeService := runtime.NewKVStoreService(storeKey)
-	ctx := testutil.DefaultContextWithDB(t, storeKey, storetypes.NewTransientStoreKey("transient_test")).Ctx
+	stakingStoreService := runtime.NewKVStoreService(stakingStoreKey)
+	distributionStoreService := runtime.NewKVStoreService(distributionStoreKey)
+	ctx := testutil.DefaultContextWithKeys(
+		map[string]*storetypes.KVStoreKey{
+			types.StoreKey:        storeKey,
+			stakingtypes.StoreKey: stakingStoreKey,
+			distrtypes.StoreKey:   distributionStoreKey,
+		},
+		map[string]*storetypes.TransientStoreKey{"transient_test": storetypes.NewTransientStoreKey("transient_test")},
+		nil,
+	)
 
 	authority := authtypes.NewModuleAddress(types.GovModuleName)
 
@@ -84,7 +101,6 @@ func initMockFixture(t *testing.T) *mockFixture {
 		feegrantKeeper,
 		supernodeKeeper,
 		actionKeeper,
-		claimKeeper,
 	)
 
 	// Initialize params with migration enabled.
@@ -96,6 +112,9 @@ func initMockFixture(t *testing.T) *mockFixture {
 	return &mockFixture{
 		ctx:                ctx,
 		keeper:             k,
+		cdc:                encCfg.Codec,
+		stakingStore:       stakingStoreService,
+		distributionStore:  distributionStoreService,
 		accountKeeper:      accountKeeper,
 		bankKeeper:         bankKeeper,
 		stakingKeeper:      stakingKeeper,
@@ -104,8 +123,126 @@ func initMockFixture(t *testing.T) *mockFixture {
 		feegrantKeeper:     feegrantKeeper,
 		supernodeKeeper:    supernodeKeeper,
 		actionKeeper:       actionKeeper,
-		claimKeeper:        claimKeeper,
 	}
+}
+
+// expectIdentityMigrationPlan sets a STRICT expectation that validator
+// migration builds exactly one SuperNode continuity plan for
+// source -> destination and applies exactly that plan.
+//
+// Deliberately not an AnyTimes() blanket stub. The plan now owns the latest
+// metrics and Everlight SNDistState move that migrate_validator.go used to
+// perform inline, so these tests must keep proving that the move is requested
+// exactly once, for the right validator pair, and that the applied plan is the
+// same object that was built. A permissive stub would let a regression that
+// drops or double-applies the plan pass silently.
+//
+// sourceMetrics/movedMetrics mirror what the real keeper would snapshot; pass
+// nil to model "no metrics row present at the source".
+func (f *mockFixture) expectIdentityMigrationPlan(
+	t *testing.T,
+	source, destination sdk.ValAddress,
+	sourceMetrics, movedMetrics []byte,
+) {
+	t.Helper()
+
+	var built sntypes.IdentityMigrationPlan
+
+	f.supernodeKeeper.EXPECT().
+		BuildIdentityMigrationPlan(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ sdk.Context, gotSource, gotDestination sdk.ValAddress) (sntypes.IdentityMigrationPlan, error) {
+			require.Equal(t, source.String(), gotSource.String(), "plan must be built for the source validator")
+			require.Equal(t, destination.String(), gotDestination.String(), "plan must be built for the destination validator")
+			built = sntypes.NewIdentityMigrationPlan(gotSource, gotDestination, sourceMetrics, nil, movedMetrics, nil, nil)
+			return built, nil
+		}).Times(1)
+
+	f.supernodeKeeper.EXPECT().
+		ApplyIdentityMigrationPlan(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ sdk.Context, got sntypes.IdentityMigrationPlan) error {
+			require.NotNil(t, built, "plan must be built before it is applied")
+			require.Equal(t, built, got, "the applied plan must be the plan that was built")
+			return nil
+		}).Times(1)
+}
+
+func (f *mockFixture) wireScopedMigrationStores() {
+	f.keeper.SetStakingStoreService(f.stakingStore)
+	f.keeper.SetDistributionStoreService(f.distributionStore)
+}
+
+func (f *mockFixture) writeRedelegation(red stakingtypes.Redelegation) {
+	delegator, err := sdk.AccAddressFromBech32(red.DelegatorAddress)
+	if err != nil {
+		panic(err)
+	}
+	src, err := sdk.ValAddressFromBech32(red.ValidatorSrcAddress)
+	if err != nil {
+		panic(err)
+	}
+	dst, err := sdk.ValAddressFromBech32(red.ValidatorDstAddress)
+	if err != nil {
+		panic(err)
+	}
+
+	store := f.stakingStore.OpenKVStore(f.ctx)
+	bz := stakingtypes.MustMarshalRED(f.cdc, red)
+	if err := store.Set(stakingtypes.GetREDKey(delegator, src, dst), bz); err != nil {
+		panic(err)
+	}
+	if err := store.Set(stakingtypes.GetREDByValSrcIndexKey(delegator, src, dst), []byte{}); err != nil {
+		panic(err)
+	}
+	if err := store.Set(stakingtypes.GetREDByValDstIndexKey(delegator, src, dst), []byte{}); err != nil {
+		panic(err)
+	}
+}
+
+func (f *mockFixture) writeRedelegationIndexes(delegator sdk.AccAddress, src, dst sdk.ValAddress) {
+	store := f.stakingStore.OpenKVStore(f.ctx)
+	if err := store.Set(stakingtypes.GetREDByValSrcIndexKey(delegator, src, dst), []byte{}); err != nil {
+		panic(err)
+	}
+	if err := store.Set(stakingtypes.GetREDByValDstIndexKey(delegator, src, dst), []byte{}); err != nil {
+		panic(err)
+	}
+}
+
+func (f *mockFixture) writeValidatorHistoricalRewards(
+	val sdk.ValAddress,
+	period uint64,
+	rewards distrtypes.ValidatorHistoricalRewards,
+) {
+	store := f.distributionStore.OpenKVStore(f.ctx)
+	if err := store.Set(distrtypes.GetValidatorHistoricalRewardsKey(val, period), f.cdc.MustMarshal(&rewards)); err != nil {
+		panic(err)
+	}
+}
+
+func (f *mockFixture) writeValidatorSlashEvent(
+	val sdk.ValAddress,
+	height uint64,
+	event distrtypes.ValidatorSlashEvent,
+) {
+	store := f.distributionStore.OpenKVStore(f.ctx)
+	if err := store.Set(distrtypes.GetValidatorSlashEventKey(val, height, event.ValidatorPeriod), f.cdc.MustMarshal(&event)); err != nil {
+		panic(err)
+	}
+}
+
+func countKVPrefix(t *testing.T, storeService corestore.KVStoreService, ctx sdk.Context, prefix []byte) int {
+	t.Helper()
+
+	store := storeService.OpenKVStore(ctx)
+	iterator, err := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	require.NoError(t, err)
+	defer func() { _ = iterator.Close() }()
+
+	var count int
+	for ; iterator.Valid(); iterator.Next() {
+		count++
+	}
+	return count
 }
 
 func testAccAddr() sdk.AccAddress {
@@ -134,9 +271,10 @@ func expectHistoricalRewardsIncrement(
 	mock.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), val, period, gomock.Any()).Return(nil)
 }
 
-// expectHistoricalRewardsReset sets up mock expectations for
-// resetHistoricalRewardsReferenceCount: iterate to find the period, then set refcount to 1.
-func expectHistoricalRewardsReset(
+// expectHistoricalRewardsSet sets up mock expectations for
+// setHistoricalRewardsReferenceCount: look up the (val, period) row, then write
+// its refcount back in a single set.
+func expectHistoricalRewardsSet(
 	mock *evmigrationmocks.MockDistributionKeeper,
 	val sdk.ValAddress,
 	period uint64,
@@ -1011,8 +1149,8 @@ func TestMigrateFeegrant_NoAllowances(t *testing.T) {
 
 // --- MigrateSupernode tests ---
 
-// TestMigrateSupernode_Found verifies that the supernode account field is updated
-// from legacy to new address and PrevSupernodeAccounts history is maintained.
+// TestMigrateSupernode_Found verifies that migration preserves the complete
+// existing account timeline and appends the new effective account once.
 func TestMigrateSupernode_Found(t *testing.T) {
 	f := initMockFixture(t)
 	legacy := testAccAddr()
@@ -1022,20 +1160,23 @@ func TestMigrateSupernode_Found(t *testing.T) {
 		SupernodeAccount: legacy.String(),
 		ValidatorAddress: sdk.ValAddress(legacy).String(),
 		PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
-			{Account: legacy.String(), Height: 1},
+			{Account: testAccAddr().String(), Height: 1},
+			{Account: legacy.String(), Height: 7},
 		},
 	}
+	originalHistory := []*sntypes.SupernodeAccountHistory{
+		{Account: sn.PrevSupernodeAccounts[0].Account, Height: sn.PrevSupernodeAccounts[0].Height},
+		{Account: sn.PrevSupernodeAccounts[1].Account, Height: sn.PrevSupernodeAccounts[1].Height},
+	}
 
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sn, true, nil)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
-			// Existing legacy entry should be rewritten to new address.
-			require.Len(t, updated.PrevSupernodeAccounts, 2)
-			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[0].Account)
-			require.Equal(t, int64(1), updated.PrevSupernodeAccounts[0].Height)
-			// New migration entry appended.
-			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[1].Account)
+			require.Len(t, updated.PrevSupernodeAccounts, len(originalHistory)+1)
+			require.Equal(t, originalHistory, updated.PrevSupernodeAccounts[:len(originalHistory)])
+			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[2].Account)
+			require.Equal(t, f.ctx.BlockHeight(), updated.PrevSupernodeAccounts[2].Height)
 			return nil
 		})
 
@@ -1049,7 +1190,7 @@ func TestMigrateSupernode_NotFound(t *testing.T) {
 	legacy := testAccAddr()
 	newAddr := testAccAddr()
 
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sntypes.SuperNode{}, false, nil)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sntypes.SuperNode{}, false, nil)
 
 	err := f.keeper.MigrateSupernode(f.ctx, legacy, newAddr)
 	require.NoError(t, err)
@@ -1057,32 +1198,70 @@ func TestMigrateSupernode_NotFound(t *testing.T) {
 
 // --- MigrateActions tests ---
 
-// TestMigrateActions_CreatorAndSuperNodes verifies that both the Creator field
-// and SuperNodes array entries are updated from legacy to new address.
+// TestMigrateActions_CreatorAndSuperNodes verifies that when the legacy address
+// is both the creator and a supernode of the same action, the action is updated
+// exactly once (deduped across the creator and supernode indexes) with both the
+// Creator field and the matching SuperNodes entry re-keyed to the new address.
 func TestMigrateActions_CreatorAndSuperNodes(t *testing.T) {
 	f := initMockFixture(t)
 	legacy := testAccAddr()
 	newAddr := testAccAddr()
 	otherAddr := testAccAddr()
 
-	action := &actiontypes.Action{
+	// Each index lookup resolves an independent copy of the same action, mirroring
+	// the real keeper which unmarshals a fresh Action on every GetActionByID.
+	byCreator := &actiontypes.Action{
+		ActionID:   "action-1",
+		Creator:    legacy.String(),
+		SuperNodes: []string{legacy.String(), otherAddr.String()},
+	}
+	bySuperNode := &actiontypes.Action{
 		ActionID:   "action-1",
 		Creator:    legacy.String(),
 		SuperNodes: []string{legacy.String(), otherAddr.String()},
 	}
 
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ any, cb func(*actiontypes.Action) bool) error {
-			cb(action)
-			return nil
-		})
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), legacy.String()).
+		Return([]*actiontypes.Action{byCreator}, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), legacy.String()).
+		Return([]*actiontypes.Action{bySuperNode}, nil)
 	f.actionKeeper.EXPECT().SetAction(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated *actiontypes.Action) error {
+			require.Equal(t, "action-1", updated.ActionID)
 			require.Equal(t, newAddr.String(), updated.Creator)
 			require.Equal(t, newAddr.String(), updated.SuperNodes[0])
 			require.Equal(t, otherAddr.String(), updated.SuperNodes[1])
 			return nil
-		})
+		}).Times(1)
+
+	err := f.keeper.MigrateActions(f.ctx, legacy, newAddr)
+	require.NoError(t, err)
+}
+
+// TestMigrateActions_SuperNodeOnly verifies that an action where the legacy
+// address appears only as a supernode (with a different creator) has just its
+// SuperNodes entry re-keyed, leaving the Creator field untouched.
+func TestMigrateActions_SuperNodeOnly(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+	newAddr := testAccAddr()
+	creator := testAccAddr()
+
+	action := &actiontypes.Action{
+		ActionID:   "action-2",
+		Creator:    creator.String(),
+		SuperNodes: []string{legacy.String()},
+	}
+
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), legacy.String()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), legacy.String()).
+		Return([]*actiontypes.Action{action}, nil)
+	f.actionKeeper.EXPECT().SetAction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ any, updated *actiontypes.Action) error {
+			require.Equal(t, creator.String(), updated.Creator)
+			require.Equal(t, newAddr.String(), updated.SuperNodes[0])
+			return nil
+		}).Times(1)
 
 	err := f.keeper.MigrateActions(f.ctx, legacy, newAddr)
 	require.NoError(t, err)
@@ -1094,66 +1273,11 @@ func TestMigrateActions_NoMatch(t *testing.T) {
 	legacy := testAccAddr()
 	newAddr := testAccAddr()
 
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ any, cb func(*actiontypes.Action) bool) error {
-			// No actions match legacy address.
-			cb(&actiontypes.Action{
-				ActionID:   "action-1",
-				Creator:    testAccAddr().String(),
-				SuperNodes: []string{testAccAddr().String()},
-			})
-			return nil
-		})
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), legacy.String()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), legacy.String()).Return(nil, nil)
+	// No SetAction expected: nothing references the legacy address.
 
 	err := f.keeper.MigrateActions(f.ctx, legacy, newAddr)
-	require.NoError(t, err)
-}
-
-// --- MigrateClaim tests ---
-
-// TestMigrateClaim_Found verifies that the claim record's DestAddress is updated.
-func TestMigrateClaim_Found(t *testing.T) {
-	f := initMockFixture(t)
-	legacy := testAccAddr()
-	newAddr := testAccAddr()
-
-	record := claimtypes.ClaimRecord{
-		OldAddress:  "pastel1legacyoldaddress",
-		DestAddress: legacy.String(),
-	}
-
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ any, cb func(claimtypes.ClaimRecord) (bool, error)) error {
-			_, err := cb(record)
-			return err
-		})
-	f.claimKeeper.EXPECT().GetClaimRecord(gomock.Any(), record.OldAddress).Return(record, true, nil)
-	f.claimKeeper.EXPECT().SetClaimRecord(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ any, updated claimtypes.ClaimRecord) error {
-			require.Equal(t, newAddr.String(), updated.DestAddress)
-			return nil
-		})
-
-	err := f.keeper.MigrateClaim(f.ctx, legacy, newAddr)
-	require.NoError(t, err)
-}
-
-// TestMigrateClaim_NotFound verifies no-op when there is no claim record.
-func TestMigrateClaim_NotFound(t *testing.T) {
-	f := initMockFixture(t)
-	legacy := testAccAddr()
-	newAddr := testAccAddr()
-
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ any, cb func(claimtypes.ClaimRecord) (bool, error)) error {
-			_, err := cb(claimtypes.ClaimRecord{
-				OldAddress:  "pastel1otheroldaddress",
-				DestAddress: testAccAddr().String(),
-			})
-			return err
-		})
-
-	err := f.keeper.MigrateClaim(f.ctx, legacy, newAddr)
 	require.NoError(t, err)
 }
 
@@ -1176,6 +1300,10 @@ func TestMigrateStaking_ActiveDelegations(t *testing.T) {
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), valAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 5}, nil)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
+	// migrateActiveDelegations fetches the validator to convert shares → tokens (rate 1.0).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{OperatorAddress: valAddr.String(), Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)}, nil,
+	)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)
 
 	// migrateUnbondingDelegations
@@ -1189,6 +1317,59 @@ func TestMigrateStaking_ActiveDelegations(t *testing.T) {
 
 	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr, legacy)
 	require.NoError(t, err)
+}
+
+// TestMigrateStaking_SlashedValidatorStoresTokensNotShares verifies the account
+// migration path stores DelegatorStartingInfo.Stake as tokens
+// (val.TokensFromSharesTruncated(shares)), not raw shares — the same SDK
+// invariant as the validator path. For a delegation to a slashed validator
+// (exchange rate < 1) storing shares would panic the reward math on the
+// delegator's next withdraw/undelegate/redelegate.
+func TestMigrateStaking_SlashedValidatorStoresTokensNotShares(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+	newAddr := testAccAddr()
+	valAddr := sdk.ValAddress(testAccAddr())
+
+	del := stakingtypes.NewDelegation(legacy.String(), valAddr.String(), math.LegacyNewDec(100))
+
+	// Slashed validator: 90 tokens / 100 shares → TokensFromSharesTruncated(100) = 90.
+	slashedVal := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(90),
+		DelegatorShares: math.LegacyNewDec(100),
+	}
+	expectedStake := slashedVal.TokensFromSharesTruncated(del.Shares)
+
+	// migrateActiveDelegations
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return([]stakingtypes.Delegation{del}, nil)
+	f.distributionKeeper.EXPECT().DeleteDelegatorStartingInfo(gomock.Any(), valAddr, legacy).Return(nil)
+	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
+	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
+	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), valAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 5}, nil)
+	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
+	// The validator must be fetched to convert shares → tokens.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(slashedVal, nil)
+
+	var capturedStake math.LegacyDec
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).DoAndReturn(
+		func(_ sdk.Context, _ sdk.ValAddress, _ sdk.AccAddress, info distrtypes.DelegatorStartingInfo) error {
+			capturedStake = info.Stake
+			return nil
+		},
+	)
+
+	// migrateUnbondingDelegations / migrateRedelegations — none.
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
+
+	// migrateWithdrawAddress — origWithdrawAddr is legacy (self).
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
+
+	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr, legacy)
+	require.NoError(t, err)
+	require.Equal(t, expectedStake, capturedStake)
+	require.True(t, capturedStake.LT(del.Shares), "stake must be tokens (< shares) for a slashed validator")
 }
 
 // TestMigrateStaking_NoDelegations verifies no-op when delegator has no delegations.
@@ -1285,6 +1466,10 @@ func TestMigrateStaking_WithUnbondingDelegation(t *testing.T) {
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), valAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 5}, nil)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
+	// migrateActiveDelegations fetches the validator to convert shares → tokens (rate 1.0).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{OperatorAddress: valAddr.String(), Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)}, nil,
+	)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)
 
 	// migrateUnbondingDelegations
@@ -1343,6 +1528,10 @@ func TestMigrateStaking_WithRedelegation(t *testing.T) {
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), srcValAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 3}, nil)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, srcValAddr, 2, 1)
+	// migrateActiveDelegations fetches the validator to convert shares → tokens (rate 1.0).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), srcValAddr).Return(
+		stakingtypes.Validator{OperatorAddress: srcValAddr.String(), Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)}, nil,
+	)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), srcValAddr, newAddr, gomock.Any()).Return(nil)
 
 	// migrateUnbondingDelegations
@@ -1432,8 +1621,7 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 
 	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
 
-	// No active delegations.
-	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
+	// No active delegations (passed in directly, not fetched).
 
 	// One unbonding delegation with an UnbondingId.
 	ubd := stakingtypes.UnbondingDelegation{
@@ -1449,9 +1637,6 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			},
 		},
 	}
-	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(
-		[]stakingtypes.UnbondingDelegation{ubd}, nil,
-	)
 	f.stakingKeeper.EXPECT().RemoveUnbondingDelegation(gomock.Any(), ubd).Return(nil)
 	f.stakingKeeper.EXPECT().SetUnbondingDelegation(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, newUbd stakingtypes.UnbondingDelegation) error {
@@ -1494,6 +1679,8 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			},
 		},
 	}
+	// Redelegations are discovered by an internal scan; this fixture leaves the
+	// scoped store unwired, so the scan falls back to IterateRedelegations.
 	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, fn func(int64, stakingtypes.Redelegation) bool) error {
 			require.False(t, fn(0, srcRed))
@@ -1522,14 +1709,898 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(89)).Return(nil)
 
-	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr)
+	err := f.keeper.MigrateValidatorDelegations(
+		f.ctx, oldValAddr, newValAddr,
+		nil,
+		[]stakingtypes.UnbondingDelegation{ubd},
+		nil,
+	)
 	require.NoError(t, err)
 }
 
+func TestMigrateValidatorDelegations_UsesScopedRedelegationIndexes(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	delegator := testAccAddr()
+	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
+
+	dstVal := sdk.ValAddress(testAccAddr())
+	srcRed := stakingtypes.Redelegation{
+		DelegatorAddress:    delegator.String(),
+		ValidatorSrcAddress: oldValAddr.String(),
+		ValidatorDstAddress: dstVal.String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 8,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(50),
+			SharesDst:      math.LegacyNewDec(50),
+			UnbondingId:    88,
+		}},
+	}
+	srcVal := sdk.ValAddress(testAccAddr())
+	dstRed := stakingtypes.Redelegation{
+		DelegatorAddress:    delegator.String(),
+		ValidatorSrcAddress: srcVal.String(),
+		ValidatorDstAddress: oldValAddr.String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 9,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(75),
+			SharesDst:      math.LegacyNewDec(75),
+			UnbondingId:    89,
+		}},
+	}
+	unrelatedRed := stakingtypes.Redelegation{
+		DelegatorAddress:    testAccAddr().String(),
+		ValidatorSrcAddress: sdk.ValAddress(testAccAddr()).String(),
+		ValidatorDstAddress: sdk.ValAddress(testAccAddr()).String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 10,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(100),
+			SharesDst:      math.LegacyNewDec(100),
+			UnbondingId:    90,
+		}},
+	}
+	f.writeRedelegation(srcRed)
+	f.writeRedelegation(dstRed)
+	f.writeRedelegation(unrelatedRed)
+
+	rewritten := map[uint64]stakingtypes.Redelegation{}
+	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), gomock.Any()).Return(nil).Times(2)
+	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, red stakingtypes.Redelegation) error {
+			require.True(t, red.ValidatorSrcAddress == newValAddr.String() || red.ValidatorDstAddress == newValAddr.String())
+			require.False(t, red.ValidatorSrcAddress == oldValAddr.String())
+			require.False(t, red.ValidatorDstAddress == oldValAddr.String())
+			rewritten[red.Entries[0].UnbondingId] = red
+			return nil
+		},
+	).Times(2)
+	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(2)
+	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+
+	// V4's internal scoped scan discovers the two related redelegations
+	// (dropping the unrelated one) and re-keys exactly those.
+	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, nil, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, rewritten, 2)
+	require.Equal(t, newValAddr.String(), rewritten[88].ValidatorSrcAddress)
+	require.Equal(t, dstVal.String(), rewritten[88].ValidatorDstAddress)
+	require.Equal(t, srcVal.String(), rewritten[89].ValidatorSrcAddress)
+	require.Equal(t, newValAddr.String(), rewritten[89].ValidatorDstAddress)
+}
+
+func TestMigrateValidatorDelegations_DeduplicatesSourceAndDestinationIndexes(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	delegator := testAccAddr()
+	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
+
+	red := stakingtypes.Redelegation{
+		DelegatorAddress:    delegator.String(),
+		ValidatorSrcAddress: oldValAddr.String(),
+		ValidatorDstAddress: oldValAddr.String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 10,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(100),
+			SharesDst:      math.LegacyNewDec(100),
+			UnbondingId:    101,
+		}},
+	}
+	f.writeRedelegation(red)
+
+	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), red).Return(nil).Times(1)
+	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, migrated stakingtypes.Redelegation) error {
+			require.Equal(t, newValAddr.String(), migrated.ValidatorSrcAddress)
+			require.Equal(t, newValAddr.String(), migrated.ValidatorDstAddress)
+			return nil
+		},
+	).Times(1)
+	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(1)
+	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(101)).Return(nil).Times(1)
+
+	// V4's internal scan collects the doubly-indexed redelegation exactly once
+	// (src == dst), so it is re-keyed a single time (the .Times(1) mocks above).
+	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, nil, nil, nil)
+	require.NoError(t, err)
+}
+
+func TestMigrateValidatorDelegations_UsesPreloadedRedelegations(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	dstValAddr := sdk.ValAddress(testAccAddr())
+	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
+
+	red := stakingtypes.Redelegation{
+		DelegatorAddress:    testAccAddr().String(),
+		ValidatorSrcAddress: oldValAddr.String(),
+		ValidatorDstAddress: dstValAddr.String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 10,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(100),
+			SharesDst:      math.LegacyNewDec(100),
+			UnbondingId:    111,
+		}},
+	}
+
+	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), red).Return(nil).Times(1)
+	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ sdk.Context, migrated stakingtypes.Redelegation) error {
+			require.Equal(t, newValAddr.String(), migrated.ValidatorSrcAddress)
+			require.Equal(t, dstValAddr.String(), migrated.ValidatorDstAddress)
+			return nil
+		},
+	).Times(1)
+	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(1)
+	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(111)).Return(nil).Times(1)
+
+	// The staking store intentionally has no redelegation rows. Passing a
+	// non-nil preloaded slice proves V4 does not rescan the scoped indexes.
+	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, nil, nil, []stakingtypes.Redelegation{red})
+	require.NoError(t, err)
+}
+
+func TestMigrateValidatorDelegations_ReturnsErrorForStaleRedelegationIndex(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	delegator := testAccAddr()
+	dstValAddr := sdk.ValAddress(testAccAddr())
+
+	f.writeRedelegationIndexes(delegator, oldValAddr, dstValAddr)
+
+	// A stale redelegation index (no backing record) surfaces from V4's internal
+	// scoped scan, which aborts before re-keying anything. delegations/ubds are
+	// nil, so the scan runs first and its error propagates unchanged.
+	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, nil, nil, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "points to missing record")
+}
+
+func TestMigrateValidatorDistribution_UsesScopedDistributionPrefixes(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	otherValAddr := sdk.ValAddress(testAccAddr())
+
+	oldRewards := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 7}
+	otherRewards := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 99}
+	oldSlash := distrtypes.ValidatorSlashEvent{ValidatorPeriod: 11, Fraction: math.LegacyMustNewDecFromStr("0.010000000000000000")}
+	otherSlash := distrtypes.ValidatorSlashEvent{ValidatorPeriod: 22, Fraction: math.LegacyMustNewDecFromStr("0.020000000000000000")}
+
+	f.writeValidatorHistoricalRewards(oldValAddr, 11, oldRewards)
+	f.writeValidatorHistoricalRewards(otherValAddr, 22, otherRewards)
+	f.writeValidatorSlashEvent(oldValAddr, 100, oldSlash)
+	f.writeValidatorSlashEvent(otherValAddr, 200, otherSlash)
+
+	notFound := errors.New("not found")
+	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorCurrentRewards{}, notFound)
+	f.distributionKeeper.EXPECT().GetValidatorAccumulatedCommission(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorAccumulatedCommission{}, notFound)
+	f.distributionKeeper.EXPECT().GetValidatorOutstandingRewards(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorOutstandingRewards{}, notFound)
+
+	f.distributionKeeper.EXPECT().DeleteValidatorHistoricalRewards(gomock.Any(), oldValAddr)
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(11), oldRewards).Return(nil)
+	f.distributionKeeper.EXPECT().DeleteValidatorSlashEvents(gomock.Any(), oldValAddr)
+	f.distributionKeeper.EXPECT().SetValidatorSlashEvent(gomock.Any(), newValAddr, uint64(100), oldSlash.ValidatorPeriod, oldSlash).Return(nil)
+
+	err := f.keeper.MigrateValidatorDistribution(f.ctx, oldValAddr, newValAddr)
+	require.NoError(t, err)
+}
+
+func TestMigrateValidatorDelegations_RekeysMultipleSourceRedelegations(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
+
+	// Two redelegations that both have oldValAddr as SOURCE, from distinct
+	// delegators to distinct destinations. Both live under the same val-src
+	// index prefix, so the scan must advance the iterator past the first key.
+	dstA := sdk.ValAddress(testAccAddr())
+	dstB := sdk.ValAddress(testAccAddr())
+	redA := stakingtypes.Redelegation{
+		DelegatorAddress:    testAccAddr().String(),
+		ValidatorSrcAddress: oldValAddr.String(),
+		ValidatorDstAddress: dstA.String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 8,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(50),
+			SharesDst:      math.LegacyNewDec(50),
+			UnbondingId:    201,
+		}},
+	}
+	redB := stakingtypes.Redelegation{
+		DelegatorAddress:    testAccAddr().String(),
+		ValidatorSrcAddress: oldValAddr.String(),
+		ValidatorDstAddress: dstB.String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 9,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(75),
+			SharesDst:      math.LegacyNewDec(75),
+			UnbondingId:    202,
+		}},
+	}
+	f.writeRedelegation(redA)
+	f.writeRedelegation(redB)
+
+	rewritten := map[uint64]stakingtypes.Redelegation{}
+	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), gomock.Any()).Return(nil).Times(2)
+	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, red stakingtypes.Redelegation) error {
+			require.Equal(t, newValAddr.String(), red.ValidatorSrcAddress)
+			require.NotEqual(t, oldValAddr.String(), red.ValidatorDstAddress)
+			rewritten[red.Entries[0].UnbondingId] = red
+			return nil
+		},
+	).Times(2)
+	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(2)
+	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+
+	// Both redelegations share the val-src index prefix; V4's internal scan must
+	// advance the iterator past the first key to collect (and re-key) both.
+	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, nil, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, rewritten, 2)
+	require.Equal(t, dstA.String(), rewritten[201].ValidatorDstAddress)
+	require.Equal(t, dstB.String(), rewritten[202].ValidatorDstAddress)
+}
+
+// TestMigrateValidatorDelegations_SetsHistoricalRewardsRefCountOnce pins the V4
+// optimization: rather than resetting the target period's historical-rewards
+// reference count and then incrementing it once per delegation (N+1 full-chain
+// scans), the count is written exactly once as base(1) + N. The scoped
+// distribution store is wired, so the lookup is the production O(1) store.Get
+// path; the single write is captured to assert the exact final count. A wrong
+// count (off-by-one) or a per-delegation-increment regression (Times(1) → N)
+// both fail here.
+func TestMigrateValidatorDelegations_SetsHistoricalRewardsRefCountOnce(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+
+	// Three active delegations from distinct delegators.
+	dels := make([]stakingtypes.Delegation, 3)
+	for i := range dels {
+		dels[i] = stakingtypes.NewDelegation(testAccAddr().String(), oldValAddr.String(), math.LegacyNewDec(int64(10*(i+1))))
+	}
+
+	// Current rewards period 5 → target (previous) period 4.
+	const targetPeriod = uint64(4)
+	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), newValAddr).Return(
+		distrtypes.ValidatorCurrentRewards{Period: 5}, nil,
+	)
+	// Seed a stale base row so the scoped O(1) lookup succeeds; its count must be
+	// overwritten in a single write, not incremented from.
+	f.writeValidatorHistoricalRewards(newValAddr, targetPeriod, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1})
+
+	// The refcount write must happen EXACTLY once; a per-delegation increment
+	// regression would call it N times and fail the Times(1) bound.
+	var capturedRefCount uint32
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, targetPeriod, gomock.Any()).DoAndReturn(
+		func(_ sdk.Context, _ sdk.ValAddress, _ uint64, h distrtypes.ValidatorHistoricalRewards) error {
+			capturedRefCount = h.ReferenceCount
+			return nil
+		},
+	).Times(1)
+
+	// V4 fetches the re-keyed validator once to convert shares → tokens (rate 1.0).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		stakingtypes.Validator{OperatorAddress: newValAddr.String(), Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)}, nil,
+	)
+
+	// Per-delegation re-keying: no refcount call inside the loop. Each delegation's
+	// fresh starting info must reference the target period.
+	f.distributionKeeper.EXPECT().DeleteDelegatorStartingInfo(gomock.Any(), oldValAddr, gomock.Any()).Return(nil).Times(3)
+	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), gomock.Any()).Return(nil).Times(3)
+	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil).Times(3)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), newValAddr, gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ sdk.Context, _ sdk.ValAddress, _ sdk.AccAddress, info distrtypes.DelegatorStartingInfo) error {
+			require.Equal(t, targetPeriod, info.PreviousPeriod)
+			return nil
+		},
+	).Times(3)
+
+	// Delegations passed in directly; no unbondings/redelegations.
+	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, dels, nil, nil)
+	require.NoError(t, err)
+	// base(1) + 3 delegations.
+	require.Equal(t, uint32(4), capturedRefCount)
+}
+
+// TestMigrateValidatorDelegations_SlashedValidatorStoresTokensNotShares verifies
+// the re-keyed DelegatorStartingInfo.Stake holds tokens
+// (val.TokensFromSharesTruncated(shares)), not raw shares. The SDK stores stake
+// as tokens (x/distribution initializeDelegation); for a validator whose exchange
+// rate dropped below 1 — any validator ever slashed, which passes the
+// only-currently-jailed pre-check — shares overstate the real stake, so storing
+// shares makes CalculateDelegationRewards panic ("calculated final stake greater
+// than current stake") on every delegator's next withdraw/undelegate/redelegate.
+func TestMigrateValidatorDelegations_SlashedValidatorStoresTokensNotShares(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+
+	del := stakingtypes.NewDelegation(testAccAddr().String(), oldValAddr.String(), math.LegacyNewDec(100))
+
+	// Slashed validator: 90 tokens back 100 shares (exchange rate 0.9), so
+	// TokensFromSharesTruncated(100) = 90, strictly less than the 100 shares.
+	slashedVal := stakingtypes.Validator{
+		OperatorAddress: newValAddr.String(),
+		Tokens:          math.NewInt(90),
+		DelegatorShares: math.LegacyNewDec(100),
+	}
+	expectedStake := slashedVal.TokensFromSharesTruncated(del.Shares)
+
+	const targetPeriod = uint64(4)
+	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), newValAddr).Return(
+		distrtypes.ValidatorCurrentRewards{Period: 5}, nil,
+	)
+	f.writeValidatorHistoricalRewards(newValAddr, targetPeriod, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1})
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, targetPeriod, gomock.Any()).Return(nil).Times(1)
+
+	// The re-keyed validator must be fetched to convert shares → tokens.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(slashedVal, nil)
+
+	f.distributionKeeper.EXPECT().DeleteDelegatorStartingInfo(gomock.Any(), oldValAddr, gomock.Any()).Return(nil)
+	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), gomock.Any()).Return(nil)
+	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
+
+	var capturedStake math.LegacyDec
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), newValAddr, gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ sdk.Context, _ sdk.ValAddress, _ sdk.AccAddress, info distrtypes.DelegatorStartingInfo) error {
+			capturedStake = info.Stake
+			return nil
+		},
+	)
+
+	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, []stakingtypes.Delegation{del}, nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, expectedStake, capturedStake)
+	require.True(t, capturedStake.LT(del.Shares), "stake must be tokens (< shares) for a slashed validator")
+}
+
+// TestRepairLegacyRawShareStartingInfo_ReconstructsPreSlashTokenStake pins the
+// repair for rows already written by v1.20.0. The first slash predates the
+// starting row and is therefore reflected only in the validator exchange rate;
+// the second slash follows the row and must remain part of period replay.
+func TestRepairLegacyRawShareStartingInfo_ReconstructsPreSlashTokenStake(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	f.ctx = f.ctx.WithBlockHeight(300)
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+
+	// Two 0.1% slashes leave the validator at a 0.998001 token/share rate.
+	// The correct stake at the row's height (after only the first slash) was
+	// 499,500; v1.20.0 incorrectly stored the raw 500,000 shares instead.
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(998_001),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+	startingInfo := distrtypes.DelegatorStartingInfo{
+		PreviousPeriod: 180,
+		Stake:          del.Shares,
+		Height:         100,
+	}
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).Return(startingInfo, nil)
+
+	// The pre-start event must not be replayed; the post-start event must be.
+	f.writeValidatorSlashEvent(valAddr, 50, distrtypes.ValidatorSlashEvent{
+		ValidatorPeriod: 31,
+		Fraction:        math.LegacyMustNewDecFromStr("0.001"),
+	})
+	f.writeValidatorSlashEvent(valAddr, 200, distrtypes.ValidatorSlashEvent{
+		ValidatorPeriod: 182,
+		Fraction:        math.LegacyMustNewDecFromStr("0.001"),
+	})
+
+	var repaired distrtypes.DelegatorStartingInfo
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr, gomock.Any()).
+		DoAndReturn(func(_ sdk.Context, _ sdk.ValAddress, _ sdk.AccAddress, info distrtypes.DelegatorStartingInfo) error {
+			repaired = info
+			return nil
+		})
+
+	err := f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr)
+	require.NoError(t, err)
+	require.Equal(t, math.LegacyMustNewDecFromStr("499500"), repaired.Stake)
+
+	// Replaying the post-start slash now lands exactly at current token stake,
+	// satisfying the x/distribution invariant that previously panicked.
+	finalStake := repaired.Stake.MulTruncate(math.LegacyMustNewDecFromStr("0.999"))
+	require.Equal(t, val.TokensFromShares(del.Shares), finalStake)
+}
+
+// TestRepairLegacyRawShareStartingInfo_EmptyValidatorSharesIsNoOp guards the
+// keeper-mock case (and any zero-share validator): with no delegator shares the
+// repair must bail out before the zero-denominator TokensFromShares conversion
+// and must not read or write distribution state. Strict mock expectations
+// (Times(0)) fail the test if it touches the distribution keeper.
+func TestRepairLegacyRawShareStartingInfo_EmptyValidatorSharesIsNoOp(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+
+	// DelegatorShares left as the zero value (nil) — the empty-state fingerprint.
+	val := stakingtypes.Validator{OperatorAddress: valAddr.String()}
+
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	require.NoError(t, f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr))
+}
+
+// TestRepairLegacyRawShareStartingInfo_NeverSlashedIsNoOp guards the healthy
+// common case: a validator at a 1.0 exchange rate whose current token stake
+// equals the delegation's shares was never slashed, so it cannot be the v1.20.0
+// failure mode. The repair must return before reading any starting info.
+func TestRepairLegacyRawShareStartingInfo_NeverSlashedIsNoOp(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+
+	// Tokens == DelegatorShares → exchange rate exactly 1.0, so currentStake
+	// equals del.Shares and the "was it slashed?" guard short-circuits.
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(1_000_000),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	require.NoError(t, f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr))
+}
+
+// TestRepairLegacyRawShareStartingInfo_CorrectTokenRowIsNoOp guards a slashed
+// validator whose starting info was written correctly (stake as tokens, not raw
+// shares) — either by the SDK or by the v1.20.1 forward fix. The row does not
+// carry the raw-shares fingerprint, so the repair must leave it untouched.
+func TestRepairLegacyRawShareStartingInfo_CorrectTokenRowIsNoOp(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	f.ctx = f.ctx.WithBlockHeight(300)
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(998_001),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+	// Stake stored as the token value (499,500), NOT the raw shares (500,000).
+	startingInfo := distrtypes.DelegatorStartingInfo{
+		PreviousPeriod: 180,
+		Stake:          math.LegacyNewDec(499_500),
+		Height:         100,
+	}
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).Return(startingInfo, nil)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	require.NoError(t, f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr))
+}
+
+// TestRepairLegacyRawShareStartingInfo_WithinMarginIsNoOp guards the row whose
+// single slash was recorded AFTER its starting height. The SDK replays that
+// slash itself, so the reconstructed final stake already lands at currentStake
+// (within the 3-ulp tolerance) and does not panic — this is a legitimate
+// pre-slash row, not a v1.20.0 corruption, and must not be rewritten even though
+// it superficially matches the Stake==shares fingerprint.
+func TestRepairLegacyRawShareStartingInfo_WithinMarginIsNoOp(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	f.ctx = f.ctx.WithBlockHeight(300)
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(1_000_000))
+
+	// Rate 0.999: a single 0.1% slash, recorded after the starting height.
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(999_000),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+	startingInfo := distrtypes.DelegatorStartingInfo{
+		PreviousPeriod: 180,
+		Stake:          del.Shares, // matches the raw-shares fingerprint...
+		Height:         100,
+	}
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).Return(startingInfo, nil)
+
+	// ...but the slash post-dates the starting height, so replaying it reconciles
+	// finalStake (1,000,000 × 0.999 = 999,000) exactly to currentStake.
+	f.writeValidatorSlashEvent(valAddr, 200, distrtypes.ValidatorSlashEvent{
+		ValidatorPeriod: 182,
+		Fraction:        math.LegacyMustNewDecFromStr("0.001"),
+	})
+
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	require.NoError(t, f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr))
+}
+
+// TestRepairLegacyRawShareStartingInfo_GetStartingInfoError propagates a read
+// failure (wrapped) rather than silently skipping the repair.
+func TestRepairLegacyRawShareStartingInfo_GetStartingInfoError(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(998_001),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).
+		Return(distrtypes.DelegatorStartingInfo{}, errors.New("boom"))
+
+	err := f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr)
+	require.ErrorContains(t, err, "get delegator starting info")
+}
+
+// TestRepairLegacyRawShareStartingInfo_SetStartingInfoError propagates a write
+// failure (wrapped) from the repair path.
+func TestRepairLegacyRawShareStartingInfo_SetStartingInfoError(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+	f.ctx = f.ctx.WithBlockHeight(300)
+
+	valAddr := sdk.ValAddress(testAccAddr())
+	delAddr := testAccAddr()
+	del := stakingtypes.NewDelegation(delAddr.String(), valAddr.String(), math.LegacyNewDec(500_000))
+	val := stakingtypes.Validator{
+		OperatorAddress: valAddr.String(),
+		Tokens:          math.NewInt(998_001),
+		DelegatorShares: math.LegacyNewDec(1_000_000),
+	}
+	// Raw-shares fingerprint with no post-start slash events, so the repair
+	// clamps to currentStake and reaches the SetDelegatorStartingInfo call.
+	startingInfo := distrtypes.DelegatorStartingInfo{
+		PreviousPeriod: 180,
+		Stake:          del.Shares,
+		Height:         100,
+	}
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr).Return(startingInfo, nil)
+	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, delAddr, gomock.Any()).
+		Return(errors.New("boom"))
+
+	err := f.keeper.RepairLegacyRawShareStartingInfoForTest(f.ctx, val, del, delAddr)
+	require.ErrorContains(t, err, "set repaired delegator starting info")
+}
+
+func TestMigrateValidatorDistribution_RekeysAllPeriodsAndSlashEvents(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	otherValAddr := sdk.ValAddress(testAccAddr())
+
+	// Two historical-reward periods for old, one for an unrelated validator.
+	// Distinct ReferenceCounts make the two re-key calls distinguishable.
+	rewards11 := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 7}
+	rewards42 := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 13}
+	otherRewards := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 99}
+	f.writeValidatorHistoricalRewards(oldValAddr, 11, rewards11)
+	f.writeValidatorHistoricalRewards(oldValAddr, 42, rewards42)
+	f.writeValidatorHistoricalRewards(otherValAddr, 11, otherRewards)
+
+	// Two slash events for old with DISTINCT heights AND periods (height!=period
+	// per event), plus one for an unrelated validator. Height comes from the
+	// store key, period from the unmarshaled value; making them differ pins down
+	// that the re-key does not swap the two.
+	slash100 := distrtypes.ValidatorSlashEvent{ValidatorPeriod: 5, Fraction: math.LegacyMustNewDecFromStr("0.010000000000000000")}
+	slash250 := distrtypes.ValidatorSlashEvent{ValidatorPeriod: 9, Fraction: math.LegacyMustNewDecFromStr("0.030000000000000000")}
+	otherSlash := distrtypes.ValidatorSlashEvent{ValidatorPeriod: 22, Fraction: math.LegacyMustNewDecFromStr("0.020000000000000000")}
+	f.writeValidatorSlashEvent(oldValAddr, 100, slash100)
+	f.writeValidatorSlashEvent(oldValAddr, 250, slash250)
+	f.writeValidatorSlashEvent(otherValAddr, 300, otherSlash)
+
+	notFound := errors.New("not found")
+	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorCurrentRewards{}, notFound)
+	f.distributionKeeper.EXPECT().GetValidatorAccumulatedCommission(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorAccumulatedCommission{}, notFound)
+	f.distributionKeeper.EXPECT().GetValidatorOutstandingRewards(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorOutstandingRewards{}, notFound)
+
+	f.distributionKeeper.EXPECT().DeleteValidatorHistoricalRewards(gomock.Any(), oldValAddr)
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(11), rewards11).Return(nil)
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(42), rewards42).Return(nil)
+
+	f.distributionKeeper.EXPECT().DeleteValidatorSlashEvents(gomock.Any(), oldValAddr)
+	f.distributionKeeper.EXPECT().SetValidatorSlashEvent(gomock.Any(), newValAddr, uint64(100), uint64(5), slash100).Return(nil)
+	f.distributionKeeper.EXPECT().SetValidatorSlashEvent(gomock.Any(), newValAddr, uint64(250), uint64(9), slash250).Return(nil)
+
+	err := f.keeper.MigrateValidatorDistribution(f.ctx, oldValAddr, newValAddr)
+	require.NoError(t, err)
+}
+
+func TestMigrateValidatorScopedIteration_SimulatesGlobalStateImprovement(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
+
+	const (
+		unrelatedValidators = 25
+		recordsPerValidator = 20
+	)
+	for i := 0; i < unrelatedValidators; i++ {
+		val := sdk.ValAddress(testAccAddr())
+		for j := 0; j < recordsPerValidator; j++ {
+			period := uint64(10_000 + i*recordsPerValidator + j)
+			height := uint64(20_000 + i*recordsPerValidator + j)
+			f.writeValidatorHistoricalRewards(val, period, distrtypes.ValidatorHistoricalRewards{ReferenceCount: uint32(1 + j%3)})
+			f.writeValidatorSlashEvent(
+				val,
+				height,
+				distrtypes.ValidatorSlashEvent{
+					ValidatorPeriod: period,
+					Fraction:        math.LegacyMustNewDecFromStr("0.010000000000000000"),
+				},
+			)
+			f.writeRedelegation(stakingtypes.Redelegation{
+				DelegatorAddress:    testAccAddr().String(),
+				ValidatorSrcAddress: sdk.ValAddress(testAccAddr()).String(),
+				ValidatorDstAddress: sdk.ValAddress(testAccAddr()).String(),
+				Entries: []stakingtypes.RedelegationEntry{{
+					CreationHeight: int64(height),
+					CompletionTime: completionTime,
+					InitialBalance: math.NewInt(100),
+					SharesDst:      math.LegacyNewDec(100),
+					UnbondingId:    uint64(30_000 + i*recordsPerValidator + j),
+				}},
+			})
+		}
+	}
+
+	rewards11 := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 7}
+	rewards12 := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 8}
+	rewards13 := distrtypes.ValidatorHistoricalRewards{ReferenceCount: 9}
+	f.writeValidatorHistoricalRewards(oldValAddr, 11, rewards11)
+	f.writeValidatorHistoricalRewards(oldValAddr, 12, rewards12)
+	f.writeValidatorHistoricalRewards(oldValAddr, 13, rewards13)
+
+	slash100 := distrtypes.ValidatorSlashEvent{ValidatorPeriod: 21, Fraction: math.LegacyMustNewDecFromStr("0.020000000000000000")}
+	slash101 := distrtypes.ValidatorSlashEvent{ValidatorPeriod: 22, Fraction: math.LegacyMustNewDecFromStr("0.030000000000000000")}
+	f.writeValidatorSlashEvent(oldValAddr, 100, slash100)
+	f.writeValidatorSlashEvent(oldValAddr, 101, slash101)
+
+	dstValAddr := sdk.ValAddress(testAccAddr())
+	srcValAddr := sdk.ValAddress(testAccAddr())
+	srcRed := stakingtypes.Redelegation{
+		DelegatorAddress:    testAccAddr().String(),
+		ValidatorSrcAddress: oldValAddr.String(),
+		ValidatorDstAddress: dstValAddr.String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 101,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(50),
+			SharesDst:      math.LegacyNewDec(50),
+			UnbondingId:    40_001,
+		}},
+	}
+	dstRed := stakingtypes.Redelegation{
+		DelegatorAddress:    testAccAddr().String(),
+		ValidatorSrcAddress: srcValAddr.String(),
+		ValidatorDstAddress: oldValAddr.String(),
+		Entries: []stakingtypes.RedelegationEntry{{
+			CreationHeight: 102,
+			CompletionTime: completionTime,
+			InitialBalance: math.NewInt(75),
+			SharesDst:      math.LegacyNewDec(75),
+			UnbondingId:    40_002,
+		}},
+	}
+	f.writeRedelegation(srcRed)
+	f.writeRedelegation(dstRed)
+
+	broadScanKeys := countKVPrefix(t, f.distributionStore, f.ctx, distrtypes.ValidatorHistoricalRewardsPrefix) +
+		countKVPrefix(t, f.distributionStore, f.ctx, distrtypes.ValidatorSlashEventPrefix) +
+		countKVPrefix(t, f.stakingStore, f.ctx, stakingtypes.RedelegationKey)
+	scopedDistributionKeys := countKVPrefix(t, f.distributionStore, f.ctx, distrtypes.GetValidatorHistoricalRewardsPrefix(oldValAddr)) +
+		countKVPrefix(t, f.distributionStore, f.ctx, distrtypes.GetValidatorSlashEventPrefix(oldValAddr))
+	scopedRedelegationKeys := countKVPrefix(t, f.stakingStore, f.ctx, stakingtypes.GetREDsFromValSrcIndexKey(oldValAddr)) +
+		countKVPrefix(t, f.stakingStore, f.ctx, stakingtypes.GetREDsToValDstIndexKey(oldValAddr))
+	scopedKeysBeforeRedelegationReuse := scopedDistributionKeys + scopedRedelegationKeys + scopedRedelegationKeys
+	scopedKeysAfterRedelegationReuse := scopedDistributionKeys + scopedRedelegationKeys
+
+	require.Equal(t, 1507, broadScanKeys)
+	require.Equal(t, 9, scopedKeysBeforeRedelegationReuse)
+	require.Equal(t, 7, scopedKeysAfterRedelegationReuse)
+	require.GreaterOrEqual(t, broadScanKeys/scopedKeysAfterRedelegationReuse, 200)
+	t.Logf(
+		"simulated testnet shape: old broad scan keys=%d, scoped before red reuse=%d, scoped after red reuse=%d, main reduction=%dx, incremental scoped reduction=%d%%",
+		broadScanKeys,
+		scopedKeysBeforeRedelegationReuse,
+		scopedKeysAfterRedelegationReuse,
+		broadScanKeys/scopedKeysAfterRedelegationReuse,
+		100*(scopedKeysBeforeRedelegationReuse-scopedKeysAfterRedelegationReuse)/scopedKeysBeforeRedelegationReuse,
+	)
+
+	notFound := errors.New("not found")
+	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorCurrentRewards{}, notFound)
+	f.distributionKeeper.EXPECT().GetValidatorAccumulatedCommission(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorAccumulatedCommission{}, notFound)
+	f.distributionKeeper.EXPECT().GetValidatorOutstandingRewards(gomock.Any(), oldValAddr).Return(distrtypes.ValidatorOutstandingRewards{}, notFound)
+	f.distributionKeeper.EXPECT().DeleteValidatorHistoricalRewards(gomock.Any(), oldValAddr)
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(11), rewards11).Return(nil)
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(12), rewards12).Return(nil)
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(13), rewards13).Return(nil)
+	f.distributionKeeper.EXPECT().DeleteValidatorSlashEvents(gomock.Any(), oldValAddr)
+	f.distributionKeeper.EXPECT().SetValidatorSlashEvent(gomock.Any(), newValAddr, uint64(100), slash100.ValidatorPeriod, slash100).Return(nil)
+	f.distributionKeeper.EXPECT().SetValidatorSlashEvent(gomock.Any(), newValAddr, uint64(101), slash101.ValidatorPeriod, slash101).Return(nil)
+
+	err := f.keeper.MigrateValidatorDistribution(f.ctx, oldValAddr, newValAddr)
+	require.NoError(t, err)
+
+	rewritten := map[uint64]stakingtypes.Redelegation{}
+	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), gomock.Any()).Return(nil).Times(2)
+	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ sdk.Context, red stakingtypes.Redelegation) error {
+			rewritten[red.Entries[0].UnbondingId] = red
+			return nil
+		},
+	).Times(2)
+	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(2)
+	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+
+	err = f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, nil, nil, []stakingtypes.Redelegation{srcRed, dstRed})
+	require.NoError(t, err)
+	require.Len(t, rewritten, 2)
+	require.Equal(t, newValAddr.String(), rewritten[40_001].ValidatorSrcAddress)
+	require.Equal(t, dstValAddr.String(), rewritten[40_001].ValidatorDstAddress)
+	require.Equal(t, srcValAddr.String(), rewritten[40_002].ValidatorSrcAddress)
+	require.Equal(t, newValAddr.String(), rewritten[40_002].ValidatorDstAddress)
+}
+
+// TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic locks in the
+// fix for a consensus-halt bug: redelegationsForValidator collects records into a
+// Go map, and iterating that map directly to replay them (RemoveRedelegation ->
+// SetRedelegation -> InsertRedelegationQueue) leaked Go's randomized map order into
+// state writes. InsertRedelegationQueue appends to shared queue timeslices, so a
+// nondeterministic replay order diverges the queue bytes (and the app hash) across
+// nodes. The fix emits records in redelegation-store-key order; this test asserts
+// the replay order matches that canonical order regardless of insertion order.
+//
+// With numReds records there are numReds! possible map orderings, so if the sort is
+// ever reverted to raw map iteration this test fails essentially every run rather
+// than flaking intermittently.
+func TestMigrateValidatorDelegations_RedelegationReplayIsDeterministic(t *testing.T) {
+	f := initMockFixture(t)
+	f.wireScopedMigrationStores()
+
+	oldValAddr := sdk.ValAddress(testAccAddr())
+	newValAddr := sdk.ValAddress(testAccAddr())
+	completionTime := f.ctx.BlockTime().Add(21 * 24 * 3600 * 1e9)
+
+	const numReds = 12
+
+	type placedRed struct {
+		key         string
+		unbondingID uint64
+	}
+	placed := make([]placedRed, 0, numReds)
+	for i := 0; i < numReds; i++ {
+		del := testAccAddr()
+		dst := sdk.ValAddress(testAccAddr())
+		unbondingID := uint64(70_000 + i)
+		f.writeRedelegation(stakingtypes.Redelegation{
+			DelegatorAddress:    del.String(),
+			ValidatorSrcAddress: oldValAddr.String(),
+			ValidatorDstAddress: dst.String(),
+			Entries: []stakingtypes.RedelegationEntry{{
+				CreationHeight: int64(i),
+				CompletionTime: completionTime,
+				InitialBalance: math.NewInt(100),
+				SharesDst:      math.LegacyNewDec(100),
+				UnbondingId:    unbondingID,
+			}},
+		})
+		placed = append(placed, placedRed{
+			key:         string(stakingtypes.GetREDKey(del, oldValAddr, dst)),
+			unbondingID: unbondingID,
+		})
+	}
+
+	// Expected replay order == redelegations sorted by their store key, matching
+	// the canonical order redelegationsForValidator now emits.
+	sorted := make([]placedRed, len(placed))
+	copy(sorted, placed)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].key < sorted[j].key })
+	expectedOrder := make([]uint64, len(sorted))
+	for i, p := range sorted {
+		expectedOrder[i] = p.unbondingID
+	}
+
+	var replayOrder []uint64
+	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), gomock.Any()).Return(nil).Times(numReds)
+	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ sdk.Context, red stakingtypes.Redelegation) error {
+			replayOrder = append(replayOrder, red.Entries[0].UnbondingId)
+			return nil
+		},
+	).Times(numReds)
+	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil).Times(numReds)
+	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(numReds)
+
+	// Passing nil redelegations forces the internal scoped scan (the map path).
+	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr, nil, nil, nil)
+	require.NoError(t, err)
+
+	require.Equal(t, expectedOrder, replayOrder, "redelegations must replay in deterministic store-key order")
+}
+
 // --- Validator-supernode metrics tests ---
+//
+// Latest metrics are no longer re-keyed inline by migrate_validator.go; the
+// SuperNode-owned identity migration plan owns that move together with the
+// Everlight SNDistState move. These tests therefore assert the plan is built
+// for the right validator pair and carries the metrics payload, instead of
+// asserting a Get/Set/Delete call sequence that no longer exists.
 
 // TestMigrateValidatorSupernode_WithMetrics verifies that metrics state is
-// re-keyed when the supernode has metrics.
+// carried by the continuity plan when the supernode has metrics.
 func TestMigrateValidatorSupernode_WithMetrics(t *testing.T) {
 	f := initMockFixture(t)
 	oldValAddr := sdk.ValAddress(testAccAddr())
@@ -1540,19 +2611,17 @@ func TestMigrateValidatorSupernode_WithMetrics(t *testing.T) {
 		ValidatorAddress: oldValAddr.String(),
 		SupernodeAccount: sdk.AccAddress(oldValAddr).String(),
 	}
-	metrics := sntypes.SupernodeMetricsState{
+	sourceMetrics := f.cdc.MustMarshal(&sntypes.SupernodeMetricsState{
 		ValidatorAddress: oldValAddr.String(),
-	}
+	})
+	movedMetrics := f.cdc.MustMarshal(&sntypes.SupernodeMetricsState{
+		ValidatorAddress: newValAddr.String(),
+	})
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, sourceMetrics, movedMetrics)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(metrics, true)
-	f.supernodeKeeper.EXPECT().SetMetricsState(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ any, updated sntypes.SupernodeMetricsState) error {
-			require.Equal(t, newValAddr.String(), updated.ValidatorAddress)
-			return nil
-		})
-	f.supernodeKeeper.EXPECT().DeleteMetricsState(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
@@ -1564,7 +2633,8 @@ func TestMigrateValidatorSupernode_WithMetrics(t *testing.T) {
 }
 
 // TestMigrateValidatorSupernode_MetricsWriteFails verifies that a failure
-// writing metrics state propagates as an error.
+// applying the continuity plan propagates as an error and aborts the migration
+// before the SuperNode primary is touched.
 func TestMigrateValidatorSupernode_MetricsWriteFails(t *testing.T) {
 	f := initMockFixture(t)
 	oldValAddr := sdk.ValAddress(testAccAddr())
@@ -1575,16 +2645,19 @@ func TestMigrateValidatorSupernode_MetricsWriteFails(t *testing.T) {
 		ValidatorAddress: oldValAddr.String(),
 		SupernodeAccount: sdk.AccAddress(oldValAddr).String(),
 	}
-	metrics := sntypes.SupernodeMetricsState{
-		ValidatorAddress: oldValAddr.String(),
-	}
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
-	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(metrics, true)
-	f.supernodeKeeper.EXPECT().SetMetricsState(gomock.Any(), gomock.Any()).Return(
-		fmt.Errorf("metrics store write failed"),
-	)
+	f.supernodeKeeper.EXPECT().
+		BuildIdentityMigrationPlan(gomock.Any(), oldValAddr, newValAddr).
+		Return(sntypes.NewIdentityMigrationPlan(oldValAddr, newValAddr, nil, nil, nil, nil, nil), nil).Times(1)
+	f.supernodeKeeper.EXPECT().
+		ApplyIdentityMigrationPlan(gomock.Any(), gomock.Any()).
+		Return(fmt.Errorf("metrics store write failed")).Times(1)
+
+	// The SuperNode primary must never be deleted or rewritten once the
+	// continuity move has failed: no DeleteSuperNode / SetSuperNode is
+	// expected, so gomock fails the test if either is called.
 
 	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
 	require.Error(t, err)
@@ -1598,7 +2671,12 @@ func TestMigrateValidatorSupernode_NotFound(t *testing.T) {
 	newValAddr := sdk.ValAddress(testAccAddr())
 	newAddr := sdk.AccAddress(newValAddr)
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
+	// The continuity plan is built and applied even when no SuperNode primary
+	// exists: validator-keyed Everlight residue can outlive the primary, and
+	// leaving it behind is exactly the orphaning this plan prevents.
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
 
 	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
 	require.NoError(t, err)
@@ -1622,9 +2700,10 @@ func TestMigrateValidatorSupernode_EvidenceAddressMigrated(t *testing.T) {
 		},
 	}
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Len(t, updated.Evidence, 2)
@@ -1639,9 +2718,9 @@ func TestMigrateValidatorSupernode_EvidenceAddressMigrated(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMigrateValidatorSupernode_AccountHistoryMigrated verifies that
-// PrevSupernodeAccounts entries matching the old account are updated.
-func TestMigrateValidatorSupernode_AccountHistoryMigrated(t *testing.T) {
+// TestMigrateValidatorSupernode_AccountHistoryPreserved verifies that existing
+// timeline entries remain exact and the new effective account is appended once.
+func TestMigrateValidatorSupernode_AccountHistoryPreserved(t *testing.T) {
 	f := initMockFixture(t)
 	oldValAddr := sdk.ValAddress(testAccAddr())
 	newValAddr := sdk.ValAddress(testAccAddr())
@@ -1653,22 +2732,23 @@ func TestMigrateValidatorSupernode_AccountHistoryMigrated(t *testing.T) {
 		ValidatorAddress: oldValAddr.String(),
 		SupernodeAccount: oldAccountStr,
 		PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
-			{Account: oldAccountStr, Height: 100},
 			{Account: otherAccount, Height: 50},
+			{Account: oldAccountStr, Height: 100},
 		},
 	}
+	originalHistory := []*sntypes.SupernodeAccountHistory{
+		{Account: otherAccount, Height: 50},
+		{Account: oldAccountStr, Height: 100},
+	}
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			require.Len(t, updated.PrevSupernodeAccounts, 3)
-			// Entry matching old account should be updated.
-			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[0].Account)
-			// Entry for a different account should be unchanged.
-			require.Equal(t, otherAccount, updated.PrevSupernodeAccounts[1].Account)
-			// New migration entry appended with new address and current height.
+			require.Equal(t, originalHistory, updated.PrevSupernodeAccounts[:2])
 			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[2].Account)
 			require.Equal(t, f.ctx.BlockHeight(), updated.PrevSupernodeAccounts[2].Height)
 			return nil
@@ -1676,6 +2756,37 @@ func TestMigrateValidatorSupernode_AccountHistoryMigrated(t *testing.T) {
 
 	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
 	require.NoError(t, err)
+}
+
+func TestMigrateValidatorSupernode_AlternateEncodingSelfOwnedMigratesOnce(t *testing.T) {
+	f := initMockFixture(t)
+	legacyAddr := testAccAddr()
+	newAddr := testAccAddr()
+	oldValAddr := sdk.ValAddress(legacyAddr)
+	newValAddr := sdk.ValAddress(newAddr)
+	sn := sntypes.SuperNode{
+		ValidatorAddress: strings.ToUpper(oldValAddr.String()),
+		SupernodeAccount: strings.ToUpper(legacyAddr.String()),
+		PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
+			{Account: strings.ToUpper(legacyAddr.String()), Height: 100},
+		},
+	}
+
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(sn, true, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr).Times(1)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
+	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, updated sntypes.SuperNode) error {
+			require.Equal(t, newValAddr.String(), updated.ValidatorAddress)
+			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
+			require.Len(t, updated.PrevSupernodeAccounts, 2)
+			require.Equal(t, strings.ToUpper(legacyAddr.String()), updated.PrevSupernodeAccounts[0].Account)
+			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[1].Account)
+			return nil
+		}).Times(1)
+
+	require.NoError(t, f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, legacyAddr, newAddr))
 }
 
 // TestMigrateValidatorSupernode_IndependentAccountPreserved verifies that when
@@ -1698,9 +2809,11 @@ func TestMigrateValidatorSupernode_IndependentAccountPreserved(t *testing.T) {
 		},
 	}
 
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), sdk.AccAddress(oldValAddr).String()).Return(sntypes.SuperNode{}, false, nil)
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), independentSNAccount).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
 			// Validator address should be re-keyed.
@@ -1716,6 +2829,70 @@ func TestMigrateValidatorSupernode_IndependentAccountPreserved(t *testing.T) {
 
 	err := f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, sdk.AccAddress(oldValAddr), newAddr)
 	require.NoError(t, err)
+}
+
+func TestMigrateValidatorSupernode_AccountOwnedUnderAnotherValidator(t *testing.T) {
+	f := initMockFixture(t)
+	legacyAddr := testAccAddr()
+	newAddr := testAccAddr()
+	oldValAddr := sdk.ValAddress(legacyAddr)
+	newValAddr := sdk.ValAddress(newAddr)
+	accountOwnedVal := sdk.ValAddress(testAccAddr())
+	accountOwned := sntypes.SuperNode{
+		ValidatorAddress: accountOwnedVal.String(),
+		SupernodeAccount: legacyAddr.String(),
+	}
+
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(accountOwned, true, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
+	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, updated sntypes.SuperNode) error {
+			require.Equal(t, accountOwnedVal.String(), updated.ValidatorAddress)
+			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
+			require.Len(t, updated.PrevSupernodeAccounts, 1)
+			return nil
+		})
+
+	require.NoError(t, f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, legacyAddr, newAddr))
+}
+
+func TestMigrateValidatorSupernode_TwoDistinctRecords(t *testing.T) {
+	f := initMockFixture(t)
+	legacyAddr := testAccAddr()
+	newAddr := testAccAddr()
+	oldValAddr := sdk.ValAddress(legacyAddr)
+	newValAddr := sdk.ValAddress(newAddr)
+	accountOwnedVal := sdk.ValAddress(testAccAddr())
+	independentAccount := testAccAddr()
+	accountOwned := sntypes.SuperNode{
+		ValidatorAddress: accountOwnedVal.String(),
+		SupernodeAccount: legacyAddr.String(),
+	}
+	validatorAssociated := sntypes.SuperNode{
+		ValidatorAddress: oldValAddr.String(),
+		SupernodeAccount: independentAccount.String(),
+	}
+
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(accountOwned, true, nil)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(validatorAssociated, true)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), independentAccount.String()).Return(validatorAssociated, true, nil)
+	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, updated sntypes.SuperNode) error {
+			require.Equal(t, accountOwnedVal.String(), updated.ValidatorAddress)
+			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
+			return nil
+		})
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
+	f.expectIdentityMigrationPlan(t, oldValAddr, newValAddr, nil, nil)
+	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, updated sntypes.SuperNode) error {
+			require.Equal(t, newValAddr.String(), updated.ValidatorAddress)
+			require.Equal(t, independentAccount.String(), updated.SupernodeAccount)
+			return nil
+		})
+
+	require.NoError(t, f.keeper.MigrateValidatorSupernode(f.ctx, oldValAddr, newValAddr, legacyAddr, newAddr))
 }
 
 // --- FinalizeVestingAccount tests for all vesting types ---

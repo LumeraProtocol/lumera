@@ -118,6 +118,55 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 	}
 }
 
+func TestKeeper_MarkSuperNodeStorageFull(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	stakingKeeper := supernodemocks.NewMockStakingKeeper(ctrl)
+	slashingKeeper := supernodemocks.NewMockSlashingKeeper(ctrl)
+	bankKeeper := supernodemocks.NewMockBankKeeper(ctrl)
+
+	k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
+	ctx = ctx.WithBlockHeight(42)
+
+	valAddr := sdk.ValAddress([]byte("validator_addr__20x"))
+	sn := types.SuperNode{
+		ValidatorAddress: valAddr.String(),
+		SupernodeAccount: sdk.AccAddress([]byte("supernode_account_20")).String(),
+		PrevIpAddresses:  []*types.IPAddressHistory{{Address: "127.0.0.1", Height: 1}},
+		P2PPort:          "4444",
+		States: []*types.SuperNodeStateRecord{
+			{State: types.SuperNodeStatePostponed, Height: 10, Reason: "audit_missing_reports"},
+		},
+	}
+	require.NoError(t, k.SetSuperNode(ctx, sn))
+
+	require.NoError(t, k.MarkSuperNodeStorageFull(ctx, valAddr))
+
+	got, found := k.QuerySuperNode(ctx, valAddr)
+	require.True(t, found)
+	require.NotEmpty(t, got.States)
+	require.Equal(t, types.SuperNodeStateStorageFull, got.States[len(got.States)-1].State)
+	require.Equal(t, int64(42), got.States[len(got.States)-1].Height)
+
+	var event sdk.Event
+	for _, e := range ctx.EventManager().Events() {
+		if e.Type == types.EventTypeSupernodeStorageFull {
+			event = e
+			break
+		}
+	}
+	require.Equal(t, types.EventTypeSupernodeStorageFull, event.Type)
+	foundOldState := false
+	for _, attr := range event.Attributes {
+		if string(attr.Key) == types.AttributeKeyOldState && string(attr.Value) == types.SuperNodeStatePostponed.String() {
+			foundOldState = true
+			break
+		}
+	}
+	require.True(t, foundOldState)
+}
+
 func TestKeeper_GetAllSuperNodes(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

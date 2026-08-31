@@ -128,6 +128,24 @@ func TestBuildProofFromPartial_SingleKey_InvalidSig_Aborts(t *testing.T) {
 	require.ErrorContains(t, err, "single-key partial signature invalid")
 }
 
+func TestValidateMatchingMultisigSignerIndices_AllowsMatching(t *testing.T) {
+	err := validateMatchingMultisigSignerIndices("alice-legacy", "alice-evm", false, false, 1, 1)
+	require.NoError(t, err)
+}
+
+func TestValidateMatchingMultisigSignerIndices_RejectsMismatch(t *testing.T) {
+	err := validateMatchingMultisigSignerIndices("alice-legacy", "alice-evm", false, false, 0, 3)
+	require.ErrorContains(t, err, "legacy key \"alice-legacy\" is signer index 0")
+	require.ErrorContains(t, err, "new key \"alice-evm\" is signer index 3")
+	require.ErrorContains(t, err, "same signer position")
+}
+
+func TestValidateMatchingMultisigSignerIndices_SkipsSingleKeySide(t *testing.T) {
+	require.NoError(t, validateMatchingMultisigSignerIndices("legacy", "new", true, false, 0, 2))
+	require.NoError(t, validateMatchingMultisigSignerIndices("legacy", "new", false, true, 0, 2))
+	require.NoError(t, validateMatchingMultisigSignerIndices("legacy", "new", true, true, 0, 2))
+}
+
 // ---------- buildProofFromPartial — multisig Cosmos side ----------
 
 func TestBuildProofFromPartial_Multisig_Valid2of3(t *testing.T) {

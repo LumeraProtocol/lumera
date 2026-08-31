@@ -1,6 +1,6 @@
 // verify.go implements the "verify" mode, which scans all migrated legacy
 // addresses and checks that no leftover state references remain across bank,
-// staking, distribution, authz, feegrant, action, claim, and supernode modules.
+// staking, distribution, authz, feegrant, action, and supernode modules.
 package main
 
 import (
@@ -34,7 +34,7 @@ func runVerify() {
 		log.Println("no migrated legacy addresses to verify")
 		return
 	}
-	log.Printf("verifying %d migrated legacy addresses across all chain modules (except evmigration)", len(targets))
+	log.Printf("verifying %d migrated legacy addresses across chain modules (skipping evmigration and claim state)", len(targets))
 
 	var issues []issue
 	addIssue := func(t verifyTarget, module, detail string) {
@@ -120,16 +120,6 @@ func runVerify() {
 			addIssue(t, "action", fmt.Sprintf("still referenced as supernode in %d action(s): %s",
 				len(ids), strings.Join(ids, ", ")))
 		}
-
-		// ── claim: claim record pointing to legacy ────────────────────
-		if claimed, destAddr, _, err := queryClaimRecord(t.legacyAddr); err == nil {
-			if !claimed {
-				addIssue(t, "claim", "unclaimed claim record still exists for legacy address")
-			} else if destAddr == t.legacyAddr {
-				addIssue(t, "claim", "claim record dest_address still points to legacy address")
-			}
-		}
-		// claim query errors are expected (no record = good)
 
 		// ── evmigration: migration record must exist ──────────────────
 		hasMigRecord, recordNewAddr := queryMigrationRecord(t.legacyAddr)

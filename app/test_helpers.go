@@ -209,6 +209,17 @@ func GetDefaultWasmOptions() []wasmkeeper.Option {
 }
 
 func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, wasmOpts ...wasmkeeper.Option) (*App, GenesisState) {
+	return setupWithAppOptionOverrides(t, chainID, withGenesis, invCheckPeriod, nil, wasmOpts...)
+}
+
+func setupWithAppOptionOverrides(
+	t testing.TB,
+	chainID string,
+	withGenesis bool,
+	invCheckPeriod uint,
+	overrides map[string]interface{},
+	wasmOpts ...wasmkeeper.Option,
+) (*App, GenesisState) {
 	db := dbm.NewMemDB()
 	nodeHome := t.TempDir()
 	snapshotDir := filepath.Join(nodeHome, "data", "snapshots")
@@ -231,6 +242,9 @@ func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, 
 	appOptions[IBCModuleRegisterFnOptionV2] = func(ibcRouter *ibcapi.Router) {
 		ibcRouter.AddRoute(mockv2.PortIDA, mockv2.NewIBCModule())
 		ibcRouter.AddRoute(mockv2.PortIDB, mockv2.NewIBCModule())
+	}
+	for key, value := range overrides {
+		appOptions[key] = value
 	}
 
 	app := New(

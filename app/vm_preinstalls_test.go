@@ -41,7 +41,7 @@ func TestEVMAddPreinstallsMatrix(t *testing.T) {
 				Address: "0x1000000000000000000000000000000000000002",
 				Code:    "0x",
 			},
-			expectErrSubstr: "has no code",
+			expectErrSubstr: "has empty code hash",
 		},
 		{
 			name: "rejects preinstall with existing account",

@@ -360,6 +360,20 @@ func (mr *MockSupernodeKeeperMockRecorder) IsSuperNodeActive(ctx, valAddr any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSuperNodeActive", reflect.TypeOf((*MockSupernodeKeeper)(nil).IsSuperNodeActive), ctx, valAddr)
 }
 
+// MarkSuperNodeStorageFull mocks base method.
+func (m *MockSupernodeKeeper) MarkSuperNodeStorageFull(ctx types1.Context, valAddr types1.ValAddress) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkSuperNodeStorageFull", ctx, valAddr)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkSuperNodeStorageFull indicates an expected call of MarkSuperNodeStorageFull.
+func (mr *MockSupernodeKeeperMockRecorder) MarkSuperNodeStorageFull(ctx, valAddr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkSuperNodeStorageFull", reflect.TypeOf((*MockSupernodeKeeper)(nil).MarkSuperNodeStorageFull), ctx, valAddr)
+}
+
 // Logger mocks base method.
 func (m *MockSupernodeKeeper) Logger() log.Logger {
 	m.ctrl.T.Helper()

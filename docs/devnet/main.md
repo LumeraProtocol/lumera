@@ -24,6 +24,7 @@ The Lumera devnet is a Docker-based local test network that runs 5 validator nod
 | [lumera-uploader.md](lumera-uploader.md) | Lumera Uploader (formerly network-maker) multi-account service |
 | [supernode.md](supernode.md) | Supernode setup, on-chain registration, and `sncli` |
 | [tests.md](tests.md) | Validator, Hermes, and EVM migration devnet tests |
+| [gen-activity.md](gen-activity.md) | Live-devnet user activity generator (`tests-gen-activity`) |
 
 ### Related EVM integration docs
 
@@ -221,4 +222,4 @@ Go structs that deserialize `config.json` and `validators.json`. Used by the gen
 
 Based on `debian:trixie-slim`. Installs system tools (`jq`, `crudini`, `nginx-light`, `ripgrep`, `Node.js`) and copies all setup scripts. Entrypoint: `/root/scripts/start.sh`.
 
-Exposed ports: `26656 26657 1317 9090 4444 8002 50051 8080 8088`.
+Exposed ports: `26656 26657 1317 9090 4444 8002 15051 8080 8088`.

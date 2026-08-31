@@ -1,6 +1,6 @@
 # Supernode Operator EVM Migration Guide
 
-**Last updated**: 2026-04-21
+**Last updated**: 2026-06-16
 **Applies to**: operators running a Lumera supernode against an EVM-enabled chain (post-EVM upgrade)
 **Prerequisite reading**: [migration.md](migration.md) for the chain-level mechanics of legacy → EVM account migration
 
@@ -22,8 +22,8 @@ Migration is idempotent end-to-end: if anything fails mid-flight, restart the da
 
 Both paths land in the same final state (new EVM key registered as supernode, legacy key deleted, `config.yml` updated). The operator steps are identical — what differs is whether the daemon initiates the on-chain migration or just finalizes one you already submitted.
 
-- **Path A — Supernode daemon migrates for you (recommended default).** You recover a new EVM key into the supernode keyring, add`evm_key_name` to`config.yml`, and restart. The daemon detects the legacy key, dual-signs with both keys, and broadcasts`MsgClaimLegacyAccount` itself. This is the flow the rest of this guide documents in steps 1–4.
-- **Path B — Migrate via Keplr + Portal first, then let the supernode finalize.** You use the Portal's standard[end-user migration](migration.md#method-1-portal--keplr-recommended) (browser + Keplr) to submit the migration transaction yourself. Then on the supernode host, you recover the same EVM key into the supernode's keyring, update`config.yml`, and restart. On startup the daemon sees the on-chain migration record, matches it against your configured`evm_key_name`, skips the broadcast, and performs only local cleanup.
+- **Path A — Supernode daemon migrates for you (recommended default).** You recover a new EVM key into the supernode keyring, add `evm_key_name` to `config.yml`, and restart. The daemon detects the legacy key, dual-signs with both keys, and broadcasts `MsgClaimLegacyAccount` itself. This is the flow the rest of this guide documents in steps 1–4.
+- **Path B — Migrate via Keplr + Portal first, then let the supernode finalize.** You use the Portal's standard [end-user migration](migration.md#method-1-portal--keplr-recommended) (browser + Keplr) to submit the migration transaction yourself. Then on the supernode host, you recover the same EVM key into the supernode's keyring, update `config.yml`, and restart. On startup the daemon sees the on-chain migration record, matches it against your configured `evm_key_name`, skips the broadcast, and performs only local cleanup.
 
 Path B is useful when you want to use Keplr's UX to see each step (the Portal shows balances, delegations, and a pre-migration checklist), when you need to migrate the account's balance urgently for non-supernode reasons, or when your node ops team and your wallet custody team are different people.
 
@@ -36,7 +36,7 @@ Path B is useful when you want to use Keplr's UX to see each step (the Portal sh
 >
 > Then continue with Step B3 (recover the new EVM key into the supernode keyring) onward.
 
-**Why both paths work deterministically**: `supernode keys recover` derives keys at HD path `m/44'/60'/0'/0/0` using `eth_secp256k1`. Keplr uses the identical derivation for Lumera's EVM chain definition. Given the same mnemonic, both produce the exact same bech32 address — so the new address in the on-chain migration record matches what the supernode derives locally, and the `alreadyMigrated` branch activates cleanly.
+**Why both paths work deterministically**: `supernode keys recover` derives keys at HD path `m/44'/60'/0'/0/0` using `eth_secp256k1`. Keplr uses the identical derivation for Lumera's EVM chain definition. Import the chosen destination mnemonic into both tools so they produce the same destination address. That mnemonic may be the legacy mnemonic or a different one.
 
 If you chose Path B, the steps below are the same but in Step 3 the logs will show a *skipped* broadcast (see the **Path B log variant** callout in that section).
 
@@ -46,13 +46,46 @@ If you chose Path B, the steps below are the same but in Step 3 the logs will sh
 
 Before starting:
 
-- Lumera chain is**EVM-enabled**. The supernode daemon verifies this at boot via`x/upgrade.ModuleVersions(evm)`. If the chain hasn't upgraded yet the daemon fatals with`connected Lumera chain does not have EVM support` — wait for the chain upgrade.
-- You hold the**mnemonic (seed phrase)** for the legacy supernode key.
-- You have access to the host running the supernode daemon and can edit`config.yml`.
+- Lumera chain is **EVM-enabled**. The supernode daemon verifies this at boot via `x/upgrade.ModuleVersions(evm)`. If the chain hasn't upgraded yet the daemon fatals with `connected Lumera chain does not have EVM support` — wait for the chain upgrade.
+- You hold the **mnemonic (seed phrase)** for the legacy supernode key.
+- You have access to the host running the supernode daemon and can edit `config.yml`.
+- Your keyring passphrase is **at least 8 characters**. Shorter passphrases are rejected by the keyring backend, which surfaces as a confusing failure part-way through key creation rather than as a clear "passphrase too short" message.
+
+### Upgrade order: the chain goes first, then your supernode
+
+The chain must reach the EVM-enabled release **before** you upgrade your supernode binary past `v2.6.0`. Supernode `v2.6.x` refuses to start against a pre-EVM chain — by design — so upgrading early takes your node offline until the chain catches up:
+
+```text
+connected Lumera chain does not have EVM support (module "evm" not found).
+This supernode binary requires an EVM-enabled Lumera chain.
+Please upgrade your Lumera node or connect to an EVM-enabled chain
+```
+
+So the sequence is always:
+
+```
+1. chain upgrades to the EVM release
+2. you set evm_key_name (Step 2 below)
+3. you upgrade the supernode binary to v2.6.x
+4. the daemon migrates on next boot (Step 3 below)
+```
+
+### `sn-manager` will block the v2.6 upgrade until you set `evm_key_name`
+
+If you run `sn-manager` with automatic updates, it **deliberately refuses** to carry you across the EVM boundary (any upgrade from below `v2.6.0` to `v2.6.0` or above) until the migration is prepared. You will see one of:
+
+```text
+Automatic update to <version> blocked: supernode.evm_key_name is missing or empty
+Automatic update to <version> blocked: cannot read SuperNode evm_key_name: <error>
+```
+
+**This is correct behaviour, not a bug, and it is protecting you.** Do not work around it, downgrade, or disable the updater. Complete Step 1 and Step 2 below — set `evm_key_name` in `config.yml` — and the update will proceed on its own at the next check.
+
+Nodes already on `v2.6.x` are not gated, because a successful migration intentionally clears `evm_key_name`.
 
 ---
 
-## Step 1 — Recover the new EVM key from the same mnemonic
+## Step 1 — Generate or recover the EVM destination key
 
 `supernode keys recover` always produces `eth_secp256k1` keys (coin-type 60). Run it with a **new key name** distinct from your legacy one:
 
@@ -66,13 +99,13 @@ Example:
 `supernode keys recover supernode-evm --mnemonic "inspire words ... about"
 ```
 
-The output prints the new EVM address (derived at coin-type 60 from the same mnemonic). Verify:
+The output prints the new EVM address derived at coin type 60 from the chosen destination mnemonic. Verify:
 
 ```bash
 supernode keys list
 ```
 
-You should see both your legacy key and the newly recovered EVM key. Both derive from the same mnemonic; only their HD paths differ.
+You should see both your legacy key and the newly recovered EVM key. They may use the same mnemonic or different mnemonics; the new key uses coin type `60` and `eth_secp256k1`.
 
 ## Step 2 — Add `evm_key_name` to `config.yml`
 
@@ -104,10 +137,10 @@ INFO  EVM migration complete — legacy key removed, config updated
 
 On success, the daemon has:
 
-- Broadcast`MsgClaimLegacyAccount` (or`MsgMigrateValidator` if you're also a validator operator) with both signatures embedded.
+- Broadcast `MsgClaimLegacyAccount` (or `MsgMigrateValidator` if you're also a validator operator) with both signatures embedded.
 - Waited for block inclusion.
 - Deleted the old legacy key from the keyring.
-- Rewritten`config.yml`:`key_name: supernode-evm`,`identity: lumera1...newEVMaddr`,`evm_key_name` removed.
+- Rewritten `config.yml`: `key_name: supernode-evm`, `identity: lumera1...newEVMaddr`, `evm_key_name` removed.
 
 From here on, the supernode runs on the EVM key with no further intervention.
 
@@ -138,7 +171,10 @@ lumerad query evmigration migration-record <legacy-address>
 The response should show `new_address` matching your EVM key's address. Also confirm the supernode's on-chain registration points at the new address:
 
 ```bash
-lumerad query supernode get-supernode <new-address>
+# get-supernode takes the VALOPER address (lumeravaloper1…), not the account
+# address. Convert your new account address with:
+#   lumerad keys show <new-key> -a --bech val
+lumerad query supernode get-supernode <new-valoper-address>
 ```
 
 Finally, confirm `config.yml` reflects the switch:
@@ -149,6 +185,50 @@ grep -E "key_name|identity|evm_key_name" ~/.supernode/config.yml
 
 You should see `key_name: <evm-key-name>`, `identity: <new-evm-address>`, and no `evm_key_name` line.
 
+### Verify against chain state, not just the daemon's logs
+
+Always confirm the outcome on-chain. A successful-looking log line is not proof the transaction was included and executed:
+
+```bash
+lumerad query evmigration migration-records -o json      # full legacy → new mapping
+```
+
+Two things worth understanding about what you'll see:
+
+- **The old address stops resolving, and that is expected.** `prev_supernode_accounts` records your history — it does *not* keep the old address queryable:
+
+  ```text
+  $ lumerad query supernode get-supernode-by-address <OLD address>
+  rpc error: NotFound desc = supernode not found: key not found
+  ```
+
+  Query with the **new** address. If you need the historical link, read the migration record.
+
+- **Migration is not repeatable.** On success the daemon **deletes the legacy key** from the keyring. Re-running a migration therefore only ever retries a *failed* attempt — it cannot be used to "redo" a successful one, and there is no undo. Make sure you have the destination mnemonic safely recorded **before** you start.
+
+### Two keyrings: `key_name` is ambiguous without knowing which one
+
+The supernode daemon uses **its own keyring** (`~/.supernode/keys`), separate from the validator keyring. **The same key name can resolve to two different addresses:**
+
+```bash
+# validator keyring
+lumerad keys show <name> -a --keyring-backend test
+
+# supernode daemon keyring — note --keyring-dir
+lumerad keys show <name> -a --keyring-backend test --keyring-dir ~/.supernode/keys
+```
+
+Whenever an instruction says "use key X", check which keyring it means. A mismatch here — registration pointing at the validator-keyring address while `config.yml` names the daemon-keyring one — prevents the supernode from ever starting, and the symptom looks like a migration problem rather than a keyring problem.
+
+**You cannot move a migrated key between keyrings.** Once migrated the key is `eth_secp256k1`, and while `keys export` appears to succeed, `keys import` rejects it:
+
+```text
+failed to decrypt private key: unmarshal to types.PrivKey failed after 4 bytes
+  (unrecognized prefix bytes ...)
+```
+
+Generate the EVM key **directly in the keyring that will use it** (Step 1 does this for the daemon keyring via `supernode keys recover`) rather than trying to copy one across.
+
 ---
 
 ## Path B — Migrating via Portal + Keplr first
@@ -157,7 +237,7 @@ Use this section if you chose Path B from the ["Two ways to migrate"](#two-ways-
 
 ### Before you start
 
-- You need the **same mnemonic** in Keplr (for the Portal) and on the supernode host (for `supernode keys recover`). The deterministic address match between the Portal-submitted migration record and the key you'll import into the supernode keyring depends on this.
+- Import the chosen destination mnemonic in Keplr and on the supernode host so both control the destination recorded by the migration. It may be the legacy mnemonic or a different mnemonic.
 - Decide *when* you'll run each step. A safe order is: stop the supernode → migrate in Keplr → recover the EVM key → edit config → restart. Leaving the supernode running between the Portal migration and the final restart is not harmful (the legacy account no longer exists on-chain, so the supernode's outgoing txs will fail fast), but it produces alarming-looking errors in the logs until you restart.
 
 ### Step B1 — Stop the supernode
@@ -242,6 +322,12 @@ Same as Path A's [Step 4 — Verify](#step-4--verify). Three queries — migrati
 
 ## Troubleshooting
 
+> **Before you delete or overwrite any key:** never remove a key until its replacement is proven
+> to exist and resolve to the address you expect. Import under a temporary name, verify the
+> address matches, and only then swap. And never hide errors on a destructive step
+> (`2>/dev/null`) — a suppressed import error is how a recoverable failure becomes permanent key
+> loss. If you are unsure, stop and ask before deleting anything.
+
 ### `evm_key_name "<name>" is not an eth_secp256k1 key`
 
 You created or recovered the EVM-named key with the wrong algorithm. Delete it and re-run `supernode keys recover` (which always produces `eth_secp256k1`).
@@ -259,7 +345,7 @@ The chain hasn't run the EVM upgrade yet. This supernode binary is post-EVM-only
 Someone completed migration with a different EVM key than the one now in your `evm_key_name` config. Either:
 
 - Use the EVM key that actually signed the original migration (re-recover it with the mnemonic that was used), or
-- Investigate whether the on-chain`new_address` is correct — it's the authoritative record.
+- Investigate whether the on-chain `new_address` is correct — it's the authoritative record.
 
 ---
 
@@ -311,7 +397,7 @@ Four-step offline ceremony:
   #    derives the new multisig:
   lumerad keys add <op>-eth-<N> --key-type eth_secp256k1 --keyring-backend <backend>
   lumerad keys add <op>-msig-new --multisig <op>-eth-1,<op>-eth-2,<op>-eth-3 \
-    --multisig-threshold K --keyring-backend <backend>
+    --multisig-threshold K --nosort --keyring-backend <backend>
 
   # 2) Coordinator builds the proof template:
   lumerad tx evmigration generate-proof-payload \
@@ -349,11 +435,14 @@ lumerad keys add <op-name>-eth-<N> --key-type eth_secp256k1 \
 lumerad keys add <op-name>-msig-new \
   --multisig <op-name>-eth-1,<op-name>-eth-2,<op-name>-eth-3 \
   --multisig-threshold 2 \
+  --nosort \
   --keyring-backend <backend>
 
 lumerad keys show <op-name>-msig-new --address
 # lumera1...   <-- the new multisig bech32; record this as new_address
 ```
+
+> **`--nosort` is required, and member order must mirror the legacy side.** Without `--nosort`, `keys add` sorts sub-keys by address, so this composite address won't match the one `generate-proof-payload` derives from `--new-sub-pub-keys` (which preserves the listed order), and the signer indices won't line up. List the members in the **same order as the legacy multisig's `public_keys`** (`lumerad query auth account <multisig-legacy-address>`) so each co-signer holds the same signer index on both sides — the consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`.
 
 This replaces the old single-EOA "recover the new EVM key" step: the destination is a multisig derived from fresh eth sub-keys, not an EOA recovered from a mnemonic.
 
@@ -490,6 +579,8 @@ Regenerate `proof.json` with the correct `--chain-id`, have the affected signer 
 
 **What if only K−1 co-signers have provided eth sub-keys for the destination side?** — same situation, symmetric: you need K valid new-side partials. Have the missing co-signer(s) generate their eth sub-key (`lumerad keys add ... --key-type eth_secp256k1`), rebuild `proof.json` via `generate-proof-payload` with the full `--new-sub-pub-keys` list, and re-sign.
 
+**`legacy key "..." is signer index N, but new key "..." is signer index M; multisig migration requires the same signer position to approve both halves`** — raised by `sign-proof` when a co-signer passes both `--from` and `--new-key` in one call but the two keys occupy *different* positions in their respective multisigs. Each co-signer must hold the **same signer index** on the legacy and new sides (the consensus mirror-source rule requires `legacy_proof.signer_indices == new_proof.signer_indices`). The usual root cause is a destination multisig built without `--nosort` (so `keys add` sorted the sub-keys) or with a member order that doesn't mirror the legacy `public_keys`. Recreate `<op-name>-msig-new` with `--nosort`, listing the eth sub-keys in the same member order as the legacy multisig (`lumerad query auth account <multisig-legacy-address>`), then regenerate `proof.json` and re-sign.
+
 **The supernode's embedded error message says `assemble-proof` but the CLI has `combine-proof`. Which is correct?** — the CLI command is `combine-proof`. Any older embedded error message in the supernode binary is stale; use this guide's commands.
 
 ---
@@ -498,6 +589,6 @@ Regenerate `proof.json` with the correct `--chain-id`, have the affected signer 
 
 - [migration.md](migration.md) — chain-level end-user migration guide (Portal + Keplr, shell scripts, raw CLI)
 - [migration-scripts.md](migration-scripts.md) — reference for the bundled `migrate-account.sh` / `migrate-validator.sh` shell helpers (flags, exit codes, troubleshooting)
-- [validator-migration.md](validator-migration.md) — validator operator migration guide (maintenance window,`max_validator_delegations` check, consensus key handling)
-- [legacy-migration.md](../evmigration/legacy-migration.md) —`x/evmigration` module architecture, proto shapes, keeper logic, and the full reference for the offline proof flow
-- [node-evm-config-guide.md](node-evm-config-guide.md) — post-upgrade`app.toml` / RPC configuration for full nodes and validators
+- [validator-migration.md](validator-migration.md) — validator operator migration guide (maintenance window, `max_validator_delegations` check, consensus key handling)
+- [legacy-migration.md](../evmigration/legacy-migration.md) — `x/evmigration` module architecture, proto shapes, keeper logic, and the full reference for the offline proof flow
+- [node-evm-config-guide.md](node-evm-config-guide.md) — post-upgrade `app.toml` / RPC configuration for full nodes and validators

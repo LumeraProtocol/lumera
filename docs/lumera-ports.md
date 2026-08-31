@@ -28,7 +28,7 @@ This document lists network ports used by `lumerad`, with:
 > Notes:
 >
 > - Some services are disabled by default and only bind when enabled (e.g., API, gRPC, gRPC-Web, JSON-RPC depending on config).
-> - Lumera app defaults enable EVM JSON-RPC and indexer in app config initialization; runtime can still override via flags or`app.toml`.
+> - Lumera app defaults enable EVM JSON-RPC and indexer in app config initialization; runtime can still override via flags or `app.toml`.
 
 ---
 
@@ -269,7 +269,7 @@ curl -s http://127.0.0.1:6065/metrics | head
 ## 9) EVM JSON-RPC rate-limit proxy
 
 - **Purpose:** Per-IP token bucket rate limiting for the EVM JSON-RPC endpoint. Reverse-proxies requests to the internal JSON-RPC server (`:8545`).
-- **Default:**`0.0.0.0:8547` (disabled by default — must set`enable = true`)
+- **Default:**`0.0.0.0:8547` (disabled by default — must set `enable = true`)
 - **Config:**`app.toml` →`[lumera.json-rpc-ratelimit]`
   - `enable` — toggle (default:`false`)
   - `proxy-address` — listen address
@@ -277,7 +277,7 @@ curl -s http://127.0.0.1:6065/metrics | head
   - `burst` — max burst per IP (default:`100`)
   - `entry-ttl` — inactivity TTL for per-IP state (default:`5m`)
 - **CLI:** none (config-only)
-- **Note:** When enabled, external clients should connect to this port; keep`:8545` on loopback for internal/trusted access.
+- **Note:** When enabled, external clients should connect to this port; keep `:8545` on loopback for internal/trusted access.
 
 ## 10) CometBFT pprof listener
 
@@ -329,6 +329,43 @@ Given `--home <HOME>` (default `~/.lumera`), config files are typically:
 
 ---
 
+## Devnet docker host-port scheme
+
+The Dockerized devnet (`devnet/`, 5 validators) is a **different mechanism** from
+`lumerad testnet`: each validator runs in its own container network namespace, so
+the **container-side** EVM ports are always identical (`8545`, `8546`, `6065`,
+`8100`). Only the **host-published** ports differ, set in the generated
+`devnet/docker-compose.yml` from `devnet/config/validators.json`.
+
+Host EVM ports use a contiguous per-validator block, stride 100, starting at 8645
+(so the canonical `8545` is left free and never collides with a stray local node).
+For validator index `i` (0-based):
+
+- JSON-RPC HTTP:   `8645 + i*100` → container `:8545`
+- JSON-RPC WS:     `8646 + i*100` → container `:8546`
+- JSON-RPC metrics:`8647 + i*100` → container `:6065`
+- geth metrics:    `8648 + i*100` → container `:8100`
+
+| Validator   | http     | ws       | metrics  | geth     |
+| ----------- | -------- | -------- | -------- | -------- |
+| validator_1 | `8645` | `8646` | `8647` | `8648` |
+| validator_2 | `8745` | `8746` | `8747` | `8748` |
+| validator_3 | `8845` | `8846` | `8847` | `8848` |
+| validator_4 | `8945` | `8946` | `8947` | `8948` |
+| validator_5 | `9045` | `9046` | `9047` | `9048` |
+
+> **Version gate:** these host ports are published **only for EVM-enabled chain
+> versions** (`chain.version >= chain.evm_from_version`, default cutover
+> `v1.20.0`). A pre-EVM devnet publishes **no** EVM host ports, because pre-EVM
+> `lumerad` never serves these endpoints and publishing them would needlessly
+> reserve host ports (e.g. `8545`).
+>
+> The JSON-RPC metrics server additionally requires the `--metrics` start flag
+> (wired in `devnet/scripts/start.sh`), and geth metrics require
+> `[telemetry] enabled = true` (wired in `devnet/scripts/validator-setup.sh`).
+
+---
+
 ## Security recommendations
 
 - Keep sensitive endpoints on loopback unless explicitly needed:
@@ -336,9 +373,9 @@ Given `--home <HOME>` (default `~/.lumera`), config files are typically:
   - `--json-rpc.address 127.0.0.1:8545`
   - `--json-rpc.ws-address 127.0.0.1:8546`
 - Expose P2P publicly only when operating a network node.
-- Avoid`--rpc.unsafe` on public interfaces.
+- Avoid `--rpc.unsafe` on public interfaces.
 - If exposing API/gRPC publicly, place behind firewall/reverse proxy/TLS.
-- For public EVM JSON-RPC access, enable the rate-limiting proxy (`[lumera.json-rpc-ratelimit] enable = true`) and expose`:8547` instead of`:8545` directly.
+- For public EVM JSON-RPC access, enable the rate-limiting proxy (`[lumera.json-rpc-ratelimit] enable = true`) and expose `:8547` instead of `:8545` directly.
 
 ---
 

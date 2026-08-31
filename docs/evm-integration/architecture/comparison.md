@@ -54,7 +54,7 @@ Lumera is ahead in several integration-quality dimensions:
 
 | Parameter                   | Lumera                        | Evmos                 | Kava        | Cronos     |
 | --------------------------- | ----------------------------- | --------------------- | ----------- | ---------- |
-| Default base fee            | 0.0025 ulume (2.5 gwei equiv) | ~10 gwei              | ~0.25 ukava | Variable   |
+| Default base fee            | 0.0125 ulume (12.5 gwei equiv) | ~10 gwei              | ~0.25 ukava | Variable   |
 | Min gas price floor         | 0.0005 ulume                  | 0 (no floor)          | N/A         | N/A        |
 | Base fee change denominator | 16 (~6.25% adjustment)        | 8 (~12.5%)            | 8           | 8          |
 | Consensus max gas           | 25,000,000                    | 30,000,000-40,000,000 | 25,000,000  | 25,000,000 |

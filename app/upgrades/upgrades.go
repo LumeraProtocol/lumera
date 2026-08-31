@@ -17,6 +17,8 @@ import (
 	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
 	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
+	upgrade_v1_20_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_1"
+	upgrade_v1_20_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_2"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -40,7 +42,9 @@ import (
 // | v1.11.0 | custom   | add audit store                   | Initializes audit params with dynamic epoch_zero_height
 // | v1.11.1 | custom   | conditional add audit store       | Supports direct v1.10.1->v1.11.1 and enforces audit min_disk_free_percent floor (>=15)
 // | v1.12.0 | custom   | none (Everlight in supernode)     | Runs migrations; Everlight logic embedded in x/supernode
-// | v1.20.0 | custom   | add feemarket, precisebank, vm, erc20 | Adds EVM stores and applies Lumera EVM param finalization
+// | v1.20.0 | custom   | non-mainnet: add feemarket, precisebank, vm, erc20 | EVM bring-up; gated to non-mainnet (mainnet runs it via v1.20.1)
+// | v1.20.1 | custom   | state-driven add-only: feemarket, precisebank, vm, erc20 | EVM bring-up when EVM absent (any network, incl. direct 1.12.0->1.20.1); migrations-only hotfix when EVM already present. Add-only store loader mounts only missing keys.
+// | v1.20.2 | custom   | state-driven add-only: same EVM set as v1.20.1 | Consensus activation boundary for the evmigration ownership/continuity fixes. Brings up EVM when absent; otherwise runs migrations; both paths apply the configured feemarket base fee. No store migration or consensus-version bump.
 // =================================================================================================================================
 
 type UpgradeConfig struct {
@@ -72,6 +76,8 @@ var upgradeNames = []string{
 	upgrade_v1_11_1.UpgradeName,
 	upgrade_v1_12_0.UpgradeName,
 	upgrade_v1_20_0.UpgradeName,
+	upgrade_v1_20_1.UpgradeName,
+	upgrade_v1_20_2.UpgradeName,
 }
 
 var NoUpgradeConfig = UpgradeConfig{
@@ -152,9 +158,42 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 			Handler:      upgrade_v1_12_0.CreateUpgradeHandler(params),
 		}, true
 	case upgrade_v1_20_0.UpgradeName:
+		// Mainnet skips v1.20.0 entirely and runs the EVM bring-up via v1.20.1
+		// instead (see the v1.20.1 case). Testnet and devnet already ran v1.20.0,
+		// so they keep it. Mirrors the v1.8.0/v1.8.4 mainnet-skip precedent.
+		if IsMainnet(params.ChainID) {
+			return NoUpgradeConfig, true
+		}
 		return UpgradeConfig{
 			StoreUpgrade: &upgrade_v1_20_0.StoreUpgrades,
 			Handler:      upgrade_v1_20_0.CreateUpgradeHandler(params),
+		}, true
+	case upgrade_v1_20_2.UpgradeName:
+		// v1.20.2 is the coordinated halt that activates the evmigration
+		// SuperNode-ownership and Everlight-continuity fixes. Those change
+		// DeliverTx results for the same migration tx, so the binary must not
+		// be rolled out node-by-node while migrations can execute.
+		//
+		// It declares the same EVM store additions as v1.20.1 for the same
+		// reason: the add-only store loader mounts only the keys missing from
+		// committed state, making this a no-op on testnet (already on 1.20.1)
+		// and the full EVM mount on a direct 1.12.0 one-hop from mainnet.
+		return UpgradeConfig{
+			StoreUpgrade: &upgrade_v1_20_0.StoreUpgrades,
+			Handler:      upgrade_v1_20_2.CreateUpgradeHandler(params),
+		}, true
+
+	case upgrade_v1_20_1.UpgradeName:
+		// v1.20.1 carries the EVM bring-up based on chain STATE, not chain-id.
+		// It declares the same EVM store additions as v1.20.0 on every network;
+		// the add-only store loader (see StoreLoaderForUpgrade) mounts only the
+		// keys missing from committed state, so this is a no-op on chains that
+		// already ran v1.20.0 and mounts the EVM stores on a direct 1.12.0->1.20.1
+		// one-hop. The handler is likewise state-driven: it runs the full v1.20.0
+		// bring-up when the EVM stack is absent from fromVM, else migrations only.
+		return UpgradeConfig{
+			StoreUpgrade: &upgrade_v1_20_0.StoreUpgrades,
+			Handler:      upgrade_v1_20_1.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

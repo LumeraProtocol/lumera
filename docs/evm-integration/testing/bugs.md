@@ -370,3 +370,59 @@ Meanwhile, the EVM keeper (initialized in `x/vm/keeper/keeper.go:119`) correctly
 **Fix** (`app/upgrades/v1_20_0/upgrade.go`, `app/upgrades/params/params.go`, `x/erc20policy/types/keys.go`): The upgrade handler now writes the policy mode key (`"allowlist"`) and default provenance-bound base denom trace entries after setting ERC20 params. Policy constants (`PolicyMode*`, KV keys, `DefaultAllowedBaseDenomTraces`) were moved from unexported vars in `app/` to the shared `x/erc20policy/types` package so both `app` and the upgrade handler can reference them. The `Erc20StoreKey` field was added to `AppUpgradeParams` to give the handler KV store access. Entries are stored under `PolicyAllowBaseTracePfx` with empty traces (inert placeholders).
 
 **Tests**: `TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped` extended to verify the policy mode is set to `"allowlist"` and all default base denom traces are present in the allowlist after the upgrade.
+
+---
+
+### 26) Zero-signer evmigration tx rejected by app-side EVM mempool
+
+**Symptom**: `lumerad tx evmigration submit-proof tx.json` can build a valid migration tx with no Cosmos envelope signer, but broadcasting it through CheckTx fails with `tx must have at least one signer` when the app-side EVM mempool is enabled.
+
+**Root cause**: Migration txs intentionally declare zero SDK signers because authorization is embedded in the `legacy_proof` and `new_proof` message fields. The SDK's default `DefaultSignerExtractionAdapter` therefore returns an empty signer list. `PriorityNonceMempool.Insert` rejects empty signer data before the tx can be retained for proposal selection.
+
+**Fix** (`app/evmigration_signer_extraction_adapter.go`, `app/evm_mempool.go`): Added an evmigration-aware signer extraction adapter beneath the EVM-aware default. For migration-only txs it derives a deterministic synthetic signer from the message `legacy_address`; all non-migration and mixed txs delegate to the normal fallback path. Multi-message migration txs are rejected so one tx cannot map to multiple synthetic signer buckets.
+
+**Hardening — zero-fee mempool spam gate** (`x/evmigration/keeper/ante.go`): Admitting zero-signer migration txs to the mempool also opens a zero-fee spam vector — migration txs carry no fee and no signature, so anyone could flood the mempool/proposals with proof-valid txs that only fail at message execution. `VerifyMigrationProofsForAnte` now enforces the migration admission window at the ante (rejects with `ErrMigrationDisabled` / `ErrMigrationWindowClosed` when `EnableMigration` is off or `MigrationEndTime` has passed), mirroring `preChecks` steps 1–2. It also performs cheap state admission checks before mempool insertion: the legacy account must exist and must not be a module account, the source and destination must not already be migrated/claimed, and `MsgMigrateValidator` must name an existing source validator. The window check is a no-op under default params (`EnableMigration=true`, `MigrationEndTime=0`); on mainnet the operator-set `MigrationEndTime` bounds the exposure to the migration window and closes it automatically. Message execution still re-checks the full canonical migration rules.
+
+**Tests**: `TestEVMMempool_CheckTxAcceptsZeroSignerMigrationTx`, `TestEVMMempool_CheckTxRejectsProofValidNonexistentLegacyAccount`, `TestEVMMempool_CheckTxRejectsZeroSignerNonMigrationTx`, `TestEVMMempool_InsertRejectsZeroSignerNonMigrationTx`, `TestEVMMempool_InsertAcceptsZeroSignerValidatorMigrationTx`, `TestEVMMempool_InsertRejectsMalformedMigrationLegacyAddress`, `TestEVMMempool_InsertRejectsZeroSignerMixedMigrationTx`, `TestEVMMempool_PrepareProposalIncludesZeroSignerMigrationTx`, `TestVerifyMigrationProofsForAnte_AdmissionGate` (disabled / window-closed / open-window), `TestVerifyMigrationProofsForAnte_CheapStateAdmission`, and real-node `broadcast_tx_sync` coverage in `TestEVMigrationZeroSignerTxBroadcastSyncWithMempoolEnabled`, `TestEVMigrationProofValidNonexistentLegacyAccountRejectedByAnte`, `TestEVMigrationMalformedLegacyAddressRejectedByValidateBasic`, and `TestZeroSignerNonMigrationBroadcastSyncStillRejected`.
+
+---
+
+### 27) Migration rebuilds `DelegatorStartingInfo` with share count instead of token stake — bricks withdrawals after any past slash
+
+**Severity**: High
+
+**Symptom**: After migrating an account or validator that delegates to (or is) a validator that was ever slashed, the delegator's next `WithdrawDelegatorReward`, undelegate, or redelegate panics in the SDK with `calculated final stake for delegation ... greater than current stake`. The migration itself succeeds, so the fund-locking damage only surfaces on the delegator's *next* reward/unbond operation and affects every delegation re-keyed to a slashed validator.
+
+**Root cause**: Both migration paths rebuilt `DelegatorStartingInfo.Stake` from the delegation's raw `Shares`. The SDK's own `initializeDelegation` stores stake as `validator.TokensFromSharesTruncated(shares)` (tokens), not shares. Shares and tokens are equal only while a validator's exchange rate is exactly 1.0; slashing permanently lowers `validator.Tokens` while leaving `DelegatorShares` unchanged, so the rate stays below 1.0 forever. Storing shares therefore overstates the recorded stake. `CalculateDelegationRewards` later reads `stake := startingInfo.Stake`, recomputes `currentStake := val.TokensFromShares(del.GetShares())`, and panics when `stake` exceeds `currentStake` beyond a tiny rounding margin. The pre-checks only reject *currently* jailed validators, so a slashed-then-unjailed validator passes migration and hits this panic.
+
+**Fix** (`x/evmigration/keeper/migrate_validator.go`, `x/evmigration/keeper/migrate_staking.go`): Both paths now fetch the target validator and store `val.TokensFromSharesTruncated(del.Shares)`, matching the SDK invariant. In `MigrateValidatorDelegations` the fetch is hoisted out of the delegation loop (all delegations re-key to the same validator, so one `GetValidator(newValAddr)` suffices). In `migrateActiveDelegations` the fetch is per-delegation because each delegation targets a different third-party validator.
+
+**Tests**: `TestMigrateValidatorDelegations_SlashedValidatorStoresTokensNotShares`, `TestMigrateStaking_SlashedValidatorStoresTokensNotShares` — pin `DelegatorStartingInfo.Stake` to the tokens-from-shares value for a slashed validator (90 tokens / 100 shares) and assert it is strictly less than `del.Shares`.
+
+**Follow-up**: the forward fix above only prevents *new* corruption. Chains that already ran v1.20.0 carry poisoned rows that still panic — see bug #28 for the in-place repair.
+
+### 28) Chains that already ran v1.20.0 carry corrupted `DelegatorStartingInfo` rows that still brick withdrawals — needs in-place repair during migration
+
+**Severity**: High
+
+**Relationship to #27**: Bug #27 is the *forward* fix — later migrations stop writing raw shares. It does nothing for rows the buggy v1.20.0 code already persisted. Any chain that executed v1.20.0 (devnet/testnet) still holds those poisoned `DelegatorStartingInfo` rows on disk, and they panic the first time the delegation is touched. This entry is the *backward* repair for that already-written state.
+
+**Symptom**: On a chain that already ran v1.20.0, migrating a validator that was ever slashed (or that has delegators to such a validator) still aborts: `MigrateValidator`'s `WithdrawDelegationRewards` step panics in the SDK with `calculated final stake for delegator ... greater than current stake`. Because the panic aborts the whole transaction, the affected validator/delegator simply cannot be migrated — the forward fix in #27 does not help, since the bad value is already committed to state.
+
+**Root cause**: Identical to #27 — `DelegatorStartingInfo.Stake` holds the delegation's raw `Shares` instead of the token value of those shares. Shares and tokens diverge permanently once the validator is slashed (tokens burned, shares unchanged, exchange rate < 1.0), so `CalculateDelegationRewards` reconstructs a `stake` above `currentStake` and panics beyond its 3-ulp rounding margin. The distinguishing detail for the *already-written* case: v1.20.0 wrote the row at migration height, *after* any historical slash, and reset the starting height past that slash. `CalculateDelegationRewards` only replays slash events recorded at or after the starting height, so the pre-start slash is never replayed to correct the value — the raw-shares overstatement survives to the sanity check.
+
+**Fix** (`x/evmigration/keeper/migrate_distribution.go` — `repairLegacyRawShareStartingInfo`): runs per-delegation in `MigrateValidator` immediately before `WithdrawDelegationRewards`, and rewrites a row only when it carries the exact v1.20.0 fingerprint:
+
+1. Validator has positive `DelegatorShares` (rejects empty/mock state; avoids a zero-denominator conversion).
+2. `currentStake < del.Shares` — the validator was actually slashed (otherwise the panic is impossible).
+3. `startingInfo.Stake == del.Shares` exactly — the raw-shares smoking gun; a correctly-written row stores tokens and would not match.
+4. Replaying the slash events the SDK itself would replay (height ≥ starting height, period > starting `PreviousPeriod`) still leaves the reconstructed stake above `currentStake` by more than the SDK's 3-ulp margin.
+
+When all four hold, it reconstructs the token value *as of the row's own height* — `repairedStake = Stake × (currentStake / finalStake)` — so replaying the post-start slashes lands exactly on `currentStake`. This preserves the SDK's reward-period accounting (slashes recorded after the starting height keep their timing) rather than flattening every period to the current value. Truncation is deliberate: the SDK requires calculated stake ≤ current stake. The fingerprint is provably tight: the SDK's own hooks guarantee a corrupt row cannot drift into a different-but-still-corrupt state — any share change either panics before completing (`BeforeDelegationSharesModified` → `withdrawDelegationRewards`) or heals the row to tokens (`AfterDelegationModified` → `initializeDelegation`).
+
+**Tests**:
+
+- `TestRepairLegacyRawShareStartingInfo_ReconstructsPreSlashTokenStake` (unit) — pins the reconstruction arithmetic with one pre-start slash (reflected only in the exchange rate) and one post-start slash (replayed): a raw 500,000 is repaired to 499,500, and replaying the post-start slash lands exactly at `currentStake`.
+- `TestRepairLegacyRawShareStartingInfo_EmptyValidatorSharesIsNoOp`, `_NeverSlashedIsNoOp`, `_CorrectTokenRowIsNoOp`, `_WithinMarginIsNoOp` (unit) — the guard branches. Each asserts (via `Times(0)` on the distribution mock) that a healthy or non-matching row is never rewritten: empty validator state, a 1.0-rate never-slashed validator, a correctly-stored token row, and a legitimate pre-slash row whose slash post-dates the starting height (replayed correctly, within margin).
+- `TestRepairLegacyRawShareStartingInfo_GetStartingInfoError`, `_SetStartingInfoError` (unit) — wrapped error propagation on read/write failure.
+- `TestMigrateValidator_RepairsLegacyRawShareStartingInfo` (integration) — reproduces the panic end-to-end against real staking/distribution keepers: slashes a validator, injects the exact legacy fingerprint (`Stake` = raw shares, starting height dated between the slash and migration), then migrates. Without the repair `MigrateValidator` panics in `CalculateDelegationRewards`; with it, migration succeeds and the starting stake is corrected to the token value. The self-delegation is a built-in negative control — it carries the same `Stake == shares` shape but its slash post-dates its starting height, so normal SDK replay handles it and the repair leaves it untouched.

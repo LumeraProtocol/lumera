@@ -106,14 +106,21 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 	feegrantKeeper := evmigrationmocks.NewMockFeegrantKeeper(ctrl)
 	supernodeKeeper := evmigrationmocks.NewMockSupernodeKeeper(ctrl)
 	actionKeeper := evmigrationmocks.NewMockActionKeeper(ctrl)
-	claimKeeper := evmigrationmocks.NewMockClaimKeeper(ctrl)
 
 	encCfg := moduletestutil.MakeTestEncodingConfig(module.AppModule{})
 	addrCodec := addresscodec.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix())
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
+	stakingStoreKey := storetypes.NewKVStoreKey(stakingtypes.StoreKey)
 	storeService := runtime.NewKVStoreService(storeKey)
-	ctx := testutil.DefaultContextWithDB(t, storeKey, storetypes.NewTransientStoreKey("transient_test")).Ctx.
-		WithChainID(testChainID)
+	stakingStoreService := runtime.NewKVStoreService(stakingStoreKey)
+	ctx := testutil.DefaultContextWithKeys(
+		map[string]*storetypes.KVStoreKey{
+			types.StoreKey:        storeKey,
+			stakingtypes.StoreKey: stakingStoreKey,
+		},
+		map[string]*storetypes.TransientStoreKey{"transient_test": storetypes.NewTransientStoreKey("transient_test")},
+		nil,
+	).WithChainID(testChainID).WithBlockTime(time.Now())
 
 	authority := authtypes.NewModuleAddress(types.GovModuleName)
 
@@ -130,13 +137,12 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 		feegrantKeeper,
 		supernodeKeeper,
 		actionKeeper,
-		claimKeeper,
 	)
 
-	// Wire a dummy staking store service so DeleteValidatorRecordNoHooks can run
-	// in unit tests (the store itself is isolated and any delete is a safe no-op
-	// against non-existent keys). Production wiring happens in app.go.
-	k.SetStakingStoreService(storeService)
+	// Wire an isolated staking store service so scoped redelegation iteration
+	// and DeleteValidatorRecordNoHooks can run in unit tests. Production wiring
+	// happens in app.go.
+	k.SetStakingStoreService(stakingStoreService)
 
 	// Initialize params with migration enabled.
 	params := types.NewParams(true, 0, 50, 2000, 20)
@@ -147,6 +153,8 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 	mf := &mockFixture{
 		ctx:                ctx,
 		keeper:             k,
+		cdc:                encCfg.Codec,
+		stakingStore:       stakingStoreService,
 		accountKeeper:      accountKeeper,
 		bankKeeper:         bankKeeper,
 		stakingKeeper:      stakingKeeper,
@@ -155,7 +163,6 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 		feegrantKeeper:     feegrantKeeper,
 		supernodeKeeper:    supernodeKeeper,
 		actionKeeper:       actionKeeper,
-		claimKeeper:        claimKeeper,
 	}
 
 	return &msgServerFixture{
@@ -470,16 +477,14 @@ func TestClaimLegacyAccount_Success(t *testing.T) {
 	// Step 5: MigrateFeegrant — no allowances.
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 
-	// Step 6: MigrateSupernode — not a supernode.
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
+	// Strict execution preflight: source account owns no SuperNode.
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
 		sntypes.SuperNode{}, false, nil,
 	)
 
 	// Step 7: MigrateActions — no matching actions.
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
-
-	// Step 8: MigrateClaim — no claim records targeting this address.
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
@@ -566,14 +571,14 @@ func TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress(t *testing.T) {
 	// Step 3b: MigrateBank — no balance.
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(sdk.Coins{})
 
-	// Steps 4-8: no authz/feegrant/supernode/action/claim to migrate.
+	// Steps 4-7: no authz/feegrant/supernode/action to migrate.
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
 		sntypes.SuperNode{}, false, nil,
 	)
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),
@@ -602,7 +607,13 @@ func TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress(t *testing.T) {
 
 // setupPassingPreChecks configures mocks so that preChecks and signature
 // verification pass, returning the legacy/new addresses and the ready message.
-func setupPassingPreChecks(t *testing.T, f *msgServerFixture) (
+type strictSupernodeLookupResult struct {
+	sn    sntypes.SuperNode
+	found bool
+	err   error
+}
+
+func setupPassingPreChecks(t *testing.T, f *msgServerFixture, ownership ...strictSupernodeLookupResult) (
 	*secp256k1.PrivKey, sdk.AccAddress, sdk.AccAddress, *types.MsgClaimLegacyAccount,
 ) {
 	t.Helper()
@@ -617,6 +628,15 @@ func setupPassingPreChecks(t *testing.T, f *msgServerFixture) (
 	)
 
 	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
+
+	result := strictSupernodeLookupResult{}
+	if len(ownership) > 0 {
+		require.Len(t, ownership, 1)
+		result = ownership[0]
+	}
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
+		result.sn, result.found, result.err,
+	)
 
 	return privKey, legacyAddr, newAddr, msg
 }
@@ -790,39 +810,17 @@ func TestClaimLegacyAccount_FailAtFeegrant(t *testing.T) {
 	assertNoFinalization(t, f, legacyAddr)
 }
 
-// TestClaimLegacyAccount_FailAtSupernode verifies that a failure in MigrateSupernode
-// (step 6) propagates and no record is stored.
+// TestClaimLegacyAccount_FailAtSupernode verifies strict ownership corruption
+// is rejected before the account-mutation sequence starts.
 func TestClaimLegacyAccount_FailAtSupernode(t *testing.T) {
 	f := initMsgServerFixture(t)
-	_, legacyAddr, newAddr, msg := setupPassingPreChecks(t, f)
-
-	// Steps 1-5 succeed.
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(2)
-	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil).Times(2)
-	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
-
-	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
-	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), baseAcc)
-	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
-	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
-	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), newAcc)
-
-	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(sdk.Coins{})
-	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
-	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
-
-	// Step 6: MigrateSupernode fails.
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
-		sntypes.SuperNode{}, false, fmt.Errorf("supernode store corrupted"),
-	)
+	_, legacyAddr, _, msg := setupPassingPreChecks(t, f, strictSupernodeLookupResult{
+		err: fmt.Errorf("supernode store corrupted"),
+	})
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "migrate supernode")
+	require.Contains(t, err.Error(), "resolve source supernode ownership")
 	assertNoFinalization(t, f, legacyAddr)
 }
 
@@ -850,13 +848,9 @@ func TestClaimLegacyAccount_FailAtActions(t *testing.T) {
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(sdk.Coins{})
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
-		sntypes.SuperNode{}, false, nil,
-	)
-
 	// Step 7: MigrateActions fails.
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(
-		fmt.Errorf("action store corrupted"),
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(
+		nil, fmt.Errorf("action store corrupted"),
 	)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -865,52 +859,71 @@ func TestClaimLegacyAccount_FailAtActions(t *testing.T) {
 	assertNoFinalization(t, f, legacyAddr)
 }
 
-// TestClaimLegacyAccount_FailAtClaim verifies that a failure in MigrateClaim
-// (step 8, the last step before finalization) propagates and no record is stored.
-func TestClaimLegacyAccount_FailAtClaim(t *testing.T) {
-	f := initMsgServerFixture(t)
-	_, legacyAddr, newAddr, msg := setupPassingPreChecks(t, f)
-
-	// Steps 1-7 succeed.
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(2)
-	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil).Times(2)
-	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
-
-	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
-	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), baseAcc)
-	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
-	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
-	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), newAcc)
-
-	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(sdk.Coins{})
-	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
-	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
-		sntypes.SuperNode{}, false, nil,
-	)
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
-
-	// Step 8: MigrateClaim fails.
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(
-		fmt.Errorf("claim store corrupted"),
-	)
-
-	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "migrate claim")
-	assertNoFinalization(t, f, legacyAddr)
-}
-
 // --- MigrateValidator failure-path / atomicity tests ---
 
 // setupPassingValPreChecks configures mocks so that preChecks, validator-specific
 // checks, and signature verification pass for MigrateValidator, returning the
 // addresses, validator addresses, and the ready message.
-func setupPassingValPreChecks(t *testing.T, f *msgServerFixture) (
+type validatorOwnershipExpectation func(f *msgServerFixture, legacyAddr sdk.AccAddress, oldValAddr sdk.ValAddress)
+
+func expectNoValidatorSupernode(f *msgServerFixture, legacyAddr sdk.AccAddress, oldValAddr sdk.ValAddress) {
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
+		sntypes.SuperNode{}, false, nil,
+	)
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
+	expectIdentityMigrationPlanBuilt(f, oldValAddr)
+}
+
+// expectIdentityMigrationPlanBuilt allows the validator-keyed SuperNode
+// continuity plan to be BUILT (pre-V1, against pristine state) and pins the
+// direction of the move: source MUST be the old validator operator address and
+// destination MUST differ from it. Without that assertion a transposed
+// Build(ctx, new, old) would move state the wrong way and still pass.
+//
+// MaxTimes(1) because ownership-rejection tests abort before the build is
+// reached; the cap still fails a regression that builds it more than once.
+//
+// Apply is deliberately NOT expected here. It is asserted separately with an
+// exact Times(1) by expectIdentityMigrationPlanApplied, so that a regression
+// which builds the plan and then silently never applies it -- losing the
+// Everlight SNDistState move -- fails the suite instead of passing. Tests that
+// abort before V5 install no Apply expectation at all, so an early apply is
+// caught as an unexpected call.
+func expectIdentityMigrationPlanBuilt(f *msgServerFixture, expectedSource sdk.ValAddress) {
+	f.supernodeKeeper.EXPECT().
+		BuildIdentityMigrationPlan(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ sdk.Context, source, destination sdk.ValAddress) (sntypes.IdentityMigrationPlan, error) {
+			if !source.Equals(expectedSource) {
+				return nil, fmt.Errorf(
+					"continuity plan built with wrong source: got %s, want %s (source/destination transposed?)",
+					source, expectedSource)
+			}
+			if source.Equals(destination) {
+				return nil, fmt.Errorf("continuity plan source and destination must differ, both were %s", source)
+			}
+			return sntypes.NewIdentityMigrationPlan(source, destination, nil, nil, nil, nil, nil), nil
+		}).MaxTimes(1)
+}
+
+// expectIdentityMigrationPlanApplied asserts the continuity plan is applied
+// exactly once. Call this from every test whose migration reaches step V5.
+func expectIdentityMigrationPlanApplied(f *msgServerFixture) {
+	f.supernodeKeeper.EXPECT().
+		ApplyIdentityMigrationPlan(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+}
+
+func setupPassingValPreChecks(t *testing.T, f *msgServerFixture, ubds ...stakingtypes.UnbondingDelegation) (
+	sdk.AccAddress, sdk.AccAddress, sdk.ValAddress, sdk.ValAddress, *types.MsgMigrateValidator,
+) {
+	return setupPassingValPreChecksWithOwnership(t, f, nil, ubds...)
+}
+
+func setupPassingValPreChecksWithOwnership(
+	t *testing.T,
+	f *msgServerFixture,
+	ownership validatorOwnershipExpectation,
+	ubds ...stakingtypes.UnbondingDelegation,
+) (
 	sdk.AccAddress, sdk.AccAddress, sdk.ValAddress, sdk.ValAddress, *types.MsgMigrateValidator,
 ) {
 	t.Helper()
@@ -933,12 +946,22 @@ func setupPassingValPreChecks(t *testing.T, f *msgServerFixture) (
 		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
 	)
 
-	// No delegations/ubds/reds (under limit).
+	// Pre-check count read: no delegations; ubds default to empty unless a caller
+	// supplies records to drive a later V4 re-key step. The reds scan hits the
+	// wired (empty) store.
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).Return(nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(ubds, nil)
 
 	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
+
+	if ownership == nil {
+		expectNoValidatorSupernode(f, legacyAddr, oldValAddr)
+	} else {
+		ownership(f, legacyAddr, oldValAddr)
+		// Custom-ownership callers get the same continuity-plan allowance that
+		// expectNoValidatorSupernode installs for the default path.
+		expectIdentityMigrationPlanBuilt(f, oldValAddr)
+	}
 
 	_ = newValAddr // used by callers
 	return legacyAddr, newAddr, oldValAddr, newValAddr, msg
@@ -992,10 +1015,52 @@ func setupV1toV4(f *mockFixture, oldValAddr, newValAddr sdk.ValAddress) {
 	f.distributionKeeper.EXPECT().IterateValidatorSlashEvents(gomock.Any(), gomock.Any())
 	f.distributionKeeper.EXPECT().DeleteValidatorSlashEvents(gomock.Any(), oldValAddr)
 
-	// V4: no delegations.
-	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).Return(nil)
+	// V4: no delegations. The pre-check already read delegations/ubds and V4
+	// reuses those slices instead of re-fetching, so no staking Get mocks here.
+	// With both slices empty and no redelegations in the wired store, V4 makes
+	// no staking calls.
+}
+
+func TestMigrateValidator_RejectsSourceOwnershipCorruptionBeforeMutation(t *testing.T) {
+	f := initMsgServerFixture(t)
+	legacyAddr, _, _, _, msg := setupPassingValPreChecksWithOwnership(t, f,
+		func(f *msgServerFixture, legacyAddr sdk.AccAddress, _ sdk.ValAddress) {
+			f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
+				sntypes.SuperNode{}, false, fmt.Errorf("corrupt source ownership"),
+			)
+		},
+	)
+
+	_, err := f.msgServer.MigrateValidator(f.ctx, msg)
+	require.ErrorContains(t, err, "resolve source supernode ownership")
+	require.ErrorContains(t, err, "corrupt source ownership")
+	assertNoValFinalization(t, f, legacyAddr)
+}
+
+func TestMigrateValidator_RejectsValidatorSupernodeIndexMismatchBeforeMutation(t *testing.T) {
+	f := initMsgServerFixture(t)
+	legacyAddr, _, oldValAddr, _, msg := setupPassingValPreChecksWithOwnership(t, f,
+		func(f *msgServerFixture, legacyAddr sdk.AccAddress, oldValAddr sdk.ValAddress) {
+			independentAccount := testAccAddr().String()
+			primary := sntypes.SuperNode{
+				ValidatorAddress: oldValAddr.String(),
+				SupernodeAccount: independentAccount,
+			}
+			indexed := primary
+			indexed.ValidatorAddress = sdk.ValAddress(testAccAddr()).String()
+
+			f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
+				sntypes.SuperNode{}, false, nil,
+			)
+			f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(primary, true)
+			f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), independentAccount).Return(indexed, true, nil)
+		},
+	)
+
+	_, err := f.msgServer.MigrateValidator(f.ctx, msg)
+	require.ErrorContains(t, err, "resolves to")
+	require.ErrorContains(t, err, oldValAddr.String())
+	assertNoValFinalization(t, f, legacyAddr)
 }
 
 // TestMigrateValidator_FailAtValidatorRecord verifies that a failure in
@@ -1057,7 +1122,16 @@ func TestMigrateValidator_FailAtValidatorDistribution(t *testing.T) {
 // MigrateValidatorDelegations (step V4) propagates and no record is stored.
 func TestMigrateValidator_FailAtValidatorDelegations(t *testing.T) {
 	f := initMsgServerFixture(t)
-	legacyAddr, _, oldValAddr, newValAddr, msg := setupPassingValPreChecks(t, f)
+	// The delegation/ubd read moved into the pre-check, so V4 now fails while
+	// *re-keying* a record, not while fetching one. Feed one unbonding delegation
+	// through the pre-check count read; V4's RemoveUnbondingDelegation then errors.
+	// An unbonding delegation avoids the V1 per-delegator reward withdrawal that a
+	// regular delegation would trigger, keeping this focused on the V4 re-key.
+	ubd := stakingtypes.UnbondingDelegation{
+		DelegatorAddress: testAccAddr().String(),
+		ValidatorAddress: sdk.ValAddress(testAccAddr()).String(),
+	}
+	legacyAddr, _, oldValAddr, newValAddr, msg := setupPassingValPreChecks(t, f, ubd)
 
 	// Steps V1-V3 succeed.
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(sdk.Coins{}, nil)
@@ -1086,9 +1160,9 @@ func TestMigrateValidator_FailAtValidatorDelegations(t *testing.T) {
 	f.distributionKeeper.EXPECT().IterateValidatorSlashEvents(gomock.Any(), gomock.Any())
 	f.distributionKeeper.EXPECT().DeleteValidatorSlashEvents(gomock.Any(), oldValAddr)
 
-	// Step V4: delegation re-key fails.
-	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(
-		nil, fmt.Errorf("delegation index corrupted"),
+	// Step V4: unbonding-delegation re-key fails on its first store op.
+	f.stakingKeeper.EXPECT().RemoveUnbondingDelegation(gomock.Any(), ubd).Return(
+		fmt.Errorf("unbonding index corrupted"),
 	)
 
 	_, err := f.msgServer.MigrateValidator(f.ctx, msg)
@@ -1101,19 +1175,27 @@ func TestMigrateValidator_FailAtValidatorDelegations(t *testing.T) {
 // MigrateValidatorSupernode (step V5) propagates and no record is stored.
 func TestMigrateValidator_FailAtValidatorSupernode(t *testing.T) {
 	f := initMsgServerFixture(t)
-	legacyAddr, _, oldValAddr, newValAddr, msg := setupPassingValPreChecks(t, f)
+	legacyAddr, newAddr, oldValAddr, newValAddr, msg := setupPassingValPreChecksWithOwnership(t, f,
+		func(f *msgServerFixture, legacyAddr sdk.AccAddress, oldValAddr sdk.ValAddress) {
+			sn := sntypes.SuperNode{
+				ValidatorAddress: oldValAddr.String(),
+				SupernodeAccount: legacyAddr.String(),
+			}
+			f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(sn, true, nil)
+			f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+		},
+	)
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), newAddr.String()).Return(sntypes.SuperNode{}, false, nil)
 
 	// Steps V1-V4 succeed.
 	setupV1toV4(f.mockFixture, oldValAddr, newValAddr)
 
-	// Step V5: supernode re-key fails.
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(
-		sntypes.SuperNode{ValidatorAddress: oldValAddr.String()}, true,
-	)
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
+
+	// Step V5: supernode re-key fails. The plan (built pre-V1 by the shared
+	// pre-check helper) is applied first, then the primary write fails.
 	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
-	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(
-		sntypes.SupernodeMetricsState{}, false,
-	)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).Return(
 		fmt.Errorf("supernode store write failed"),
 	)
@@ -1133,12 +1215,12 @@ func TestMigrateValidator_FailAtValidatorActions(t *testing.T) {
 	// Steps V1-V4 succeed.
 	setupV1toV4(f.mockFixture, oldValAddr, newValAddr)
 
-	// V5: no supernode.
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
 
 	// Step V6: action re-key fails.
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(
-		fmt.Errorf("action store corrupted"),
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(
+		nil, fmt.Errorf("action store corrupted"),
 	)
 
 	_, err := f.msgServer.MigrateValidator(f.ctx, msg)
@@ -1157,8 +1239,11 @@ func TestMigrateValidator_FailAtAuth(t *testing.T) {
 	setupV1toV4(f.mockFixture, oldValAddr, newValAddr)
 
 	// V5-V6: no supernode, no actions.
-	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	// Migration reaches V5, so the continuity plan must be applied exactly once.
+	expectIdentityMigrationPlanApplied(f)
+
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	// Step V7: MigrateDistribution + MigrateStaking succeed before MigrateAuth fails.
 	// Snapshot withdraw addr.
@@ -1225,6 +1310,10 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 		distrtypes.ValidatorCurrentRewards{Period: 5}, nil,
 	)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
+	// migrateActiveDelegations fetches the validator to convert shares → tokens (rate 1.0).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{OperatorAddress: valAddr.String(), Tokens: math.NewInt(100), DelegatorShares: math.LegacyNewDec(100)}, nil,
+	)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)
 
 	// migrateUnbondingDelegations
@@ -1248,14 +1337,14 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 	// Step 3b: MigrateBank
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(sdk.Coins{})
 
-	// Steps 4-8: no authz/feegrant/supernode/action/claim to migrate.
+	// Steps 4-7: no authz/feegrant/supernode/action to migrate.
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
-	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
+	f.supernodeKeeper.EXPECT().StrictGetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
 		sntypes.SuperNode{}, false, nil,
 	)
-	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
-	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().GetActionsByCreator(gomock.Any(), gomock.Any()).Return(nil, nil)
+	f.actionKeeper.EXPECT().GetActionsBySuperNode(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),

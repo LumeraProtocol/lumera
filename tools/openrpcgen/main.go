@@ -32,7 +32,10 @@ import (
 const (
 	defaultOutputPath   = "docs/openrpc.json"
 	defaultServerURL    = "http://localhost:8545"
-	defaultExamplesPath = "docs/openrpc_examples_overrides.json"
+	defaultExamplesPath = "docs/openrpc/examples_overrides.json"
+	defaultParamsPath   = "docs/openrpc/param_overrides.json"
+	defaultTypesPath    = "docs/openrpc/type_overrides.json"
+	defaultResultsPath  = "docs/openrpc/result_overrides.json"
 	evmModulePath       = "github.com/cosmos/evm"
 	openRPCDiscoverName = "rpc.discover"
 	openRPCMetaSchema   = "https://raw.githubusercontent.com/open-rpc/meta-schema/master/schema.json"
@@ -142,11 +145,33 @@ func main() {
 	outPath := flag.String("out", defaultOutputPath, "output OpenRPC file path")
 	serverURL := flag.String("server", defaultServerURL, "default JSON-RPC server URL")
 	examplesPath := flag.String("examples", defaultExamplesPath, "JSON file with curated method examples overrides")
+	paramsPath := flag.String("params", defaultParamsPath, "JSON file with curated param description/schema overrides")
+	typesPath := flag.String("types", defaultTypesPath, "JSON file with curated struct-field description/schema overrides (keyed by Go type name)")
+	resultsPath := flag.String("results", defaultResultsPath, "JSON file with curated result description/schema overrides (keyed by method name)")
 	flag.Parse()
+
+	typeOverrides, err := loadTypeOverrides(*typesPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load type overrides from %s: %v\n", *typesPath, err)
+		os.Exit(1)
+	}
+	activeTypeOverrides = typeOverrides
 
 	exampleOverrides, err := loadExampleOverrides(*examplesPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load examples overrides from %s: %v\n", *examplesPath, err)
+		os.Exit(1)
+	}
+
+	paramOverrides, err := loadParamOverrides(*paramsPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load param overrides from %s: %v\n", *paramsPath, err)
+		os.Exit(1)
+	}
+
+	resultOverrides, err := loadResultOverrides(*resultsPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load result overrides from %s: %v\n", *resultsPath, err)
 		os.Exit(1)
 	}
 
@@ -160,7 +185,7 @@ func main() {
 		{Namespace: "debug", Type: reflect.TypeOf((*evmdebug.API)(nil))},
 		{Namespace: "miner", Type: reflect.TypeOf((*evmminer.API)(nil))},
 		{Namespace: lumeraopenrpc.Namespace, Type: reflect.TypeOf((*lumeraopenrpc.API)(nil))},
-	}, exampleOverrides)
+	}, exampleOverrides, paramOverrides, resultOverrides)
 
 	doc := openRPCDoc{
 		OpenRPC: "1.2.6",
@@ -175,7 +200,7 @@ func main() {
 		Methods: methods,
 		External: &externalDocs{
 			Description: "Cosmos EVM Ethereum JSON-RPC reference",
-			URL:         "https://cosmos-docs.mintlify.app/docs/api-reference/ethereum-json-rpc",
+			URL:         "https://docs.cosmos.network/evm/latest/api-reference/ethereum-json-rpc",
 		},
 	}
 
@@ -193,7 +218,7 @@ func main() {
 	fmt.Printf("wrote %s with %d methods\n", *outPath, len(methods))
 }
 
-func collectMethods(services []serviceSpec, exampleOverrides map[string][]examplePairing) []methodObject {
+func collectMethods(services []serviceSpec, exampleOverrides map[string][]examplePairing, paramOverrides paramOverrideFile, resultOverrides resultOverrideFile) []methodObject {
 	methodMap := make(map[string]methodObject)
 	inspector := &sourceInspector{
 		fset:  token.NewFileSet(),
@@ -219,7 +244,7 @@ func collectMethods(services []serviceSpec, exampleOverrides map[string][]exampl
 			}
 
 			sourceMeta := inspector.methodMetadata(svc.Type, m)
-			params, result := buildMethodDescriptors(methodName, m.Type, sourceMeta)
+			params, result := buildMethodDescriptors(methodName, m.Type, sourceMeta, paramOverrides, resultOverrides)
 			examples := methodExamples(methodName, params, result)
 			if overrideExamples, ok := exampleOverrides[methodName]; ok && len(overrideExamples) > 0 {
 				examples = overrideExamples
@@ -272,7 +297,7 @@ func isSuitableCallback(fntype reflect.Type) bool {
 	return true
 }
 
-func buildMethodDescriptors(methodName string, fntype reflect.Type, sourceMeta methodSourceMetadata) ([]contentDescriptor, contentDescriptor) {
+func buildMethodDescriptors(methodName string, fntype reflect.Type, sourceMeta methodSourceMetadata, paramOverrides paramOverrideFile, resultOverrides resultOverrideFile) ([]contentDescriptor, contentDescriptor) {
 	argStart := 1 // receiver
 	if fntype.NumIn() > argStart && fntype.In(argStart) == contextType {
 		argStart++
@@ -319,6 +344,19 @@ func buildMethodDescriptors(methodName string, fntype reflect.Type, sourceMeta m
 				required = *override.Required
 			}
 		}
+		// External JSON override has highest precedence: it lets humans curate
+		// descriptions/schemas without recompiling the generator.
+		if ext := paramOverrides.lookup(methodName, paramName); ext != nil {
+			if ext.Description != "" {
+				paramDescription = ext.Description
+			}
+			if ext.Schema != nil {
+				schema = ext.Schema
+			}
+			if ext.Required != nil {
+				required = *ext.Required
+			}
+		}
 
 		params = append(params, contentDescriptor{
 			Name:        paramName,
@@ -359,6 +397,17 @@ func buildMethodDescriptors(methodName string, fntype reflect.Type, sourceMeta m
 			Schema: map[string]any{
 				"$ref": openRPCMetaSchema,
 			},
+		}
+	}
+
+	// Curated result override has highest precedence: it lets humans describe
+	// what the JSON-RPC result actually represents, beyond the bare Go type.
+	if ovr := resultOverrides.lookup(methodName); ovr != nil {
+		if ovr.Description != "" {
+			result.Description = ovr.Description
+		}
+		if ovr.Schema != nil {
+			result.Schema = ovr.Schema
 		}
 	}
 

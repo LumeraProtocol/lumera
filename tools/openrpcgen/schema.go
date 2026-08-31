@@ -445,6 +445,7 @@ func schemaForTypeRecursive(t reflect.Type, depth int) map[string]any {
 func structProperties(t reflect.Type, depth int) (map[string]any, []string) {
 	props := make(map[string]any)
 	requiredSet := make(map[string]bool)
+	parentTypeName := t.String()
 
 	directNames := make(map[string]bool)
 	for i := 0; i < t.NumField(); i++ {
@@ -505,12 +506,31 @@ func structProperties(t reflect.Type, depth int) (map[string]any, []string) {
 			fieldSchema["description"] = "Go type: " + f.Type.String()
 		}
 
-		props[name] = fieldSchema
-
 		isPtr := f.Type.Kind() == reflect.Ptr
 		if !isPtr && !opts.omitempty {
 			requiredSet[name] = true
 		}
+
+		// Curated type-keyed override (highest precedence): wins over both
+		// the AST-derived description and the auto-generated "Go type: ..."
+		// fallback. Lookup is by the *parent* struct's Go type + field name.
+		if ovr := activeTypeOverrides.lookup(parentTypeName, name); ovr != nil {
+			if ovr.Schema != nil {
+				fieldSchema = ovr.Schema
+			}
+			if ovr.Description != "" {
+				fieldSchema["description"] = ovr.Description
+			}
+			if ovr.Required != nil {
+				if *ovr.Required {
+					requiredSet[name] = true
+				} else {
+					delete(requiredSet, name)
+				}
+			}
+		}
+
+		props[name] = fieldSchema
 	}
 
 	var required []string

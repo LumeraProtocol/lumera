@@ -1,6 +1,6 @@
 # Devnet Tests
 
-The devnet includes three test suites that run inside Docker containers against the live network. They are compiled as standalone Go test binaries and copied into the containers via `configure.sh`.
+The devnet includes containerized Go test suites plus a shell-driven LEP-6 storage-truth suite that runs against the live network.
 
 ## Test suites
 
@@ -9,6 +9,8 @@ The devnet includes three test suites that run inside Docker containers against 
 | `tests_validator` | `devnet/tests/validator/` | Any validator container | EVM JSON-RPC, IBC from Lumera side, LEP-5 cascade, port accessibility |
 | `tests_hermes` | `devnet/tests/hermes/` | Hermes container | IBC from simd side, Interchain Accounts (ICA), cascade via ICA |
 | `tests_evmigration` | `devnet/tests/evmigration/` | Hermes container | End-to-end EVM migration (see [../evm-integration/evmigration/devnet-tests.md](../evm-integration/evmigration/devnet-tests.md)) |
+| `tests-gen-activity` | `devnet/tests/gen-activity/` | Validator container with a funded local key | Live-devnet user activity generator (see [gen-activity.md](gen-activity.md)) |
+| `make devnet-tests-lep6` | `devnet/tests/lep6/lep6_test.sh` | Host shell against running validator containers | LEP-6 storage-truth params, epoch report, recheck evidence, negative rejection cases, heal-op claim/verify lifecycle |
 
 ### Shared utilities
 
@@ -26,10 +28,11 @@ The devnet includes three test suites that run inside Docker containers against 
 make devnet-tests-build
 ```
 
-This produces three binaries in `devnet/bin/`:
+This produces four binaries in `devnet/bin/`:
 - `tests_validator` -- compiled from `devnet/tests/validator/` via `go test -c`
 - `tests_hermes` -- compiled from `devnet/tests/hermes/` via `go test -c`
 - `tests_evmigration` -- compiled from `devnet/tests/evmigration/` via `go build`
+- `tests-gen-activity` -- compiled from `devnet/tests/gen-activity/` via `go build`
 
 The binaries are copied into containers by `configure.sh` and land in `/shared/release/`.
 
@@ -49,7 +52,21 @@ docker exec lumera-supernova_validator_1 /shared/release/tests_validator -test.v
 
 # All hermes tests
 docker exec lumera-hermes /shared/release/tests_hermes -test.v
+
+# Live user-account activity generator
+docker exec lumera-supernova_validator_1 /shared/release/tests-gen-activity \
+  -bin lumerad \
+  -rpc tcp://localhost:26657 \
+  -grpc localhost:9090 \
+  -chain-id lumera-devnet-1 \
+  -funding-key governance_key \
+  -accounts /shared/status/gen-activity/accounts.json
+
+# LEP-6 storage-truth chain-side lifecycle tests
+make devnet-tests-lep6
 ```
+
+The LEP-6 suite requires a running devnet (`make devnet-up-detach`). It uses existing registered supernodes when present; if fewer than three are registered, it bootstraps validator-owned supernodes from key-resolvable devnet validator accounts. The default devnet genesis uses short epochs and a test-mode heal threshold of `8`; the test still drives the chain's full heal-op scheduling eligibility predicate (threshold plus repeated failures/holder diversity or index-failure eligibility) before expecting `HEAL_OP_STATUS_VERIFIED`.
 
 ---
 

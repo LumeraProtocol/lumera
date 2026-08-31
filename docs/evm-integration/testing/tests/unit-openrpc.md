@@ -20,7 +20,7 @@ Primary files:
 | `TestServeHTTPCORSBlockedOrigin` | Verifies unlisted origin gets no `Access-Control-Allow-Origin` header. |
 | `TestServeHTTPCORSNoOriginHeader` | Verifies non-browser requests (no Origin) are allowed through. |
 | `TestServeHTTPCORSWildcardInList` | Verifies `*` in origins list allows all origins. |
-| `TestCollectMethodsPrefersOverrideExamples` | Verifies generator prefers curated overrides from `docs/openrpc_examples_overrides.json`. |
+| `TestCollectMethodsPrefersOverrideExamples` | Verifies generator prefers curated overrides from `docs/openrpc/examples_overrides.json`. |
 | `TestAlignExampleParamNamesRemapsIndexedArgs` | Verifies generator remaps generic `argN` names to human-readable parameter names. |
 | `TestExampleObjectSerializesNullValue` | Verifies generator keeps explicit `result.value: null` instead of dropping the field. |
 | `TestCollectMethodsExamplesAlwaysIncludeParamsField` | Verifies generator always emits `params` in examples (empty array when method has no parameters). |

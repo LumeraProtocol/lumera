@@ -346,6 +346,16 @@ func (k Keeper) RecoverSuperNodeFromPostponed(ctx sdk.Context, valAddr sdk.ValAd
 	return recoverFromPostponed(ctx, k, &supernode, types.SuperNodeStateActive)
 }
 
+// MarkSuperNodeStorageFull transitions a validator into STORAGE_FULL and emits
+// the canonical storage-full event.
+func (k Keeper) MarkSuperNodeStorageFull(ctx sdk.Context, valAddr sdk.ValAddress) error {
+	supernode, found := k.QuerySuperNode(ctx, valAddr)
+	if !found {
+		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "no supernode found for validator")
+	}
+	return markStorageFull(ctx, k, &supernode)
+}
+
 func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool {
 	valOperAddr := valAddr
 

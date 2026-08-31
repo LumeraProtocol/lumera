@@ -25,11 +25,19 @@ func testMixedBlockOrderingPersistsAcrossRestart(t *testing.T, node *evmtest.Nod
 
 	fundNonce := node.MustGetPendingNonceWithRetry(t, validatorAddr.Hex(), 20*time.Second)
 	fundGasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
+	// Size the funding from the live gas price rather than a fixed literal.
+	// The previous 2e14 constant assumed a ~2.5 gwei base fee; at 12.5 gwei a
+	// single 21k tx costs more than that, so the funded account could not
+	// afford the tx it was funded for.
+	fundValue := new(big.Int).Mul(fundGasPrice, big.NewInt(21_000*8))
+	if minFund := big.NewInt(200_000_000_000_000); fundValue.Cmp(minFund) < 0 {
+		fundValue = minFund
+	}
 	fundHash := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: validatorPriv,
 		Nonce:      fundNonce,
 		To:         &evmSenderAddr,
-		Value:      big.NewInt(200_000_000_000_000),
+		Value:      fundValue,
 		Gas:        21_000,
 		GasPrice:   fundGasPrice,
 	})

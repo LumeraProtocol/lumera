@@ -69,10 +69,17 @@ func (k Keeper) migrateActiveDelegations(ctx sdk.Context, legacyAddr, newAddr sd
 		}
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
 		previousPeriod := currentRewards.Period - 1
+		// Distribution stores stake as tokens (TokensFromSharesTruncated), not
+		// raw shares; for an ever-slashed validator (exchange rate < 1) storing
+		// shares overstates stake and panics the next reward/undelegate tx.
+		val, err := k.stakingKeeper.GetValidator(ctx, valAddr)
+		if err != nil {
+			return err
+		}
 		startingInfo := distrtypes.DelegatorStartingInfo{
 			Height:         uint64(sdkCtx.BlockHeight()),
 			PreviousPeriod: previousPeriod,
-			Stake:          del.Shares,
+			Stake:          val.TokensFromSharesTruncated(del.Shares),
 		}
 		if err := k.incrementHistoricalRewardsReferenceCount(ctx, valAddr, previousPeriod); err != nil {
 			return err

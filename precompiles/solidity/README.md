@@ -29,6 +29,9 @@ test/
 
 ## Quick Start
 
+> **Prerequisites:** Node.js **≥ 20** — required by the Hardhat 3 toolchain
+> (`engines.node` in `package.json`). The project is ESM (`"type": "module"`).
+
 ```bash
 # Install dependencies
 npm install

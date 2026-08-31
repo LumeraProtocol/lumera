@@ -61,12 +61,35 @@ make devnet-down              # Stop and remove containers
 make devnet-stop              # Stop containers (keep state)
 make devnet-start             # Start stopped containers
 make devnet-clean             # Remove all devnet data (/tmp/lumera-devnet-1/)
-make devnet-refresh-bin       # Copy build/lumerad into devnet/bin/ (run after make build)
-make devnet-upgrade-binaries  # Copy devnet/bin/ into all containers + restart (run devnet-refresh-bin first)
+make devnet-refresh-bin       # Build lumerad + copy it (and libwasmvm) into devnet/bin/
+make devnet-update-binaries   # Stage already-built ${BUILD_DIR}/lumerad (+libwasmvm) into /shared/release and restart containers (START_MODE=run, preserves chain state; errors if lumerad is missing — run `make build` first)
+make devnet-update-binaries-default # Stage an already-built devnet/bin/ into containers + restart (run devnet-refresh-bin first)
 make devnet-update-scripts    # Update devnet scripts in containers
 make devnet-reset             # Reset chain state, keep config
 make devnet-evm-upgrade       # Run EVM upgrade on devnet
 ```
+
+### Current shared devnet host notes
+
+For the shared EVM migration/devnet environment, SSH via:
+
+```bash
+ssh lumera-devnet
+```
+
+Important paths and containers:
+
+- Host devnet root: `/tmp/lumera-devnet-1`
+- Shared host path: `/tmp/lumera-devnet-1/shared`
+- Shared container path: `/shared`
+- Accounts file: `/tmp/lumera-devnet-1/shared/release/accounts-devnet.json` on the host, `/shared/release/accounts-devnet.json` in containers
+- Validator containers: `lumera-supernova_validator_1` through `lumera-supernova_validator_5`
+- Hermes container: `lumera-hermes`
+- Container shell: `docker exec -it lumera-supernova_validator_1 bash`
+- Validator data bind mounts: `/tmp/lumera-devnet-1/supernova_validator_N-data` on the host maps to `/root/.lumera` in `lumera-supernova_validator_N`
+- Migration scripts in validator containers: `/root/scripts/migration/migrate-account.sh`, `/root/scripts/migration/migrate-validator.sh`, `/root/scripts/migration/migrate-multisig.sh`
+
+For manual multisig migration work, run from inside a validator container that has the relevant keyring entries. The generated devnet multisig records in `accounts-devnet.json` list the composite and member key names, while the actual keyring entries live under the validator container's `/root/.lumera`. Save full transcripts and proof artifacts under `/shared/release/migration-transcripts/<account>-<timestamp>/` so they appear on the host under `/tmp/lumera-devnet-1/shared/release/migration-transcripts/`.
 
 **Note**: `claims.csv` is only needed if genesis `TotalClaimableAmount > 0` (claiming period ended 2025-01-01; default is now 0).
 

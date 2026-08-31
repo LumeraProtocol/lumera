@@ -30,7 +30,7 @@ Lumera's EVM integration is designed as a deeply integrated, production-ready la
 
 - [tests.md](testing/tests.md) — Full test inventory (unit, integration, devnet), coverage assessment, gaps, and next steps
 - [bugs.md](testing/bugs.md) — Bugs found and fixed during EVM integration
-- [security-audit.md](testing/security-audit.md) — Security audit findings and recommendations
+- [security-audit-2026-03-20.md](audits/security-audit-2026-03-20.md) — Security audit findings and recommendations
 
 ### User Guides
 
@@ -52,7 +52,7 @@ After this integration:
 - Smart contract developer UX is unlocked:
   - Solidity/Vyper contracts can be deployed and interacted with using standard EVM JSON-RPC methods.
   - Common toolchains (for example Hardhat/Foundry/Web3/Ethers libraries) can target Lumera via RPC.
-- EIP-1559 dynamic base fee is active with Lumera defaults (base fee 0.0025, min 0.0005, denominator 16), enabling predictable fee market behavior with spam protection.
+- EIP-1559 dynamic base fee is active with Lumera defaults (base fee 0.0125, min 0.0005, denominator 16), enabling predictable fee market behavior with spam protection.
 - Precisebank enables 18-decimal extended-denom accounting while preserving Cosmos bank compatibility.
 - Static precompiles expose Cosmos functionality (bank/staking/distribution/gov/bech32/p256/slashing/ics20) to EVM contracts.
 - IBC ERC20 middleware wiring enables ERC20-aware ICS20 receive/mapping flows for cross-chain token paths.

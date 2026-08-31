@@ -68,8 +68,8 @@ type SystemUnderTest struct {
 	verbose           bool
 	ChainStarted      bool
 	projectName       string
-	dirty             bool // requires full reset when marked dirty
-	stopping          bool // true while StopChain is running (suppresses exit errors)
+	dirty             bool        // requires full reset when marked dirty
+	stopping          atomic.Bool // true while StopChain is running (suppresses expected exit errors)
 
 	pidsLock mtxSync.RWMutex
 	pids     map[int]struct{}
@@ -328,7 +328,7 @@ func (s *SystemUnderTest) StopChain() {
 	if !s.ChainStarted {
 		return
 	}
-	s.stopping = true
+	s.stopping.Store(true)
 
 	// Pre-cleanup: unsubscribe from events while nodes are still alive
 	for _, c := range s.cleanupPreFn {
@@ -374,7 +374,7 @@ func (s *SystemUnderTest) StopChain() {
 	s.cleanupPostFn = nil
 
 	s.ChainStarted = false
-	s.stopping = false
+	s.stopping.Store(false)
 }
 
 func (s *SystemUnderTest) withEachPid(cb func(p *os.Process)) {
@@ -437,7 +437,13 @@ func (s *SystemUnderTest) AwaitBlockHeight(t *testing.T, targetHeight int64, tim
 	if len(timeout) != 0 {
 		maxWaitTime = timeout[0]
 	} else {
-		maxWaitTime = time.Duration(targetHeight-s.currentHeight+3) * s.blockTime
+		// Budget generous headroom: under CI load, real block production can run
+		// 2-3x slower than the nominal blockTime. Allow double the nominal time
+		// per remaining block plus a fixed startup slack. This only affects how
+		// long we wait before declaring a genuinely stuck chain failed — the
+		// happy path returns as soon as the target height is reached.
+		blocksRemaining := targetHeight - s.currentHeight
+		maxWaitTime = time.Duration(blocksRemaining)*s.blockTime*2 + 10*s.blockTime
 	}
 	abort := time.NewTimer(maxWaitTime).C
 	for {
@@ -636,7 +642,7 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 		go func(pid int, cmd *exec.Cmd, nodeIndex int) {
 			defer wg.Done()
 			err := cmd.Wait() // blocks until shutdown
-			if err != nil {
+			if err != nil && !s.stopping.Load() {
 				s.PrintBuffer()
 				errChan <- fmt.Errorf("node %d exited unexpectedly: %w", nodeIndex, err)
 			} else {
@@ -653,13 +659,13 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 	// Wait in background and close the channel when all nodes are done
 	go func() {
 		wg.Wait()
+		close(errChan)
 
 		for err := range errChan {
-			if err != nil && !s.stopping {
+			if err != nil {
 				t.Errorf("%v", err)
 			}
 		}
-		close(errChan)
 	}()
 }
 

@@ -22,7 +22,7 @@ var (
 	ErrInvalidMigrationSignature = errors.Register(ModuleName, 1112, "migration signature verification failed")
 
 	ErrNotValidator       = errors.Register(ModuleName, 1113, "legacy address is not a validator operator")
-	ErrValidatorUnbonding = errors.Register(ModuleName, 1114, "validator is unbonding or unbonded; wait for completion")
+	ErrValidatorUnbonding = errors.Register(ModuleName, 1114, "validator is unbonding; wait for the unbonding period to complete, then migrate")
 	ErrTooManyDelegators  = errors.Register(ModuleName, 1115, "validator has too many delegators; exceeds max_validator_delegations")
 
 	// Migration to a destination account of an unsupported type (vesting,

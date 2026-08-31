@@ -14,7 +14,6 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -122,24 +121,22 @@ type FeegrantKeeper interface {
 // SupernodeKeeper defines the expected interface for the x/supernode module.
 type SupernodeKeeper interface {
 	GetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) (sntypes.SuperNode, bool, error)
+	StrictGetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) (sntypes.SuperNode, bool, error)
 	QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn sntypes.SuperNode, exists bool)
 	SetSuperNode(ctx sdk.Context, supernode sntypes.SuperNode) error
 	DeleteSuperNode(ctx sdk.Context, valAddr sdk.ValAddress)
 	GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (sntypes.SupernodeMetricsState, bool)
 	SetMetricsState(ctx sdk.Context, state sntypes.SupernodeMetricsState) error
 	DeleteMetricsState(ctx sdk.Context, valAddr sdk.ValAddress)
+	BuildIdentityMigrationPlan(ctx sdk.Context, sourceValidator, destinationValidator sdk.ValAddress) (sntypes.IdentityMigrationPlan, error)
+	ApplyIdentityMigrationPlan(ctx sdk.Context, plan sntypes.IdentityMigrationPlan) error
 }
 
 // ActionKeeper defines the expected interface for the x/action module.
 type ActionKeeper interface {
 	IterateActions(ctx sdk.Context, handler func(*actiontypes.Action) bool) error
+	GetActionsByCreator(ctx sdk.Context, creator string) ([]*actiontypes.Action, error)
+	GetActionsBySuperNode(ctx sdk.Context, supernode string) ([]*actiontypes.Action, error)
 	SetAction(ctx sdk.Context, action *actiontypes.Action) error
 	GetActionByID(ctx sdk.Context, actionID string) (*actiontypes.Action, bool)
-}
-
-// ClaimKeeper defines the expected interface for the x/claim module.
-type ClaimKeeper interface {
-	GetClaimRecord(ctx sdk.Context, address string) (val claimtypes.ClaimRecord, found bool, err error)
-	SetClaimRecord(ctx sdk.Context, claimRecord claimtypes.ClaimRecord) error
-	IterateClaimRecords(ctx sdk.Context, cb func(claimtypes.ClaimRecord) (stop bool, err error)) error
 }

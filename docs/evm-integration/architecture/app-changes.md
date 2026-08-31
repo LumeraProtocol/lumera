@@ -23,7 +23,7 @@ Changes:
 - Added`SetBip44CoinType` to set BIP44 purpose 44 and coin type 60 (Ethereum).
 - Added EVM constants:
   - `EVMChainID = 76857769`
-  - `FeeMarketDefaultBaseFee = "0.0025"`
+  - `FeeMarketDefaultBaseFee = "0.0125"`
   - `FeeMarketMinGasPrice = "0.0005"` (floor preventing base fee decay to zero)
   - `FeeMarketBaseFeeChangeDenominator = 16` (gentler ~6.25% adjustment per block)
   - `ChainDefaultConsensusMaxGas = 25_000_000`
@@ -164,7 +164,7 @@ Changes:
 - Added`RegisterTxService` override in`app/evm_runtime.go` to capture the`client.Context` with the local CometBFT client that cosmos/evm creates after CometBFT starts — the default`SetClientCtx` call happens before CometBFT starts and only provides an HTTP client.
 - Added`Close()` override to stop the broadcast worker before runtime shutdown.
 - Added configurable`[lumera.evm-mempool]` section in`app.toml` with`broadcast-debug` toggle for detailed async broadcast logging.
-- Enabled app-side mempool by default in app config (`max_txs=5000`).
+- Enabled app-side mempool by default in app config (`max_txs=10000`).
 
 Benefits/new features:
 
@@ -326,7 +326,10 @@ Files:
 - `app/openrpc/http.go`
 - `app/app.go`
 - `tools/openrpcgen/main.go`
-- `docs/openrpc_examples_overrides.json`
+- `docs/openrpc/examples_overrides.json`
+- `docs/openrpc/param_overrides.json`
+- `docs/openrpc/type_overrides.json`
+- `docs/openrpc/result_overrides.json`
 - `Makefile`
 
 Changes:
@@ -359,4 +362,3 @@ Benefits/new features:
 - Wallet/tooling clients can discover method catalogs consistently from the running node.
 - OpenRPC playground/browser clients can fetch the spec cross-origin without manual proxy setup.
 - Generated docs and embedded docs stay synchronized with built binaries, reducing stale-spec deployments.
-

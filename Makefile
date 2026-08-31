@@ -10,6 +10,7 @@ BUILD_DIR ?= build
 RELEASE_DIR ?= release
 RELEASE_TARGETS ?= linux:amd64
 GOPROXY ?= https://proxy.golang.org,direct
+MIGRATION_SCRIPTS := scripts/evmigration-common.sh $(sort $(wildcard scripts/migrate-*.sh))
 
 # Build tags for conditional compilation
 BUILD_TAGS ?= ledger
@@ -41,7 +42,36 @@ SPACE := $(EMPTY) $(EMPTY)
 COMMA := ,
 BUILD_TAGS_VERSION := $(subst $(SPACE),$(COMMA),$(strip $(BUILD_TAGS)))
 GIT_HEAD_HASH ?= $(strip $(shell git rev-parse HEAD 2>/dev/null))
-VERSION_TAG ?= $(strip $(shell tag_ref=$$(git for-each-ref --merged HEAD --sort=-creatordate --format='%(refname:strip=2)' refs/tags | head -n1); if [ -z "$$tag_ref" ]; then printf ''; else tag_name=$${tag_ref#v}; tag_commit=$$(git rev-list -n1 "$$tag_ref" 2>/dev/null); head_commit=$$(git rev-parse HEAD 2>/dev/null); if [ "$$tag_commit" = "$$head_commit" ]; then printf '%s' "$$tag_name"; else printf '%s-%s' "$$tag_name" "$$(git rev-parse --short=8 HEAD 2>/dev/null)"; fi; fi))
+# Resolve the version stamped into the binary via -ldflags.
+#
+# Priority:
+#   1. GITHUB_REF_NAME on a tag push -- the tag actually being released. This is
+#      authoritative in release CI and immune to any date-based heuristic.
+#   2. Tags pointing exactly at HEAD, preferring a final release over a
+#      prerelease (-rc/-beta/-alpha/-pre/-hotfix), ties broken by `sort -V`.
+#   3. Otherwise the newest reachable tag, suffixed with the short SHA.
+#
+# Step 2 must not sort by `creatordate`: for a LIGHTWEIGHT tag that reports the
+# COMMIT date, not the tagging date, so a lightweight release tag cut days after
+# an annotated -rc on the same commit still sorts older and loses. That is how
+# the v1.20.2 release artifact came to be stamped 1.20.2-rc1.
+VERSION_TAG ?= $(strip $(shell \
+	if [ -n "$$GITHUB_REF_NAME" ] && [ "$$GITHUB_REF_TYPE" = "tag" ]; then \
+		printf '%s' "$${GITHUB_REF_NAME#v}"; \
+	else \
+		at_head=$$(git tag --points-at HEAD 2>/dev/null); \
+		if [ -n "$$at_head" ]; then \
+			best=$$(printf '%s\n' "$$at_head" | grep -vE -- '-(rc|beta|alpha|pre|hotfix)' | sort -V | tail -n1); \
+			if [ -z "$$best" ]; then best=$$(printf '%s\n' "$$at_head" | sort -V | tail -n1); fi; \
+			printf '%s' "$${best#v}"; \
+		else \
+			tag_ref=$$(git for-each-ref --merged HEAD --sort=-creatordate --format='%(refname:strip=2)' refs/tags | head -n1); \
+			if [ -n "$$tag_ref" ]; then \
+				printf '%s-%s' "$${tag_ref#v}" "$$(git rev-parse --short=8 HEAD 2>/dev/null)"; \
+			fi; \
+		fi; \
+	fi))
+RELEASE_VERSION_TAG ?= $(strip $(if $(VERSION_TAG),$(if $(filter v%,$(VERSION_TAG)),$(VERSION_TAG),v$(VERSION_TAG))))
 BUILD_LDFLAGS = \
 	-X github.com/cosmos/cosmos-sdk/version.Name=$(APP_TITLE) \
 	-X github.com/cosmos/cosmos-sdk/version.AppName=$(APP_NAME)d \
@@ -118,15 +148,18 @@ build-openapi:
 	${GO} run ./tools/openapigen -config tools/openapigen/config.toml -out docs/static/openapi.yml
 
 OPENRPC_GENERATOR_INPUTS := \
-	tools/openrpcgen/main.go \
-	docs/openrpc_examples_overrides.json
+	$(filter-out %_test.go,$(wildcard tools/openrpcgen/*.go)) \
+	docs/openrpc/examples_overrides.json \
+	docs/openrpc/param_overrides.json \
+	docs/openrpc/type_overrides.json \
+	docs/openrpc/result_overrides.json
 
 app/openrpc/openrpc.json.gz docs/openrpc.json: $(OPENRPC_GENERATOR_INPUTS)
 	@echo "Generating OpenRPC spec..."
 	@# Create a placeholder .gz so the //go:embed directive in spec.go is
 	@# satisfied during compilation of the generator (same Go module).
 	@test -f app/openrpc/openrpc.json.gz || echo '{}' | gzip > app/openrpc/openrpc.json.gz
-	${GO} run ./tools/openrpcgen -out docs/openrpc.json -examples docs/openrpc_examples_overrides.json
+	${GO} run ./tools/openrpcgen -out docs/openrpc.json -examples docs/openrpc/examples_overrides.json -params docs/openrpc/param_overrides.json -types docs/openrpc/type_overrides.json -results docs/openrpc/result_overrides.json
 	gzip -c docs/openrpc.json > app/openrpc/openrpc.json.gz
 	@echo "OpenRPC spec written to docs/openrpc.json (embedded as app/openrpc/openrpc.json.gz)"
 
@@ -178,9 +211,14 @@ release: go.sum build-proto openrpc
 		CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" GOFLAGS=${GOFLAGS} GOOS=$$goos GOARCH=$$goarch ${GO} build -mod=readonly $(if $(strip $(BUILD_TAGS)),-tags "$(BUILD_TAGS)",) -ldflags '$(BUILD_LDFLAGS)' -o $$outdir/${APP_BINARY} ./$(APP_MAIN); \
 		chmod +x $$outdir/${APP_BINARY}; \
 		mkdir -p $$outdir/scripts; \
-		cp scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh scripts/migrate-multisig.sh $$outdir/scripts/; \
-		chmod +x $$outdir/scripts/migrate-account.sh $$outdir/scripts/migrate-validator.sh $$outdir/scripts/migrate-multisig.sh; \
-		tar -C $$outdir -czf ${RELEASE_DIR}/${APP_NAME}_$${goos}_$${goarch}.tar.gz ${APP_BINARY} scripts; \
+		cp ${MIGRATION_SCRIPTS} $$outdir/scripts/; \
+		chmod +x $$outdir/scripts/*.sh; \
+		artifact=${RELEASE_DIR}/${APP_NAME}$(if $(RELEASE_VERSION_TAG),_${RELEASE_VERSION_TAG})_$${goos}_$${goarch}.tar.gz; \
+		tar -C $$outdir -czf $$artifact ${APP_BINARY} scripts; \
+		for script in ${MIGRATION_SCRIPTS}; do \
+			archive_path=scripts/$$(basename $$script); \
+			tar -tzf $$artifact | grep -Fqx $$archive_path || { echo "Missing required release file: $$archive_path" >&2; exit 1; }; \
+		done; \
 		rm -rf $$outdir; \
 	done
 	@(cd ${RELEASE_DIR} && sha256sum *.tar.gz > release_checksum)
@@ -200,7 +238,7 @@ NOCACHE_FLAG := $(if $(NOCACHE),-count=1)
 
 lint-scripts:
 	@echo "Running shellcheck on scripts/ ..."
-	@shellcheck -x scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh scripts/migrate-multisig.sh
+	@shellcheck -x ${MIGRATION_SCRIPTS}
 
 test-scripts:
 	@echo "Running bats tests for scripts/ ..."

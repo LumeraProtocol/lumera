@@ -10,7 +10,7 @@
 #   bootstrap        Runs setup scripts supernode-setup.sh & validator-setup.sh in the foreground.
 #                    Exits when setup_complete is created. Does NOT start lumerad.
 #
-#   run              Waits for setup_complete, starts lumerad, and tails logs.
+#   run              Waits for setup_complete, starts lumerad, verifies block production, and tails logs.
 #
 #   wait  (optional) Wait for setup_complete and exit.
 #
@@ -331,13 +331,25 @@ start_lumera() {
 
 	echo "[BOOT] ${MONIKER}: Starting lumerad..."
 	CLAIMS_LOCAL="${DAEMON_HOME}/config/claims.csv"
-	EXTRA_START_FLAGS=""
-	if [ -f "${CLAIMS_LOCAL}" ] && "${DAEMON}" start --help 2>&1 | grep -q 'skip-claims-check' && "${DAEMON}" start --help 2>&1 | grep -q 'claims-path'; then
-		EXTRA_START_FLAGS="--skip-claims-check=false --claims-path=${CLAIMS_LOCAL}"
+	EXTRA_START_FLAGS="$(lumerad_claims_start_flags "${DAEMON}" "${CLAIMS_LOCAL}")"
+	if [ -n "${EXTRA_START_FLAGS}" ]; then
 		echo "[BOOT] ${MONIKER}: Claims CSV found, loading claim records at genesis"
 	fi
+	# The EVM JSON-RPC metrics server is enabled by the --metrics start flag and
+	# only exists on EVM-enabled builds; pre-EVM lumerad does not know the flag.
+	if lumera_supports_evm; then
+		local enable_metrics
+		enable_metrics="$(jq -r '.["json-rpc"].enable_metrics // true' "${CFG_CHAIN}" 2>/dev/null || echo true)"
+		if [ "${enable_metrics}" = "true" ]; then
+			EXTRA_START_FLAGS="${EXTRA_START_FLAGS} --metrics"
+			echo "[BOOT] ${MONIKER}: EVM build detected, enabling JSON-RPC metrics (--metrics)"
+		fi
+	fi
+	echo "+ ${DAEMON} start --home ${DAEMON_HOME} ${EXTRA_START_FLAGS}"
 	# shellcheck disable=SC2086
-	run "${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
+	"${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
+	LUMERAD_PID=$!
+	echo "[BOOT] ${MONIKER}: lumerad started, pid=${LUMERAD_PID}"
 
 	if [ "${MONIKER}" = "${PRIMARY_MONIKER}" ]; then
 		mkdir -p "$(dirname "${PRIMARY_STARTED_FLAG}")"
@@ -348,7 +360,39 @@ start_lumera() {
 
 tail_logs() {
 	touch "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}" "${TEST_ACCOUNTS_SETUP_OUT}"
-	exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}" "${TEST_ACCOUNTS_SETUP_OUT}"
+	tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}" "${TEST_ACCOUNTS_SETUP_OUT}" &
+	TAIL_PID=$!
+}
+
+# Wait on the lumerad process and propagate its exit code as the container's
+# exit code. If lumerad dies (crash, SIGKILL on host that matches `pkill -f
+# 'lumerad start'`, OOM, etc.) PID 1 exits too. The docker-compose
+# `restart: unless-stopped` policy handles recovery on any container exit while
+# the propagated code keeps crash/kill status visible to docker / observability.
+#
+# History: 2026-06-02 — a host `pkill -9 -f 'lumerad start'` matched lumerad
+# inside the 5 validator containers. PID 1 was bash + tail -F, so containers
+# stayed "Up" for 6 days while chain was dead. See PR description.
+wait_for_lumera() {
+	if [ -z "${LUMERAD_PID:-}" ]; then
+		echo "[BOOT] ${MONIKER}: lumerad pid not set; cannot supervise."
+		# Fall back to old tail-forever behaviour rather than exit 0 silently.
+		wait "${TAIL_PID:-}" 2>/dev/null || true
+		return 0
+	fi
+	# `wait <pid>` returns the exit status of that process. We deliberately do
+	# NOT use `set -e` here so we can capture the code.
+	set +e
+	wait "${LUMERAD_PID}"
+	local rc=$?
+	set -e
+	echo "[BOOT] ${MONIKER}: lumerad exited rc=${rc} — terminating container so docker restart policy can recover."
+	if [ -n "${TAIL_PID:-}" ]; then
+		kill "${TAIL_PID}" 2>/dev/null || true
+	fi
+	# Sleep briefly so the last log lines are flushed by tail -F before we exit.
+	sleep 1
+	exit "${rc}"
 }
 
 run_auto_flow() {
@@ -361,6 +405,7 @@ run_auto_flow() {
 	launch_test_accounts_setup
 	start_nm_ui_if_present
 	tail_logs
+	wait_for_lumera
 }
 
 case "${START_MODE}" in
@@ -380,14 +425,15 @@ bootstrap)
 run)
 	archive_existing_logs
 	wait_for_validator_setup
+	start_lumera
 	wait_for_n_blocks 3 || {
 		echo "[SN] Lumera chain not producing blocks in time; exiting."
 		exit 1
 	}
-	start_lumera
 	launch_test_accounts_setup
 	start_nm_ui_if_present
 	tail_logs
+	wait_for_lumera
 	;;
 
 wait)

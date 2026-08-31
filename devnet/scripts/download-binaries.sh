@@ -81,7 +81,14 @@ download_asset() {
 # ---------------------------------------------------------------------------
 LUMERA_TAG="$(echo "${VERSION_ENTRY}" | jq -r '.lumera.tag // empty')"
 if [[ -n "${LUMERA_TAG}" ]]; then
-	LUMERA_ASSET="lumera_${LUMERA_TAG}_linux_amd64.tar.gz"
+	# Asset filename defaults to the versioned release convention
+	# (lumera_<tag>_linux_amd64.tar.gz). Some pre-release builds publish a
+	# version-less asset (e.g. lumera_linux_amd64.tar.gz); point at it by setting
+	# "asset" in the lumera entry of binaries.json, which is used verbatim.
+	LUMERA_ASSET="$(echo "${VERSION_ENTRY}" | jq -r '.lumera.asset // empty')"
+	if [[ -z "${LUMERA_ASSET}" ]]; then
+		LUMERA_ASSET="lumera_${LUMERA_TAG}_linux_amd64.tar.gz"
+	fi
 	LUMERA_TAR="${TMPDIR}/${LUMERA_ASSET}"
 
 	echo "--- lumera ${LUMERA_TAG} ---"

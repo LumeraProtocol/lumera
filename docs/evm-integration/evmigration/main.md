@@ -27,7 +27,6 @@ When Lumera upgrades to EVM support (v1.20.0), the same mnemonic produces a **di
 | `x/feegrant` | Fee allowance re-keying (both granter and grantee) |
 | `x/supernode` | SupernodeAccount, Evidence, PrevSupernodeAccounts, MetricsState |
 | `x/action` | Creator and SuperNodes fields in action records |
-| `x/claim` | DestAddress in claim records |
 | `x/evmigration` | Core migration logic, dual-signature verification, rate limiting |
 
 ### Key design decisions
@@ -36,6 +35,7 @@ When Lumera upgrades to EVM support (v1.20.0), the same mnemonic produces a **di
 - **Zero-fee migration** -- a custom ante decorator waives gas fees for migration txs since the new address has no balance before migration completes
 - **Rate limiting** -- `max_migrations_per_block` (default 50) prevents migration flood attacks
 - **Validator migration** -- dedicated `MsgMigrateValidator` handles the additional complexity of re-keying validator records, delegator references, and consensus key mappings
+- **Claim records are not re-keyed** -- `x/claim` records are left untouched during migration. The claim DB is frozen (claiming ended 2025-01-01) and retained for reference only; re-keying `DestAddress` was cosmetic (funds already moved during the claim period). Scanning the ~18K-record claim store per migration was unbounded gas with no functional benefit, so it was removed. The legacy-to-new mapping lives in `MigrationRecords` and can reconstruct claim linkage offline if ever needed.
 
 See [legacy-migration.md](legacy-migration.md) for the full module reference.
 

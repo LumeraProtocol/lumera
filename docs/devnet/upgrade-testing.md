@@ -93,6 +93,8 @@ The `make devnet-evm-upgrade` target automates a full upgrade from pre-EVM to EV
 7. Wait for chain to resume producing blocks
 ```
 
+Use this upgrade pipeline, not a fresh EVM init, for release qualification. It preserves the pre-EVM `app.toml` shape and exercises the startup config migration that adds `[evm]`, `[evm.mempool]`, `[json-rpc]`, `[tls]`, and `[lumera.*]`; this is the path that catches legacy no-op mempool settings such as `mempool.max-txs = -1`.
+
 ### Running the full EVM migration test
 
 ```bash

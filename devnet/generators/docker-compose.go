@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -44,6 +45,7 @@ type DockerComposeService struct {
 	CapAdd        []string                               `yaml:"cap_add,omitempty"`
 	SecurityOpt   []string                               `yaml:"security_opt,omitempty"`
 	Logging       *DockerComposeLogging                  `yaml:"logging,omitempty"`
+	Restart       string                                 `yaml:"restart,omitempty"`
 }
 
 type DockerComposeNetwork struct {
@@ -145,6 +147,50 @@ func detectLumeraVersion(binaryName string) string {
 	return ""
 }
 
+// parseSemverTriple extracts numeric major.minor.patch from a version string
+// such as "v1.20.0" or "v1.20.0-rc1". Prerelease/build metadata is ignored.
+// Returns ok=false when the value cannot be parsed into three integers.
+func parseSemverTriple(version string) (major, minor, patch int, ok bool) {
+	v := strings.TrimPrefix(strings.TrimSpace(version), "v")
+	if i := strings.IndexAny(v, "-+"); i >= 0 {
+		v = v[:i]
+	}
+	parts := strings.Split(v, ".")
+	if len(parts) != 3 {
+		return 0, 0, 0, false
+	}
+	nums := make([]int, 3)
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			return 0, 0, 0, false
+		}
+		nums[i] = n
+	}
+	return nums[0], nums[1], nums[2], true
+}
+
+// versionAtLeast reports whether current >= floor by semver major.minor.patch.
+// It fails closed (returns false) when either version cannot be parsed, so an
+// unresolvable chain version never publishes EVM ports.
+func versionAtLeast(current, floor string) bool {
+	cMaj, cMin, cPatch, ok := parseSemverTriple(current)
+	if !ok {
+		return false
+	}
+	fMaj, fMin, fPatch, ok := parseSemverTriple(floor)
+	if !ok {
+		return false
+	}
+	if cMaj != fMaj {
+		return cMaj > fMaj
+	}
+	if cMin != fMin {
+		return cMin > fMin
+	}
+	return cPatch >= fPatch
+}
+
 func resolveLumeraChainVersion(config *confg.ChainConfig) (string, error) {
 	if config == nil {
 		return "", fmt.Errorf("nil chain config")
@@ -199,6 +245,10 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 	if evmFromVersion == "" {
 		evmFromVersion = confg.DefaultEVMFromVersion
 	}
+	// EVM JSON-RPC endpoints only exist from evmFromVersion onward. Publishing
+	// their host ports for a pre-EVM chain reserves ports (notably 8545) for
+	// servers that never start, causing bind collisions on the host.
+	evmEnabled := versionAtLeast(chainVersion, evmFromVersion)
 
 	for index, validator := range validators {
 		serviceName := fmt.Sprintf("%s-%s", config.Docker.ContainerPrefix, validator.Name)
@@ -213,19 +263,21 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			env["USE_EXISTING_GENESIS"] = "1"
 		}
 		env["INTEGRATION_TEST"] = "true"
-		// Mark the everlight test's target validator (the one whose supernode
-		// key the test uses to drive MsgSubmitEpochReport). Its on-chain
-		// host_reporter is suppressed at boot so the test wins the
-		// account-sequence race for that key. Keep host_reporter running on
-		// the other validators so peer reachability data still flows, which
-		// is what gates ACTIVE-state eligibility.
+		// Keep validator-owned host_reporters enabled by default so all
+		// supernodes submit audit epoch reports and remain healthy. Specific
+		// tests that drive MsgSubmitEpochReport externally can override this
+		// to 1 when they need to avoid account-sequence contention.
 		if validator.Name == "supernova_validator_1" {
-			env["EVERLIGHT_TEST_TARGET"] = "1"
+			env["EVERLIGHT_TEST_TARGET"] = "0"
 		}
 
 		service := DockerComposeService{
 			Build:         ".",
 			ContainerName: serviceName,
+			// Auto-restart on lumerad crashes / host pkill mishaps.
+			// start.sh wait_for_lumera() makes PID 1 exit with lumerad's
+			// status for observability; this policy handles recovery.
+			Restart: "unless-stopped",
 			Ports: []string{
 				fmt.Sprintf("%d:%d", validator.Port, DefaultP2PPort),
 				fmt.Sprintf("%d:%d", validator.RPCPort, DefaultRPCPort),
@@ -273,13 +325,24 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			}
 		}
 
-		// Optional JSON-RPC host bindings per validator.
-		// Container ports are fixed by lumerad: 8545 (HTTP) and 8546 (WebSocket).
-		if validator.JSONRPC.Port > 0 {
-			service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.Port, DefaultJSONRPCPort))
-		}
-		if validator.JSONRPC.WSPort > 0 {
-			service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.WSPort, DefaultJSONRPCWSPort))
+		// Optional JSON-RPC host bindings per validator, published only for
+		// EVM-enabled chain versions. Container ports are fixed by lumerad:
+		// 8545 (HTTP), 8546 (WebSocket), 6065 (JSON-RPC metrics), 8100 (geth
+		// metrics). Host ports follow a contiguous per-validator block
+		// (8645/8646/8647/8648 + index*100) defined in validators.json.
+		if evmEnabled {
+			if validator.JSONRPC.Port > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.Port, DefaultJSONRPCPort))
+			}
+			if validator.JSONRPC.WSPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.WSPort, DefaultJSONRPCWSPort))
+			}
+			if validator.JSONRPC.MetricsPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.MetricsPort, DefaultJSONRPCMetricsPort))
+			}
+			if validator.JSONRPC.GethMetricsPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.GethMetricsPort, DefaultGethMetricsPort))
+			}
 		}
 
 		if index > 0 {
@@ -335,6 +398,7 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			},
 			Environment: map[string]string{
 				"HERMES_CONFIG":            "/root/.hermes/config.toml",
+				"LUMERA_HERMES_CONTAINER":  "true",
 				"LUMERA_VERSION":           chainVersion,
 				"LUMERA_FIRST_EVM_VERSION": evmFromVersion,
 			},

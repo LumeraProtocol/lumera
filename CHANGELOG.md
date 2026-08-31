@@ -2,49 +2,120 @@
 
 ---
 
+## 1.20.3
+
+Changes included since `v1.20.2` (range: `v1.20.2..v1.20.3`).
+
+A release-tooling-only follow-up to `v1.20.2`. **Validators must use the `v1.20.3` binary for the on-chain upgrade plan named `v1.20.2`.** When using Cosmovisor, install the binary at `cosmovisor/upgrades/v1.20.2/bin/lumerad`.
+
+There are no application-state, consensus, store-migration, or upgrade-handler changes relative to `v1.20.2`. The only source change corrects the version stamped into release binaries.
+
+- Fixed release version stamping: the original `v1.20.2` artifact reports `1.20.2-rc1` even though it was built from the correct `v1.20.2` application commit (`aafc4a28`). The release process now prioritizes the GitHub tag being built, then a final tag pointing at `HEAD`, before falling back to the newest reachable tag plus the commit suffix.
+
+> The original `v1.20.2` artifact is superseded. Do not use it for the mainnet upgrade.
+
+---
+
+## 1.20.2
+
+Changes included since `v1.20.1` (range: `v1.20.1..v1.20.2`).
+
+> **Release artifact notice:** The original `v1.20.2` artifact incorrectly reports its version as `1.20.2-rc1`. It is superseded and must not be used for the mainnet upgrade. Validators must install `v1.20.3`; the on-chain upgrade plan name remains `v1.20.2`.
+
+A coordinated upgrade (plan name `v1.20.2`) that serves as the **consensus activation boundary** for validator-migration correctness fixes in `x/evmigration`: the fixes change DeliverTx outcomes for the same migration transaction, so they must activate atomically across the validator set at one halt height rather than via rolling restarts. The handler is state-driven, like `v1.20.1`, and serves both live arrival shapes from one binary: on testnet (arriving from `v1.20.1`, EVM present) it runs migrations only and leaves the live `migration_end_time` untouched; on mainnet (arriving one-hop from `v1.12.0`, EVM absent) it performs the full EVM bring-up by delegating to the `v1.20.1`/`v1.20.0` path, with add-only store mounting and a fail-closed guard against partial EVM state. No module consensus-version bumps and no destructive store changes.
+
+### Fee market
+
+- **Raised the EIP-1559 default/reset base fee fivefold**: `0.0025` → `0.0125 ulume/gas`. The `min_gas_price` floor is unchanged at `0.0005 ulume/gas`, so an idle chain still decays to the same floor; the upgrade handler re-applies the new base fee on both arrival shapes. Measured supernode fee impact on devnet was ~+28% per epoch (not 5×) because of the unchanged floor.
+
+### Validator migration correctness (`x/evmigration`)
+
+- Fixed loss of Everlight distribution state on validator migration: the validator-keyed `rdist/` accumulator (smoothed-bytes EMA, growth-cap baseline, ramp-up progress, eligibility start) was orphaned under the old operator address, so a migrated validator silently re-entered the new-SN ramp at reduced payout weight and bypassed the growth cap. A SuperNode-owned Build/Apply plan now atomically moves both validator-keyed families it owns (`snm_` latest metrics and `rdist/` distribution state) to the new operator address, failing closed on destination collisions or malformed rows. Payout history (`rhist/`) intentionally stays under the validator that earned it.
+- Added a backward repair for distribution rows corrupted by `v1.20.0`: account migrations under `v1.20.0` stored `DelegatorStartingInfo.Stake` as raw shares instead of tokens, so delegations to ever-slashed validators could panic reward withdrawal during a later validator migration. The repair matches the exact `v1.20.0` fingerprint, replays applicable slash events, and reconstructs the starting stake atomically inside the migration transaction; it is idempotent and a no-op for unaffected rows. (Mainnet is unaffected — it never ran `v1.20.0`.)
+- Hardened supernode re-keying during migration: ownership is now resolved canonically (not by literal address text), verified in a strict preflight before any writes, dual validator/supernode-account relationships are preserved, and destination supernode ownership collisions are rejected. `PrevSupernodeAccounts` history is preserved and appended to instead of being rewritten.
+
+### Migration tooling & operator experience
+
+- Migration scripts now auto-resolve the keyring backend (`--keyring-backend` flag > `LUMERA_KEYRING_BACKEND` > `client.toml` > on-disk keyring detection > SDK default `os`) instead of hardcoding `test`, and show the keyring passphrase prompt for the `os` backend instead of appearing to hang.
+- Hardened the migration CLI and account/validator/multisig scripts: visible prompts and staged progress output, reliable tx confirmation over HTTP-only RPC endpoints, true immediate-return `--tx-timeout 0s`, and idempotent re-runs of interrupted batch migrations. Release tarballs now include and validate all migration scripts.
+- Documentation: stopping the node before validator migration is mandatory (a supervisor-respawned instance can double-sign and tombstone the validator); documented the Keplr cached-chain trap that can silently restore the legacy coin-type-118 profile; folded supernode-migration runbook findings (upgrade order, sn-manager auto-update gate, two-keyring trap, non-repeatability of migration) into the guides.
+
+### Upgrade & operations
+
+- Registered the `v1.20.2` upgrade handler as a state-driven boundary that delegates to the rehearsed `v1.20.1` logic, with add-only store-loader routing on all networks. Module consensus versions are pinned by tests against live mainnet/testnet state, and both arrival shapes (plus idempotent replay after a mid-upgrade crash) are covered by mutation-tested upgrade tests.
+- Devnet: added a `devnet-upgrade-1202` target and mainnet-shaped pre-EVM rehearsal fixtures (a `v1.12.0` genesis/config for the one-hop shape and a `v1.20.1`-shaped EVM genesis for a non-vacuous fee-market gate); fixed upgrade halt detection reporting false alarms on healthy upgrades; fixed two bugs that prevented the lumera-uploader from ever starting; test fee expectations are now derived from `config/evm.go` instead of hardcoded literals.
+- Dependencies: bumped `golang.org/x/crypto` 0.51.0 → 0.52.0 (root, devnet, and systemtests modules).
+
+---
+
+## 1.20.1
+
+Changes included since `v1.20.0` (range: `v1.20.0..v1.20.1`).
+
+A hotfix that hardens `x/evmigration` for large validators and live-network conditions. On networks that already ran `v1.20.0` (testnet/devnet) it is migration-only with no store changes; on mainnet — which skips `v1.20.0` entirely — `v1.20.1` also performs the full EVM bring-up (adds the EVM stores and finalizes Lumera EVM params) by reusing the `v1.20.0` store additions and handler.
+
+### Account migration performance (`x/evmigration`)
+
+- Optimized validator migration so its cost scales with the migrating validator's own footprint instead of total chain state: scoped distribution/staking index reads replace full-chain `Iterate*` scans, a redundant second read of the validator's staking records is removed, and the historical-rewards reference count is now written once (`base + N`) instead of via N+1 full-chain scans. In the modeled large-validator case this touches ~215× fewer KV keys (1507 → 7).
+- Optimized action re-keying (both `ClaimLegacyAccount` and `MigrateValidator`) to resolve affected actions through the `Creator`/`SuperNodes` secondary indexes instead of scanning the entire action store. This fixes `ClaimLegacyAccount` txs observed burning ~1.5B gas each on testnet, which would be unminable under a mainnet block gas cap.
+
+### Account migration correctness & safety (`x/evmigration`)
+
+- Fixed a fund-locking bug: migration rebuilt `DelegatorStartingInfo.Stake` from raw delegation shares instead of tokens, so any delegation to an ever-slashed validator would panic the delegator's next reward withdrawal, undelegate, or redelegate (`calculated final stake … greater than current stake`). Stake is now stored as tokens-from-shares, matching the SDK invariant.
+- Fixed a validator-migration deadlock: `Unbonded` (non-jailed) validators — those that fell out of the active set purely on stake weight — can now migrate and recover their keys, funds, and rewards. Only `Unbonding` validators remain blocked, because their live unbonding-queue entry would otherwise be orphaned and halt the chain at maturity; the guidance is to wait for the unbonding period to complete.
+- Removed claim-record re-keying from migration. The claim DB is frozen (claiming ended 2025-01-01) and retained for reference only; re-keying was cosmetic and scanned the ~18K-record store on every migration. The legacy→new mapping in `MigrationRecords` can reconstruct claim linkage offline if ever needed.
+- Made scoped redelegation replay deterministic (sorted store-key order) so migrations produce identical app hashes across nodes.
+- Hardened `MigrationEstimate` to fail loud on lookup errors instead of returning partial data.
+
+### Upgrade & operations
+
+- Excluded the `v1.20.0` upgrade handler on mainnet and routed the full EVM bring-up through `v1.20.1` instead (mirrors the existing `v1.8.0`/`v1.8.4` mainnet-skip precedent). On mainnet, `v1.20.1` reuses the `v1.20.0` store additions and handler verbatim, so everything `v1.20.0` does is guaranteed to run; on testnet/devnet (which already ran `v1.20.0`) `v1.20.1` remains a migration-only hotfix (standard handler, no store changes).
+- Updated the Lumera uploader devnet default gRPC port to `15051` to avoid the reserved Windows/Docker Desktop `50051` range, and documented chain-helper network defaults for migration tooling.
+
+---
+
 ## 1.20.0
 
 Changes included since `v1.11.1` (range: `v1.11.1..v1.20.0`).
 
 Full EVM integration documentation: [docs/evm-integration/main.md](docs/evm-integration/main.md)
 
-- Added Cosmos EVM v0.6.0 with four new modules: `x/vm` (EVM execution), `x/feemarket` (EIP-1559 dynamic base fee), `x/precisebank` (6-decimal `ulume` ↔ 18-decimal `alume` bridge), and `x/erc20` (STRv2 token pair registration + IBC middleware).
-- Added dual-route ante handler (`app/evm/ante.go`) routing Ethereum extension txs to the EVM path and all others to the Cosmos path, with pending tx listener support.
-- Added app-side EVM mempool (`app/evm_mempool.go`) with Ethereum-like sender ordering, nonce-gap handling, and same-nonce replacement rules.
-- Added async broadcast queue (`app/evm_broadcast.go`) to prevent mempool mutex re-entry deadlock during nonce-gap promotion.
-- Added 11 static precompiles: P256, Bech32, Staking, Distribution, ICS20, Bank, Gov, Slashing, plus custom Action (`0x0901`), Supernode (`0x0902`), and Wasm (`0x0903`) precompiles for Lumera-specific EVM→Cosmos and EVM→CosmWasm calls.
-- Added JSON-RPC server and indexer enabled by default with 7 namespaces; optional per-IP rate limiting proxy (`app/evm_jsonrpc_ratelimit.go`) with configurable token bucket.
-- Added EVM tracing support configurable at runtime via `app.toml [evm] tracer` (json, struct, access_list, markdown).
-- Added OpenRPC discovery: `rpc_discover` JSON-RPC method, `GET /openrpc.json` HTTP endpoint with CORS, gzip-compressed spec embedded in binary (315 KB → 20 KB), and build-time generation via `tools/openrpcgen`.
-- Changed default key type to `eth_secp256k1` and BIP44 coin type from 118 to 60 for Ethereum-compatible wallet derivation (MetaMask, Ledger).
-- Added EVM chain ID `76857769`, base fee `0.0025 ulume/gas`, min gas price floor `0.0005 ulume/gas` (prevents zero-fee spam), and base fee change denominator `16` (~6.25% adjustment per block).
-- Added IBC ERC20 middleware wired on both v1 and v2 transfer stacks with governance-controlled registration policy (`all`/`allowlist`/`none`) via `MsgSetRegistrationPolicy`.
-- Added `x/evmigration` module for legacy coin-type-118 → 60 account migration with dual-signature verification and multi-module atomic state re-keying (auth, bank, staking, distribution, authz, feegrant, supernode, action, claim); a separate `MsgMigrateValidator` flow re-keys the validator operator, deletes the orphaned legacy KV row, and rejects jailed validators with operator guidance.
-- Added multisig migration support: `LegacyProof` proto with single-key + multisig `oneof` variants, `MaxMultisigSubKeys` param (default 20), and a K/N mirror-source consensus rule requiring sub-key count and threshold to match between legacy and new sides. Verifier helpers (`verifySecp256k1Sig`, `verifySingleKeyProof`, `verifyMultisigProof`) include duplicate-sub-key preflight, `signer_indices`/sub-key uniqueness checks, and a defense-in-depth `ValidateProofPair` at the message-server boundary.
-- Added a four-step offline multisig CLI flow (`generate-proof-payload` → `sign-proof` → `combine-proof` → `submit-proof`) so co-signers can participate without sharing keys; `combine-proof` verifies each partial cryptographically before assembling the final proof, surfacing tampered partials before on-chain submission.
-- Added user-facing migration helper scripts (`scripts/migrate-account.sh`, `scripts/migrate-validator.sh`, `scripts/migrate-multisig.sh`) wrapping the full pre-flight estimate → key import → snapshot → submit → verify flow, with multisig-aware K/N partials, validator-specific cap checks and downtime acknowledgment, and fail-closed query handling so script-level success implies on-chain success.
-- Added `devnet/scripts/lumera-helper.sh unjail-validator` helper plus downtime warnings in the validator migration guide for operators approaching the slashing window.
-- Added fee-waiving ante decorator for migration txs (`ante/evmigration_fee_decorator.go`) since new addresses have zero balance pre-migration.
-- Added v1.20.0 upgrade handler with store additions for feemarket, precisebank, vm, erc20, and evmigration; post-migration finalization sets Lumera EVM params, feemarket params, and ERC20 defaults.
-- Added Action module precompile (`0x0901`) and Supernode module precompile (`0x0902`) giving Solidity contracts native access to `MsgRequestAction`/`MsgFinalizeAction` (including LEP-5 cascade availability commitments) and supernode queries/registration respectively.
-- Added CosmWasm ↔ EVM cross-runtime bridge (Phase 1, non-payable, depth-1 reentrancy guard): `WasmPrecompile` at `0x0903` exposes `execute`, `query`, `contractInfo`, `rawQuery` to Solidity, and a custom Wasm message handler + query handler decorator (`app/wasm_evm_plugin.go`) lets CosmWasm contracts invoke EVM contracts via `ApplyMessage` with an explicitly-constructed `statedb`. Cross-runtime gas is capped at `DefaultCrossRuntimeGasCap = 3,000,000` per call.
-- Added blocked-address protections: module accounts and all precompile addresses are excluded from bank sends to prevent accidental token loss.
-- Added centralized bank denom metadata (`config/bank_metadata.go`) and `RegisterExtraInterfaces` for `eth_secp256k1` crypto interface registration across SDK + EVM paths.
-- Added `RegisterTxService` override (`app/evm_runtime.go`) to capture the local CometBFT client for the async broadcast worker, replacing the stale HTTP client that `SetClientCtx` provides before CometBFT starts.
-- Added depinject custom signer wiring for `MsgEthereumTx` and safe early-RPC keeper coin info initialization (`SetKeeperDefaults`) to prevent panics before genesis runs.
-- CosmWasm (`wasmd v0.61.6` + `wasmvm v3.0.3`) and EVM coexist in the same runtime — Lumera is the only Cosmos chain shipping both simultaneously, and the cross-runtime bridge above lets contracts call across the boundary in either direction.
-- Added evmigration query endpoints for migration planning and monitoring: `MigrationEstimate` (pre-migration impact analysis with delegation/unbonding/redelegation/authz/feegrant counts), `MigrationStats` (on-chain progress tracking), `LegacyAccounts` (paginated unmigrated account listing), and `MigratedAccounts` (searchable migration history).
-- Added dual signature verification in evmigration: legacy proofs accept both raw SHA-256 CLI signing and ADR-036 wallet signing (Keplr/Leap); new address proofs accept both raw Keccak-256 and EIP-191 `personal_sign` (MetaMask), ensuring compatibility across all major wallet types.
-- Added `app.toml` auto-config migration (`cmd/lumera/cmd/config_migrate.go`) for nodes upgrading from pre-EVM binaries — automatically detects missing `[evm]`, `[json-rpc]`, `[tls]`, and `[lumera.*]` sections and regenerates `app.toml` with Lumera defaults while preserving existing operator settings.
-- Added EVM mempool Prometheus metrics (`app/evm_mempool_metrics.go`): gauges for mempool size, pending/queued counts, and broadcast queue depth; labeled rejection counter (`rejections_total{source,reason}`) for observability.
-- Added `MsgSetRegistrationPolicy` governance message for ERC20 IBC auto-registration: operators can toggle policy between `all`, `allowlist`, and `none` modes; pre-populated genesis allowlist includes inert base denom traces for major tokens (uatom, uosmo, uusdc, inj) ready for governance channel binding.
-- Added evmigration user guides under `docs/evm-integration/user-guides/`: `migration.md` (CLI/Keplr/MetaMask account migration), `validator-migration.md`, `supernode-migration.md`, and `migration-scripts.md` reference for the helper scripts above.
-- Added node operator EVM configuration guide (`docs/evm-integration/user-guides/node-evm-config-guide.md`) and tuning guide (`docs/evm-integration/user-guides/tune-guide.md`) covering `app.toml` tuning, RPC exposure, tracer config, and rate limit setup.
-- Added comprehensive EVM integration test suites under `tests/integration/evm/` covering ante, contracts, feemarket, IBC ERC20, JSON-RPC, mempool, precisebank, precompiles, and VM queries.
-- Added devnet evmigration end-to-end tests validating the full legacy account migration flow across a multi-validator network, plus multisig-mode coverage (single-key, multisig-of-secp256k1, and multisig-of-eth destinations) and `PermanentLocked` vesting fixtures.
-- Added `make devnet-evm-upgrade` and versioned 1.11.1 devnet targets to exercise the on-chain `v1.11.1 → v1.20.0` upgrade path end-to-end against the multi-validator devnet.
-- Renamed the devnet upload service from `network-maker` to `lumera-uploader` across docs, dockerfile, and lifecycle scripts; legacy binary names are still recognized by `devnet/scripts/stop.sh` for backwards compatibility.
-- Updated transitive Go dependencies (CosmWasm, go-ethereum, and others) to address critical and high-severity security vulnerabilities surfaced by Go module audit.
+This release integrates a full EVM execution layer (Cosmos EVM v0.6.0) alongside the existing CosmWasm runtime, and adds the `x/evmigration` module for migrating legacy accounts to Ethereum-compatible keys.
+
+### EVM execution layer
+
+- Added Cosmos EVM v0.6.0 with four modules: `x/vm` (EVM execution), `x/feemarket` (EIP-1559 dynamic base fee), `x/precisebank` (6-decimal `ulume` ↔ 18-decimal `alume` bridge), and `x/erc20` (STRv2 token pairs + IBC middleware). CosmWasm (`wasmd v0.61.6`) and EVM now coexist in the same runtime.
+- **Breaking:** changed default key type to `eth_secp256k1` and BIP44 coin type from 118 to 60 for Ethereum-compatible wallet derivation (MetaMask, Ledger).
+- Added EVM chain ID `76857769`, EIP-1559 base fee `0.0025 ulume/gas`, and a min gas price floor `0.0005 ulume/gas` (prevents zero-fee spam).
+- Added a JSON-RPC server and indexer enabled by default (7 namespaces), OpenRPC discovery (`rpc_discover`, `GET /openrpc.json`), runtime-configurable tracing, and an optional per-IP rate-limiting proxy.
+- Added an app-side EVM mempool with Ethereum-like sender ordering and nonce-gap handling, an async broadcast queue, and Prometheus metrics (size, pending/queued, broadcast depth, labeled rejections).
+- Added a dual-route ante handler that routes Ethereum extension txs to the EVM path and all others to the Cosmos path.
+
+### Precompiles & cross-runtime bridge
+
+- Added 11 static precompiles (P256, Bech32, Staking, Distribution, ICS20, Bank, Gov, Slashing) plus custom Action (`0x0901`) and Supernode (`0x0902`) precompiles giving Solidity contracts native access to action requests/finalization (incl. LEP-5 cascade commitments) and supernode queries/registration.
+- Added a CosmWasm ↔ EVM cross-runtime bridge (Phase 1): a Wasm precompile (`0x0903`) lets Solidity call CosmWasm contracts, and a custom message/query handler lets CosmWasm contracts call EVM contracts. Cross-runtime gas is capped at 3,000,000 per call.
+- Added blocked-address protections so module accounts and precompile addresses are excluded from bank sends, preventing accidental token loss.
+
+### IBC ERC20
+
+- Added IBC ERC20 middleware on both v1 and v2 transfer stacks with a governance-controlled registration policy (`all`/`allowlist`/`none`) via `MsgSetRegistrationPolicy`.
+
+### Account migration (`x/evmigration`)
+
+- Added the `x/evmigration` module for migrating legacy coin-type-118 accounts to coin-type-60 (Ethereum-compatible) addresses, with dual-signature verification and atomic multi-module state re-keying across auth, bank, staking, distribution, authz, feegrant, supernode, action, and claim. A separate `MsgMigrateValidator` flow re-keys the validator operator and rejects jailed validators.
+- Added multisig migration with a K/N mirror-source consensus rule and a four-step offline CLI flow (`generate-proof-payload` → `sign-proof` → `combine-proof` → `submit-proof`) so co-signers participate without sharing keys.
+- Added dual signature verification across all major wallet types: legacy proofs accept raw CLI (SHA-256) and ADR-036 (Keplr/Leap); new-address proofs accept raw Keccak-256 and EIP-191 `personal_sign` (MetaMask).
+- Migration txs are fee-free and signature-free; a hardened ante enforces the migration window and rejects implausible migrations (nonexistent/already-migrated sources, reused destinations) before mempool admission to bound zero-fee spam.
+- Added query endpoints for migration planning and monitoring: `MigrationEstimate`, `MigrationStats`, `LegacyAccounts`, and `MigratedAccounts`.
+- Added user-facing helper scripts (`migrate-account.sh`, `migrate-validator.sh`, `migrate-multisig.sh`) and user guides for account, validator, and supernode migration.
+
+### Upgrade & operations
+
+- Added the `v1.20.0` upgrade handler with store additions for the new EVM and evmigration modules and post-upgrade finalization of Lumera EVM, fee market, and ERC20 params. The handler auto-derives `migration_end_time` from the upgrade-block time (devnet +2 days; testnet and mainnet +3 calendar months).
+- Added `app.toml` auto-config migration for nodes upgrading from pre-EVM binaries — detects missing `[evm]`, `[json-rpc]`, `[tls]`, and `[lumera.*]` sections and regenerates them with Lumera defaults while preserving operator settings.
+- Added a node-operator EVM configuration guide and a tuning guide covering `app.toml`, RPC exposure, tracer config, and rate limiting.
+- Updated transitive Go dependencies (CosmWasm, go-ethereum, quic-go, and others) to address critical and high-severity security vulnerabilities, and migrated the example Solidity toolchain to Hardhat 3.
 
 ---
 

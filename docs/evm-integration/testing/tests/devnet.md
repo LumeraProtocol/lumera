@@ -1,14 +1,65 @@
 # Devnet Tests
 
 Devnet tests run inside the Docker multi-validator testnet (`make devnet-new`).
+
+## Validator EVM Tests
+
 Test source: `devnet/tests/validator/evm_test.go`
 
 | Test | Description |
 | --- | --- |
+| `TestEVMJSONRPCBasicMethods` | Verifies basic JSON-RPC health and chain metadata methods on a validator RPC endpoint. |
+| `TestEVMJSONRPCNamespacesExposed` | Verifies the expected public EVM JSON-RPC namespaces are exposed. |
+| `TestEVMJSONRPCRateLimitPublicProfileIfEnabled` | When `[lumera.json-rpc-ratelimit] enable = true` in the local devnet `app.toml`, bursts JSON-RPC requests through the public endpoint and requires HTTP 429 responses from the rate limiter. Skipped for default profiles where rate limiting is disabled. |
 | `TestEVMFeeMarketBaseFeeActive` | Validates `eth_gasPrice` returns a non-zero base fee on an active devnet. |
-| `TestEVMDynamicFeeTxE2E` | Sends a type-2 (EIP-1559) self-transfer and verifies receipt status 0x1. |
-| `TestEVMTransactionVisibleAcrossPeerValidator` | Sends a tx to the local validator and verifies the receipt is visible on a peer validator with matching blockHash — exercises the broadcast worker re-gossip path. |
+| `TestEVMSendRawTransactionAndReceipt` | Sends a raw EVM transaction and verifies the successful receipt. |
+| `TestEVMGetTransactionByHashRoundTrip` | Sends a transaction and verifies it can be fetched by hash. |
+| `TestEVMNonceIncrementsAfterMinedTx` | Verifies account nonce increments after a mined EVM transaction. |
+| `TestEVMBlockLookupByHashAndNumberConsistent` | Compares block lookup by hash and by number for consistent block metadata. |
+| `TestEVMTransactionVisibleAcrossPeerValidator` | Sends a tx to one validator and verifies the receipt is visible on a peer validator with matching `blockHash`; exercises the broadcast worker re-gossip path. |
+| `TestEVMWebSocketNewHeadsSubscription` | Subscribes to `newHeads` over the EVM WebSocket endpoint, sends a transaction, and verifies a header notification arrives. |
+| `TestEVMContractDeployCallAndLogsDevnet` | Deploys a small EVM contract, verifies deployment logs, calls the runtime with `eth_call`, and queries logs by topic. |
+| `TestEVMContractPersistsAcrossLocalLumeradRestart` | Opt-in destructive check gated by `LUMERA_DEVNET_RESTART_TESTS=true`; deploys a contract, restarts local `lumerad`, waits for JSON-RPC, and verifies code plus call behavior persist. |
+| `TestEVMActionPrecompileQueryDevnet` | Calls the Lumera Action precompile through `eth_call` and verifies ABI-shaped fee output. |
+| `TestEVMBankPrecompileTotalSupplyQueryDevnet` | Calls the standard Bank precompile `totalSupply()` query and verifies ABI-shaped output. |
+| `TestEVMStandardPrecompileQueryMatrixDevnet` | Calls Staking, Distribution, and Slashing standard precompile query paths and decodes representative outputs. Skips only the staking validator assertion when the local key is not an active validator. |
+| `TestEVMGovPrecompileTxPathDevnet` | Sends a transaction to the governance precompile and verifies an unknown-proposal failure is returned as an EVM receipt failure. |
 
 ## EVM Migration Devnet Tests
 
-See [devnet-tests.md](../../evmigration/devnet-tests.md) for full details on the EVM migration devnet test binary (modes, usage, and coverage).
+Tool source: `devnet/tests/evmigration/`
+
+See [devnet-tests.md](../../evmigration/devnet-tests.md) for full details on the EVM migration devnet test binary, Makefile targets, upgrade walkthrough, and module coverage.
+
+| Mode | Description |
+| --- | --- |
+| `prepare` | Creates legacy coin-type 118 accounts and module state before the EVM upgrade. |
+| `estimate` | Queries migration readiness and touched-state counts after the EVM upgrade. |
+| `migrate` | Migrates regular legacy accounts with `MsgClaimLegacyAccount`. |
+| `migrate-validator` | Migrates a validator operator with `MsgMigrateValidator`. |
+| `migrate-all` | Interleaves account and validator migrations in randomized batches. |
+| `verify` | Scans modules to confirm migrated legacy addresses no longer own live state. |
+| `multisig` | Exercises the focused multisig account migration proof flow. |
+| `multisig-vesting` | Exercises multisig migration for a vesting account fixture. |
+| `multisig-validator` | Exercises validator migration from a multisig legacy account. |
+| `cleanup` | Removes generated test keys from the local keyring. |
+
+## Hermes EVM/IBC Tests
+
+Test source: `devnet/tests/hermes/ibc_test.go`
+
+| Test | Description |
+| --- | --- |
+| `TestIBCUnapprovedBaseDenomDoesNotRegisterERC20Pair` | In EVM mode, sends the simd base denom to Lumera over IBC, verifies the bank voucher arrives, and confirms the unapproved voucher denom does not auto-register an ERC20 token pair. Skips if the devnet profile has already registered that pair. |
+| `TestIBCAllowlistedBaseDenomWrongChannelDoesNotRegisterERC20Pair` | Profile-gated by `LUMERA_ERC20_WRONG_CHANNEL_POLICY_TESTS=true`; with governance having pre-bound the simd base denom to a different channel named by `LUMERA_ERC20_ALLOWED_TRACE_CHANNEL`, sends over the live channel and verifies no ERC20 token pair is auto-registered. |
+
+## Conditional Coverage Notes
+
+These scenarios are covered only when the matching devnet profile or opt-in flag is enabled:
+
+| Scenario | Current coverage |
+| --- | --- |
+| Public JSON-RPC rate-limit profile | Conditional devnet coverage when rate limiting is enabled |
+| JSON-RPC restart persistence | Opt-in destructive devnet coverage gated by `LUMERA_DEVNET_RESTART_TESTS=true` |
+| Full custom precompile tx matrix | Devnet covers standard Staking/Distribution/Bank/Slashing queries, Gov tx smoke, and Action query; integration covers broader custom precompile tx/query paths |
+| Default-profile exact wrong-channel ERC20 allowlist rejection | Covered by profile-gated devnet test when the policy profile is enabled; integration covers provenance-bound policy branches |

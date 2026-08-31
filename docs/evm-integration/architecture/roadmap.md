@@ -60,7 +60,7 @@ EIP-1559 fee market with Lumera-specific tuning.
 
 |     | Item                                           | Files / Notes                                                             |
 | --- | ---------------------------------------------- | ------------------------------------------------------------------------- |
-| [x] | Default base fee: 0.0025 ulume/gas             | `config/evm.go`                                                         |
+| [x] | Default base fee: 0.0125 ulume/gas             | `config/evm.go`                                                         |
 | [x] | Min gas price floor: 0.0005 ulume/gas          | `config/evm.go` — prevents zero-fee spam                               |
 | [x] | Base fee change denominator: 16 (~6.25%/block) | `config/evm.go` — gentler than upstream 8                              |
 | [x] | Consensus max gas: 25,000,000                  | `config/evm.go`                                                         |
@@ -81,7 +81,7 @@ EVM-aware app-side mempool with deadlock prevention.
 | [x] | Broadcast worker `RegisterTxService` override | `app/evm_runtime.go` — local CometBFT client                    |
 | [x] | `Close()` override for graceful shutdown      | `app/evm_runtime.go`                                             |
 | [x] | `broadcast-debug` app.toml toggle             | `cmd/lumera/cmd/config.go`                                       |
-| [x] | Default `max_txs=5000`                        | App config defaults                                                |
+| [x] | Default `max_txs=10000`                       | App config defaults                                                |
 | [x] | Mempool eviction / capacity pressure testing    | `tests/integration/evm/mempool/capacity_pressure_test.go`        |
 | [x] | Mempool metrics / observability                 | `app/evm_mempool_metrics.go` — Prometheus gauges (size, pending, queued, broadcast\_queue\_depth) + labeled rejection counter (`rejections_total{source,reason}`) |
 

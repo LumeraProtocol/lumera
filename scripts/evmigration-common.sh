@@ -31,6 +31,9 @@ CHAIN_ID="${CHAIN_ID:-}"
 # shellcheck disable=SC2034
 KEYRING_BACKEND="test"
 # shellcheck disable=SC2034
+# 1 once --keyring-backend is passed explicitly; gates resolve_keyring_backend.
+KEYRING_BACKEND_EXPLICIT=0
+# shellcheck disable=SC2034
 KEYRING_DIR=""
 # shellcheck disable=SC2034
 HOME_DIR=""
@@ -78,6 +81,22 @@ _color_init
 log_info()  { printf '%sINFO%s  %s\n' "$_C_INFO" "$_C_RESET" "$*" >&2; }
 log_warn()  { printf '%sWARN%s  %s\n' "$_C_WARN" "$_C_RESET" "$*" >&2; }
 log_error() { printf '%sERROR%s %s\n' "$_C_ERR"  "$_C_RESET" "$*" >&2; }
+
+# Print a concise orientation block before work begins. Never prints secrets.
+log_run_summary() {
+  local operation="$1" mode="LIVE (will ask before broadcast)" keyring_location="default"
+  (( ${DRY_RUN:-0} == 1 )) && mode="DRY RUN (no broadcast)"
+  [[ -n "${KEYRING_DIR:-}" ]] && keyring_location="$KEYRING_DIR"
+  {
+    printf '\n==== %s ====\n' "$operation"
+    printf '  Mode:     %s\n' "$mode"
+    printf '  RPC:      %s\n' "${NODE:-<not set>}"
+    printf '  Keyring:  %s (%s)\n' "${KEYRING_BACKEND:-test}" "$keyring_location"
+    printf '  Legacy:   %s\n' "${LEGACY_KEY:-<from input file>}"
+    printf '  New key:  %s\n' "${NEW_KEY:-<from input file>}"
+    printf '==============================\n\n'
+  } >&2
+}
 
 _role_color() { printf '%s%s%s' "$1" "$2" "$_C_RESET"; }
 legacy_value() { _role_color "$_C_LEGACY" "$1"; }
@@ -139,10 +158,11 @@ Flags:
   --node <url>              RPC endpoint (default \$LUMERA_NODE or tcp://localhost:26657)
                             Mainnet RPC example: https://rpc.lumera.io:443
   --chain-id <id>           Chain ID (${_chain_id_help})
-  --keyring-backend <b>     test|file|os (default test)
+  --keyring-backend <b>     test|file|os (default: \$LUMERA_KEYRING_BACKEND, else
+                            client.toml, else keyring-dir detection, else os)
   --keyring-dir <dir>       Keyring directory (overrides --home for keys)
   --home <dir>              lumerad home directory
-  --mnemonic-file <path>    Import both keys from a mnemonic file (mode 0600 or stricter)
+  --mnemonic-file <path>    Import both derivations from one mnemonic (mode 0600 or stricter)
   --yes, -y                 Skip standard confirmation prompts
   --dry-run                 Run pre-flight only; do not broadcast
   --binary <path>           Override lumerad binary (default: lumerad on PATH)
@@ -167,6 +187,7 @@ parse_common_flags() {
   # The --chain-id flag (parsed below) overrides whichever default applies.
   CHAIN_ID="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}"
   KEYRING_BACKEND="test"
+  KEYRING_BACKEND_EXPLICIT=0
   KEYRING_DIR=""
   HOME_DIR=""
   MNEMONIC_FILE=""
@@ -182,7 +203,7 @@ parse_common_flags() {
     case "$1" in
       --node)            _require_value "$1" "$#" "${2-}"; NODE="$2"; shift 2 ;;
       --chain-id)        _require_value "$1" "$#" "${2-}"; CHAIN_ID="$2"; shift 2 ;;
-      --keyring-backend) _require_value "$1" "$#" "${2-}"; KEYRING_BACKEND="$2"; shift 2 ;;
+      --keyring-backend) _require_value "$1" "$#" "${2-}"; KEYRING_BACKEND="$2"; KEYRING_BACKEND_EXPLICIT=1; shift 2 ;;
       --keyring-dir)     _require_value "$1" "$#" "${2-}"; KEYRING_DIR="$2"; shift 2 ;;
       --home)            _require_value "$1" "$#" "${2-}"; HOME_DIR="$2"; shift 2 ;;
       --mnemonic-file)   _require_value "$1" "$#" "${2-}"; MNEMONIC_FILE="$2"; shift 2 ;;
@@ -252,6 +273,95 @@ _keyring_flags() {
 
 _read_keyring_flags() {
   mapfile -t _KRF < <(_keyring_flags)
+}
+
+# _keyring_prompts_for_passphrase
+# True (0) when the active backend may write an interactive passphrase prompt
+# to stderr, so callers know to tee stderr back to the terminal instead of
+# capturing it into a file (which hides the prompt and makes the command appear
+# to hang while it silently waits on stdin).
+#
+# Both `file` and `os` prompt: cosmos-sdk's `os` backend config uses the same
+# newRealPrompt as `file` and, crucially, does NOT pin AllowedBackends — so on a
+# headless host with no OS secret service it falls back to the encrypted file
+# store and emits the identical "Enter keyring passphrase (attempt N/3)" prompt.
+# The shell only sees the string "os", so guarding on `== "file"` missed it.
+# Only `test` is silent (its FilePasswordFunc returns a fixed passphrase).
+_keyring_prompts_for_passphrase() {
+  [[ "${KEYRING_BACKEND:-test}" != "test" ]]
+}
+
+# resolve_keyring_backend
+# Pin the effective keyring backend and log its source, when the user did not
+# pass --keyring-backend. Resolution order (first hit wins):
+#   1. explicit --keyring-backend (KEYRING_BACKEND_EXPLICIT=1)
+#   2. $LUMERA_KEYRING_BACKEND — the same env override lumerad itself honors
+#      (and the script convention shared with $LUMERA_NODE / $LUMERA_CHAIN_ID);
+#      must outrank client.toml/disk because the resolved value is passed to
+#      lumerad as an explicit flag, which would otherwise override the env
+#   3. keyring-backend from <home>/config/client.toml (--home selects home;
+#      --keyring-dir does NOT move client.toml)
+#   4. on-disk detection under --keyring-dir (else --home):
+#      keyring-test/ -> test, keyring-file/ -> file (os is not on-disk-detectable)
+#   5. os — the Cosmos SDK default
+# Mirrors resolve_chain_id: logs the decision so the operator sees it before signing.
+resolve_keyring_backend() {
+  if (( KEYRING_BACKEND_EXPLICIT == 1 )); then
+    log_info "keyring backend: $KEYRING_BACKEND (from --keyring-backend)"
+    return 0
+  fi
+
+  if [[ -n "${LUMERA_KEYRING_BACKEND:-}" ]]; then
+    KEYRING_BACKEND="$LUMERA_KEYRING_BACKEND"
+    log_info "keyring backend: $KEYRING_BACKEND (from \$LUMERA_KEYRING_BACKEND)"
+    return 0
+  fi
+
+  # ${HOME:-} — systemd/cron/env -i runs may have no $HOME; under `set -u` a
+  # bare $HOME would abort the script instead of reaching the os fallback.
+  local home="${HOME_DIR:-${HOME:-}/.lumera}"
+  local client_toml="$home/config/client.toml" v
+  if [[ -f "$client_toml" ]]; then
+    v=$(sed -n 's/^[[:space:]]*keyring-backend[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
+        "$client_toml" | head -n1)
+    if [[ -n "$v" ]]; then
+      KEYRING_BACKEND="$v"
+      log_info "keyring backend: $v (from $client_toml)"
+      return 0
+    fi
+  fi
+
+  local kr="${KEYRING_DIR:-$home}"
+  if [[ -d "$kr/keyring-test" ]]; then
+    KEYRING_BACKEND="test"
+    log_info "keyring backend: test (detected keyring-test/ in $kr)"
+    return 0
+  fi
+  if [[ -d "$kr/keyring-file" ]]; then
+    KEYRING_BACKEND="file"
+    log_info "keyring backend: file (detected keyring-file/ in $kr)"
+    return 0
+  fi
+
+  KEYRING_BACKEND="os"
+  log_info "keyring backend: os (SDK default; no --keyring-backend, client.toml, or keyring dir found)"
+}
+
+# The original v1.20.1 migration CLI accepts --tx-timeout=0s, but still enters
+# the SDK WebSocket wait path. Newer CLIs explicitly document and implement
+# zero as "return after broadcast", allowing these wrappers to confirm over
+# HTTP with wait_for_tx. Use the zero-timeout optimization only when the CLI
+# advertises that contract; otherwise retain v1.20.1's built-in confirmation.
+_supports_immediate_broadcast_return() {
+  "$BIN" tx evmigration claim-legacy-account --help 2>&1 \
+    | grep -Fq '0s returns after broadcast'
+}
+
+_read_migration_tx_timeout_flags() {
+  _MIGRATION_TX_TIMEOUT_FLAGS=()
+  if _supports_immediate_broadcast_return; then
+    _MIGRATION_TX_TIMEOUT_FLAGS=(--tx-timeout 0s)
+  fi
 }
 
 # resolve_chain_id
@@ -328,16 +438,93 @@ log_lumerad_err() {
   done <"$_LUMERAD_ERR_FILE"
 }
 
+# Gas sizing for migration txs. Migration fees are waived AND the chain runs
+# block.max_gas=-1 (unlimited) on devnet and mainnet, so the gas value is an
+# execution limit only and over-estimating is free — size it to the work
+# (delegation/unbonding/redelegation re-keys), not the 200000 CLI default.
+# `--gas auto` (in lumerad_tx) is the accurate path; these constants only feed
+# the fallback used when the auto-simulate fails (e.g. RPC timeout on a large
+# validator). They are deliberately conservative (over-estimate) so the fallback
+# never under-runs: calibrated from live devnet migrations (2026-06-23) where the
+# observed cost was ~6M base + ~688k/record (validator) / ~1.33M/record (account);
+# we use the higher account marginal with margin. Env-overridable.
+MIGRATION_GAS_BASE="${MIGRATION_GAS_BASE:-6000000}"
+MIGRATION_GAS_PER_RECORD="${MIGRATION_GAS_PER_RECORD:-1500000}"
+MIGRATION_GAS_ADJUSTMENT="${MIGRATION_GAS_ADJUSTMENT:-1.5}"
+
+# migration_gas_for_records <records> — fallback fixed gas when --gas auto fails.
+migration_gas_for_records() {
+  local records="${1:-0}"
+  [[ "$records" =~ ^[0-9]+$ ]] || records=0
+  echo $(( MIGRATION_GAS_BASE + MIGRATION_GAS_PER_RECORD * records ))
+}
+
+# gas_exceeds_block_limit <gas> <block_max_gas> — true (0) only when block_max_gas
+# is a positive integer and gas strictly exceeds it. Unlimited (-1), empty, or
+# non-numeric limits are treated as "no limit" (returns 1).
+gas_exceeds_block_limit() {
+  local gas="${1:-0}" limit="${2:-}"
+  [[ "$limit" =~ ^[0-9]+$ ]] || return 1
+  (( gas > limit ))
+}
+
 lumerad_tx() {
   if [[ -z "${CHAIN_ID:-}" ]]; then
     log_error "chain ID is required for tx commands; pass --chain-id or set \$LUMERA_CHAIN_ID / \$CHAIN_ID"
     exit 1
   fi
   _read_keyring_flags
+  _read_migration_tx_timeout_flags
+
+  # Primary: let the chain simulate the exact gas (migration fees are waived, so
+  # the resulting limit is free). Capture stdout (the tx JSON) separately from
+  # stderr (gas-estimate notes / errors) so callers receive clean JSON to parse.
+  # For passphrase-backed keyrings (file/os — see _keyring_prompts_for_passphrase),
+  # tee stderr back to the terminal because the passphrase prompt is written
+  # there; hiding it makes the command appear to hang. The silent `test` backend
+  # retains capture-only behavior so errors are not duplicated.
+  local err_file out rc=0 tx_cmd
+  err_file="$(mktemp)"
+  tx_cmd=("$BIN" tx "$@"
+    --node "$NODE"
+    --chain-id "$CHAIN_ID"
+    "${_KRF[@]}"
+    "${_MIGRATION_TX_TIMEOUT_FLAGS[@]}"
+    --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT"
+    --output json)
+  if _keyring_prompts_for_passphrase; then
+    log_info "unlocking keyring to sign and simulate the migration transaction"
+    log_info "enter the keyring passphrase when prompted; input is hidden while typing"
+    out="$("${tx_cmd[@]}" 2> >(tee "$err_file" >&2))" || rc=$?
+  else
+    out="$("${tx_cmd[@]}" 2>"$err_file")" || rc=$?
+  fi
+  if (( rc == 0 )); then
+    rm -f "$err_file"
+    printf '%s\n' "$out"
+    return 0
+  fi
+
+  log_warn "  --gas auto failed (rc=${rc}); falling back to record-count gas formula"
+  local _line
+  while IFS= read -r _line; do [[ -n "$_line" ]] && log_warn "    $_line"; done <"$err_file"
+  rm -f "$err_file"
+
+  # Fallback: fixed gas from the record-count formula, clamped to block max_gas.
+  local fallback_gas block_max_gas
+  fallback_gas="$(migration_gas_for_records "${MIGRATION_RECORD_COUNT:-0}")"
+  block_max_gas="$(lumerad_q consensus params 2>/dev/null | jq -r '.params.block.max_gas // .block.max_gas // "-1"' 2>/dev/null || echo -1)"
+  if gas_exceeds_block_limit "$fallback_gas" "$block_max_gas"; then
+    log_error "estimated migration gas ${fallback_gas} exceeds block max_gas ${block_max_gas}"
+    log_error "this account/validator has too many delegation records to migrate in a single tx"
+    exit 1
+  fi
   "$BIN" tx "$@" \
     --node "$NODE" \
     --chain-id "$CHAIN_ID" \
     "${_KRF[@]}" \
+    "${_MIGRATION_TX_TIMEOUT_FLAGS[@]}" \
+    --gas "$fallback_gas" \
     --output json
 }
 
@@ -361,12 +548,18 @@ preview_tx_body() {
   fi
   _read_keyring_flags
   local generated
+  if _keyring_prompts_for_passphrase; then
+    log_info "unlocking keyring to generate the transaction preview"
+    log_info "enter the keyring passphrase when prompted; input is hidden while typing"
+  else
+    log_info "generating transaction preview"
+  fi
   if ! generated=$("$BIN" tx "$@" \
         --node "$NODE" \
         --chain-id "$CHAIN_ID" \
         "${_KRF[@]}" \
         --generate-only \
-        --output json 2>/dev/null); then
+        --output json); then
     log_warn "  could not generate tx body for preview (continuing anyway)"
     return 0
   fi
@@ -396,7 +589,15 @@ preview_tx_body() {
 resolve_address() {
   local key_name="$1"
   local addr
-  if ! addr=$(lumerad_keys show "$key_name" -a 2>/dev/null); then
+  if _keyring_prompts_for_passphrase; then
+    log_info "unlocking keyring for key $(legacy_value "$key_name") (enter the keyring passphrase when prompted)"
+  else
+    log_info "resolving address for key $(legacy_value "$key_name")"
+  fi
+  # Do not suppress stderr here. Passphrase-backed keyrings (file/os) write their
+  # prompt to stderr; redirecting it made the script appear to hang while it
+  # was actually waiting for input.
+  if ! addr=$(lumerad_keys show "$key_name" -a); then
     log_error "key not found in keyring: $key_name"
     exit 1
   fi
@@ -655,12 +856,38 @@ snapshot_bank_balances() {
   lumerad_q bank balances "$addr"
 }
 
+_handle_tx_query_json() {
+  local hash="$1" json="$2" started="$3"
+  local code height raw_log
+
+  code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null || true)
+  if [[ "$code" == "0" ]]; then
+    height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null || printf '<unknown>')
+    log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+    return 0
+  fi
+  if [[ -n "$code" ]]; then
+    raw_log=$(jq -r '.raw_log // "<no raw_log>"' <<<"$json" 2>/dev/null || printf '<no raw_log>')
+    log_error "tx $hash failed with code $code: $raw_log"
+    return 1
+  fi
+  return 2
+}
+
+_query_tx_no_keyring() {
+  local hash="$1"
+  "$BIN" query tx "$hash" --node "$NODE" --output json
+}
+
 # wait_for_tx <hash>
-# Waits for the tx to commit using two paths in order:
+# Waits for the tx to commit using three paths in order:
 #   1. Fast path — `query tx <hash>`. Catches the case where the tx was
 #      already committed by the time we got here.
 #   2. Slow path — `query wait-tx <hash> --timeout`. Subscribes to the
 #      CometBFT WebSocket and waits for the commit event.
+#   3. Fallback path — repeated `query tx <hash>` until the timeout expires.
+#      This covers RPC/WebSocket paths where wait-tx returns immediately even
+#      though the tx later commits and becomes queryable.
 #
 # Important: the slow-path call goes DIRECTLY to $BIN, NOT through lumerad_q.
 # Cosmos SDK's wait-tx accepts --keyring-backend without warning but then
@@ -679,41 +906,64 @@ snapshot_bank_balances() {
 wait_for_tx() {
   local hash="$1"
   local timeout="${LUMERA_TX_WAIT_TIMEOUT:-90}"
-  local json code height
+  local json rc elapsed remaining next_progress
   local started=$SECONDS
 
   # Fast path: tx may already be committed.
   # NOTE: `lumerad q tx <missing>` exits 0 with empty stdout (error goes to
   # stderr). So a "found" check is "stdout is non-empty AND parseable JSON",
   # not just "exit 0". Empty json → both nested ifs are false → fall through.
-  if json=$(lumerad_q tx "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
-    code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null)
-    if [[ "$code" == "0" ]]; then
-      height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null)
-      log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+  if json=$(_query_tx_no_keyring "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
+    if _handle_tx_query_json "$hash" "$json" "$started"; then
       return 0
-    fi
-    if [[ -n "$code" ]]; then
-      log_error "tx $hash failed with code $code: $(jq -r '.raw_log // "<no raw_log>"' <<<"$json")"
-      return 1
+    else
+      rc=$?
+      if (( rc == 1 )); then
+        return 1
+      fi
     fi
   fi
 
   # Slow path: subscribe and wait. Bypass lumerad_q so we don't pass
   # --keyring-backend, which silently breaks wait-tx (see header comment).
   if json=$("$BIN" query wait-tx "$hash" --node "$NODE" --output json --timeout "${timeout}s" 2>/dev/null) && [[ -n "$json" ]]; then
-    code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null)
-    if [[ "$code" == "0" ]]; then
-      height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null)
-      log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+    if _handle_tx_query_json "$hash" "$json" "$started"; then
       return 0
-    fi
-    if [[ -n "$code" ]]; then
-      log_error "tx $hash failed with code $code: $(jq -r '.raw_log // "<no raw_log>"' <<<"$json")"
-      return 1
+    else
+      rc=$?
+      if (( rc == 1 )); then
+        return 1
+      fi
     fi
   fi
-  local elapsed=$(( SECONDS - started ))
+
+  elapsed=$(( SECONDS - started ))
+  remaining=$(( timeout - elapsed ))
+  if (( remaining > 0 )); then
+    log_info "tx $hash not indexed yet; polling query tx for up to ${remaining}s"
+    next_progress=10
+    while (( SECONDS - started < timeout )); do
+      sleep 1
+      if json=$(_query_tx_no_keyring "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
+        if _handle_tx_query_json "$hash" "$json" "$started"; then
+          return 0
+        else
+          rc=$?
+          if (( rc == 1 )); then
+            return 1
+          fi
+        fi
+      fi
+
+      elapsed=$(( SECONDS - started ))
+      if (( elapsed >= next_progress && elapsed < timeout )); then
+        log_info "still waiting for tx $hash to be indexed (${elapsed}s elapsed, timeout ${timeout}s)"
+        next_progress=$(( next_progress + 10 ))
+      fi
+    done
+  fi
+
+  elapsed=$(( SECONDS - started ))
 
   log_warn "tx $hash not indexed after ${elapsed}s (timeout was ${timeout}s); it may still land on chain"
   log_warn "  check status manually: $BIN q tx $hash"
@@ -1203,6 +1453,35 @@ key_multisig_sub_pub_keys_csv() {
     exit 1
   fi
   printf '%s\n' "$keys_csv"
+}
+
+log_signer_order_json_array() {
+  local title="$1" threshold="$2" keys_json="$3"
+  local count
+  count=$(jq -r 'length' <<<"$keys_json" 2>/dev/null || printf '0')
+  log_info "$title (${threshold}-of-${count})"
+  log_info "  signer index is part of the multisig address; keep this order unchanged"
+  local i key
+  for (( i=0; i<count; i++ )); do
+    key=$(jq -r ".[$i]" <<<"$keys_json")
+    log_info "  index $i: $key"
+  done
+}
+
+log_signer_order_csv() {
+  local title="$1" threshold="$2" keys_csv="$3"
+  local old_ifs="$IFS"
+  IFS=','
+  read -r -a _evmig_order_keys <<<"$keys_csv"
+  IFS="$old_ifs"
+  local keys_json
+  keys_json=$(printf '%s\n' "${_evmig_order_keys[@]}" | jq -R . | jq -cs .)
+  log_signer_order_json_array "$title" "$threshold" "$keys_json"
+}
+
+pubkey_index_in_json_array() {
+  local key="$1" keys_json="$2"
+  jq -r --arg key "$key" 'index($key) // empty' <<<"$keys_json"
 }
 
 # key_pubkey_b64 <key-name>

@@ -1,0 +1,41 @@
+# gen-activity-config.toml — default configuration for the devnet activity
+# generator (tests-gen-activity).
+#
+# Keys mirror the CLI flag names (see devnet/tests/gen-activity). Precedence is
+# defaults < [common] < [chains.<name>] < explicit CLI flags, so values here are
+# overridable on the command line.
+#
+# This file is staged to the shared release directory next to the binary and the
+# accounts registry. Run it from inside a validator container, e.g.:
+#   docker exec -it lumera-supernova_validator_1 \
+#     /shared/release/tests-gen-activity \
+#       -config /shared/release/gen-activity-config.toml -chain devnet
+#
+# dry-run defaults to true: the tool prints the planned accounts/activity without
+# submitting any transactions. Pass -dry-run=false to actually submit.
+
+[common]
+bin = "lumerad"
+rpc = "tcp://localhost:26657"
+grpc = "localhost:9090"
+chain-id = "lumera-devnet-1"
+home = "/root/.lumera"
+keyring-backend = "test"
+evm-cutover-version = "v1.20.0"
+funding-key = "governance_key"
+accounts = "/shared/release/accounts-devnet.json"
+num-accounts = 10
+max-account-amount = "10000000ulume"
+account-prefix = "gen"
+actions = true
+max-actions-per-run = 3
+action-states = "pending,done,approved"
+action-readiness-timeout = "180s"
+funding-batch-size = 1
+parallelism = 5
+dry-run = true
+
+# Named chain section selected with `-chain devnet`. Inherits everything from
+# [common]; override per-chain values here as needed.
+[chains.devnet]
+chain-id = "lumera-devnet-1"

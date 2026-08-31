@@ -36,7 +36,7 @@ _mms_generate() {
   local sig_format="" binary="lumerad"
   local new_sub_pub_keys="" new_threshold="" legacy_key=""
   local new_key=""
-  local keyring_backend="test" keyring_dir="" home_dir=""
+  local keyring_backend="test" keyring_dir="" home_dir="" kb_explicit=0
   while (( $# > 0 )); do
     case "$1" in
       --legacy)           _require_value "$1" "$#" "${2-}"; legacy="$2"; shift 2 ;;
@@ -51,7 +51,7 @@ _mms_generate() {
       --new-threshold)    _require_value "$1" "$#" "${2-}"; new_threshold="$2"; shift 2 ;;
       --legacy-key)       _require_value "$1" "$#" "${2-}"; legacy_key="$2"; shift 2 ;;
       --binary)           _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
-      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; shift 2 ;;
+      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; kb_explicit=1; shift 2 ;;
       --keyring-dir)      _require_value "$1" "$#" "${2-}"; keyring_dir="$2"; shift 2 ;;
       --home)             _require_value "$1" "$#" "${2-}"; home_dir="$2"; shift 2 ;;
       -h|--help)
@@ -116,7 +116,12 @@ G_USAGE
   KEYRING_DIR="$keyring_dir"
   # shellcheck disable=SC2034
   HOME_DIR="$home_dir"
+  # shellcheck disable=SC2034  # consumed by resolve_keyring_backend
+  KEYRING_BACKEND_EXPLICIT="$kb_explicit"
+  resolve_keyring_backend
+  keyring_backend="$KEYRING_BACKEND"
 
+  log_info "[generate 1/5] validating prerequisites and connecting to RPC $node"
   require_multisig_binary
   require_jq
   resolve_chain_id
@@ -126,6 +131,8 @@ G_USAGE
     exit 1
   fi
 
+  log_info "[generate 2/5] resolving legacy and destination multisig addresses"
+  [[ "$keyring_backend" == "file" ]] && log_info "the encrypted keyring may prompt for its passphrase; input is hidden while typing"
   local legacy_input="$legacy"
   if [[ "$legacy" != lumera1* ]]; then
     legacy=$(resolve_address "$legacy_input")
@@ -154,10 +161,11 @@ G_USAGE
     log_info "using destination EVM multisig key $(new_value "$new_key") -> address $(new_value "$new")"
   fi
 
+  log_info "[generate 3/5] checking the on-chain multisig shape and signer order"
   # Check on-chain pubkey BEFORE estimate so a nil-pubkey multisig gets
   # the exit-8 "seed the pubkey first" remediation, not a confusing
   # downstream error.
-  local pk_type
+  local pk_type legacy_pubkey_json legacy_sub_pub_keys_json
   pk_type=$(auth_pubkey_type "$legacy")
   case "$pk_type" in
     none)
@@ -171,8 +179,10 @@ G_USAGE
     *) log_error "unexpected pubkey type for $(legacy_value "$legacy"): $pk_type"; exit 2 ;;
   esac
   local legacy_threshold legacy_subkey_count
-  legacy_threshold=$(auth_multisig_threshold "$legacy")
-  legacy_subkey_count=$(auth_multisig_subkey_count "$legacy")
+  legacy_pubkey_json=$(auth_multisig_pubkey_json "$legacy")
+  legacy_threshold=$(jq -r '.threshold // empty' <<<"$legacy_pubkey_json")
+  legacy_subkey_count=$(jq -r '.public_keys | length' <<<"$legacy_pubkey_json")
+  legacy_sub_pub_keys_json=$(jq -c '[.public_keys[]?.key]' <<<"$legacy_pubkey_json")
   if [[ -z "$legacy_threshold" || ! "$legacy_threshold" =~ ^[0-9]+$ || "$legacy_threshold" == "0" ]]; then
     log_error "could not read legacy multisig threshold from chain for $(legacy_value "$legacy")"
     exit 2
@@ -186,6 +196,7 @@ G_USAGE
     log_info "using on-chain legacy multisig threshold for new multisig: ${new_threshold}-of-${legacy_subkey_count}"
   fi
 
+  log_info "[generate 4/5] checking migration eligibility and destination freshness"
   # Pull estimate — provides is_validator, would_succeed, is_multisig confirmation.
   local estimate
   estimate=$(preflight_estimate "$legacy")
@@ -231,15 +242,26 @@ G_USAGE
   [[ -n "$home_dir"    ]] && args+=(--home "$home_dir")
   args+=(--node "$node" --chain-id "$chain_id" --output json)
 
-  log_info "generating proof template at $out"
+  log_info "[generate 5/5] writing proof template to $out"
   log_info "  legacy: $(legacy_value "$legacy")"
   [[ -n "$new" ]] && log_info "  new:    $(new_value "$new")"
   "$BIN" "${args[@]}"
-  log_info "done — distribute $out to the K co-signers"
+  if [[ -f "$out" ]]; then
+    local proof_json proof_new_threshold proof_new_keys_json
+    proof_json=$(read_proof_file "$out")
+    proof_new_threshold=$(jq -r '.new.threshold' <<<"$proof_json")
+    proof_new_keys_json=$(jq -c '.new.sub_pub_keys' <<<"$proof_json")
+    log_signer_order_json_array "On-chain legacy signer order" "$legacy_threshold" "$legacy_sub_pub_keys_json"
+    log_signer_order_json_array "Destination signer order" "$proof_new_threshold" "$proof_new_keys_json"
+    log_info "Signing instruction: co-signers should sign the same signer index on both legacy and new sides"
+    log_info "For same-mnemonic migrations: recover each EVM sub-key from the matching legacy mnemonic, then build the destination multisig with --nosort in the legacy order above"
+  fi
+  log_info "generate complete — no transaction was broadcast"
+  log_info "NEXT: securely distribute $out to at least K co-signers; each runs 'migrate-multisig.sh sign'"
 }
 _mms_sign() {
   local input="" from="" new_key="" chain_id="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}" out="" binary="lumerad"
-  local node="${LUMERA_NODE:-tcp://localhost:26657}" keyring_backend="test" keyring_dir="" home_dir=""
+  local node="${LUMERA_NODE:-tcp://localhost:26657}" keyring_backend="test" keyring_dir="" home_dir="" kb_explicit=0
   local positional=()
   while (( $# > 0 )); do
     case "$1" in
@@ -249,7 +271,7 @@ _mms_sign() {
       --node)             _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
       --out)              _require_value "$1" "$#" "${2-}"; out="$2"; shift 2 ;;
       --binary)           _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
-      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; shift 2 ;;
+      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; kb_explicit=1; shift 2 ;;
       --keyring-dir)      _require_value "$1" "$#" "${2-}"; keyring_dir="$2"; shift 2 ;;
       --home)             _require_value "$1" "$#" "${2-}"; home_dir="$2"; shift 2 ;;
       -h|--help)
@@ -322,7 +344,12 @@ S_USAGE
   KEYRING_DIR="$keyring_dir"
   # shellcheck disable=SC2034
   HOME_DIR="$home_dir"
+  # shellcheck disable=SC2034  # consumed by resolve_keyring_backend
+  KEYRING_BACKEND_EXPLICIT="$kb_explicit"
+  resolve_keyring_backend
+  keyring_backend="$KEYRING_BACKEND"
 
+  log_info "[sign 1/4] validating prerequisites and chain ID"
   require_multisig_binary
   require_jq
   resolve_chain_id
@@ -332,12 +359,16 @@ S_USAGE
     exit 1
   fi
 
+  log_info "[sign 2/4] validating proof file $input"
   # Parse + validate the input proof/partial. read_proof_file rejects
   # single-key-on-either-side (exit 3), bad payload_hex (exit 9), missing
   # fields (exit 9), and structural issues (exit 9).
   local pjson
   pjson=$(read_proof_file "$input")
 
+  log_info "[sign 3/4] matching your local key(s) to signer positions"
+  [[ "$keyring_backend" == "file" ]] && log_info "the encrypted keyring may prompt for its passphrase; input is hidden while typing"
+  local from_idx="" new_idx=""
   if [[ -n "$from" ]]; then
     local from_pubkey listed
     from_pubkey=$(key_pubkey_b64 "$from")
@@ -346,6 +377,8 @@ S_USAGE
       log_error "--from '$(legacy_value "$from")' pubkey is not among legacy.sub_pub_keys in $input"
       exit 1
     fi
+    from_idx=$(jq -r --arg pk "$from_pubkey" '.legacy.sub_pub_keys | index($pk) // empty' <<<"$pjson")
+    log_info "legacy signer index $from_idx: $(legacy_value "$from")"
   fi
   if [[ -n "$new_key" ]]; then
     local new_pubkey listed_new
@@ -355,6 +388,47 @@ S_USAGE
       log_error "--new-key '$(new_value "$new_key")' pubkey is not among new.sub_pub_keys in $input"
       exit 1
     fi
+    new_idx=$(jq -r --arg pk "$new_pubkey" '.new.sub_pub_keys | index($pk) // empty' <<<"$pjson")
+    log_info "new signer index $new_idx: $(new_value "$new_key")"
+  fi
+  log_info "Signing instruction: sign the same signer index on both legacy and new sides; combine only counts matching indices"
+
+  # Multisig-to-multisig signer-index alignment pre-check. When a co-signer
+  # passes BOTH --from and --new-key, the two keys must occupy the same signer
+  # position in their respective multisigs (mirror-source rule). The on-chain
+  # consensus check enforces this, and `lumerad sign-proof` rejects mismatches
+  # with a terse error. We catch it earlier with an actionable remediation so
+  # the operator doesn't have to round-trip through cryptic CLI output.
+  #
+  # Root cause when this fires: the destination EVM multisig was built without
+  # --nosort, so cosmos-sdk sorted its eth_secp256k1 sub-pubkeys by bytes —
+  # and that byte-order differs from the legacy secp256k1 byte-order. Result:
+  # member N's legacy key and EVM key land at different indices.
+  if [[ -n "$from_idx" && -n "$new_idx" && "$from_idx" != "$new_idx" ]]; then
+    local legacy_threshold
+    legacy_threshold=$(jq -r '.legacy.threshold // .new.threshold // "K"' <<<"$pjson")
+    log_error "signer-index mismatch: legacy key '$(legacy_value "$from")' is at index $from_idx,"
+    log_error "  but new key '$(new_value "$new_key")' is at index $new_idx in $input"
+    log_error ""
+    log_error "Multisig migration requires the same signer position on both sides."
+    log_error "The destination EVM multisig was almost certainly built WITHOUT --nosort,"
+    log_error "so its sub-pub-keys were re-sorted by bytes and no longer mirror the legacy"
+    log_error "member order."
+    log_error ""
+    log_error "Remediation — rebuild the destination multisig in legacy member order:"
+    log_error "  1. Get legacy member order from chain:"
+    log_error "     lumerad query auth account <legacy-multisig-address> -o json \\"
+    log_error "       | jq -r '.account.value.pub_key.public_keys[].key'"
+    log_error "  2. Identify each member's eth_secp256k1 sub-key (in the SAME order)."
+    log_error "  3. Recreate the destination key WITH --nosort:"
+    log_error "       lumerad keys delete <new-multisig-key> -y    # if it already exists"
+    log_error "       lumerad keys add <new-multisig-key> \\"
+    log_error "         --multisig=<eth-sub-1>,<eth-sub-2>,...,<eth-sub-N> \\"
+    log_error "         --multisig-threshold=${legacy_threshold} \\"
+    log_error "         --nosort"
+    log_error "  4. Re-run 'migrate-multisig.sh generate' with the rebuilt key, then redistribute"
+    log_error "     the fresh proof.json to co-signers."
+    exit 11
   fi
 
   # Pass through to lumerad tx evmigration sign-proof. At least one of
@@ -371,20 +445,25 @@ S_USAGE
   local sides=()
   [[ -n "$from"    ]] && sides+=("legacy($(legacy_value "$from"))")
   [[ -n "$new_key" ]] && sides+=("new($(new_value "$new_key"))")
-  log_info "signing $input: ${sides[*]}"
+  log_info "[sign 4/4] signing $input: ${sides[*]}"
+  [[ "$keyring_backend" == "file" ]] && log_info "enter the keyring passphrase when prompted; signing does not broadcast"
   "$BIN" "${args[@]}"
-  log_info "partial written to $out"
+  log_info "sign complete — partial written to $out; no transaction was broadcast"
+  log_info "NEXT: return $out to the coordinator"
 }
 _mms_combine() {
   local out="" binary="lumerad"
+  local node="${LUMERA_NODE:-tcp://localhost:26657}"
   local positional=()
   while (( $# > 0 )); do
     case "$1" in
       --out)     _require_value "$1" "$#" "${2-}"; out="$2"; shift 2 ;;
+      --node)    _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
       --binary)  _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
       -h|--help)
         cat >&2 <<'C_USAGE'
-Usage: migrate-multisig.sh combine <partial1.json> <partial2.json> [...] --out <tx.json> [--binary <path>]
+Usage: migrate-multisig.sh combine <partial1.json> <partial2.json> [...] --out <tx.json> \
+  [--node <url>] [--binary <path>]
 
 Purpose:
   The coordinator merges co-signer partial JSON files into a final tx.json
@@ -393,6 +472,12 @@ Purpose:
 Required:
   <partial*.json>       One or more partial files returned by co-signers.
   --out <tx.json>       Output transaction file.
+
+Optional:
+  --node <url>          RPC endpoint for gas simulation (default $LUMERA_NODE or
+                        tcp://localhost:26657). combine now simulates gas (--gas auto)
+                        and therefore requires connectivity to a node; the coordinator
+                        already needs a node for the subsequent submit step.
 
 Validation before combine:
   - all partials are valid multisig proof/partial files
@@ -426,11 +511,15 @@ C_USAGE
 
   # shellcheck disable=SC2034
   BIN="$binary"
+  # shellcheck disable=SC2034
+  NODE="$node"
 
+  log_info "[combine 1/3] validating prerequisites and RPC connectivity"
   require_multisig_binary
   require_jq
   resolve_chain_id
 
+  log_info "[combine 2/3] validating ${#positional[@]} partial file(s) and checking matching-index quorum"
   # Per-file + cross-file consistency check. summarize_partials prints the
   # K-of-N entry-presence matrix to stderr and exits 9 on cross-file
   # disagreement (it calls read_proof_file internally, which rejects
@@ -442,7 +531,11 @@ C_USAGE
 
   # Pass through to lumerad combine-proof. If lumerad reports fewer valid
   # signatures than the threshold, map its exit to exit 4.
-  local args=(tx evmigration combine-proof "${positional[@]}" --out "$out")
+  log_info "[combine 3/3] combining signatures and simulating gas through $node"
+  log_info "gas simulation may take a while for validators with many delegations"
+  local args=(tx evmigration combine-proof "${positional[@]}" --out "$out" \
+    --node "$node" --chain-id "$CHAIN_ID" \
+    --gas auto --gas-adjustment "$MIGRATION_GAS_ADJUSTMENT")
   local combine_out combine_rc=0
   combine_out=$("$BIN" "${args[@]}" 2>&1) || combine_rc=$?
   printf '%s\n' "$combine_out" >&2
@@ -452,11 +545,12 @@ C_USAGE
   if (( combine_rc != 0 )); then
     exit "$combine_rc"
   fi
-  log_info "combined tx written to $out"
+  log_info "combine complete — transaction written to $out; nothing was broadcast"
+  log_info "NEXT: review the summary, then run 'migrate-multisig.sh submit $out'"
 }
 _mms_submit() {
   local input="" chain_id="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}" node="${LUMERA_NODE:-tcp://localhost:26657}" binary="lumerad"
-  local keyring_backend="test" keyring_dir="" home_dir=""
+  local keyring_backend="test" keyring_dir="" home_dir="" kb_explicit=0
   local yes=0 dry_run=0 node_stopped=0
   local positional=()
   while (( $# > 0 )); do
@@ -464,7 +558,7 @@ _mms_submit() {
       --chain-id)         _require_value "$1" "$#" "${2-}"; chain_id="$2"; shift 2 ;;
       --node)             _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
       --binary)           _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
-      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; shift 2 ;;
+      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; kb_explicit=1; shift 2 ;;
       --keyring-dir)      _require_value "$1" "$#" "${2-}"; keyring_dir="$2"; shift 2 ;;
       --home)             _require_value "$1" "$#" "${2-}"; home_dir="$2"; shift 2 ;;
       --yes|-y)           yes=1; shift ;;
@@ -536,11 +630,20 @@ SU_USAGE
   KEYRING_DIR="$keyring_dir"
   # shellcheck disable=SC2034
   HOME_DIR="$home_dir"
+  # shellcheck disable=SC2034  # consumed by resolve_keyring_backend
+  KEYRING_BACKEND_EXPLICIT="$kb_explicit"
+  resolve_keyring_backend
+  keyring_backend="$KEYRING_BACKEND"
   # shellcheck disable=SC2034
   YES="$yes"
   # shellcheck disable=SC2034
   DRY_RUN="$dry_run"
 
+  local submit_mode="LIVE (will ask before broadcast)"
+  (( dry_run == 1 )) && submit_mode="DRY RUN (no broadcast)"
+  log_info "multisig submit mode: $submit_mode"
+  log_info "RPC endpoint: $node (HTTP-only endpoints are supported)"
+  log_info "[1/6] validating local prerequisites and resolving chain ID"
   require_multisig_binary
   require_jq
   resolve_chain_id
@@ -550,6 +653,7 @@ SU_USAGE
     exit 1
   fi
 
+  log_info "[2/6] validating the combined multisig transaction file"
   # Parse + validate tx.json. Rejects non-multisig→multisig (exit 3),
   # missing fields / malformed (exit 9). Emits compact summary JSON.
   local tx_meta
@@ -563,16 +667,19 @@ SU_USAGE
   new_threshold=$(jq -r '.new_threshold' <<<"$tx_meta")
   new_num_signers=$(jq -r '.new_num_signers' <<<"$tx_meta")
 
+  log_info "[3/6] checking migration history and destination freshness"
   assert_not_migrated "$legacy" "$new"
   assert_new_address_unused "$new"
   assert_destination_fresh "$new"
 
   # Fresh estimate — catches ceremony-duration chain-state drift.
+  log_info "[4/6] requesting a fresh migration estimate"
   local estimate
   estimate=$(preflight_estimate "$legacy")
   assert_multisig "$estimate"
   assert_estimate_succeeds "$estimate"
 
+  log_info "[5/6] recording the legacy balance for post-migration verification"
   local snap
   snap=$(snapshot_bank_balances "$legacy")
 
@@ -614,25 +721,42 @@ BANNER
 
   # Skip the interactive prompt in --dry-run; nothing destructive will happen.
   if (( DRY_RUN == 1 )); then
-    log_info "--dry-run: stopping before broadcast"
+    log_info "[6/6] dry-run complete: all pre-flight checks passed; no transaction was broadcast"
     return 0
   fi
+  log_info "[6/6] requesting confirmation and broadcasting over RPC"
   confirm "Proceed with broadcast?"
 
   # submit-proof does not take --from; authorization is in the proof bytes.
   # We still pass keyring flags so the SDK's NewFactoryCLI can construct a
   # keyring-less context without erroring, and --output json for parsing.
+  _read_migration_tx_timeout_flags
   local args=(tx evmigration submit-proof "$input"
     --chain-id "$chain_id"
     --node "$node"
     --keyring-backend "$keyring_backend"
     --output json)
+  args+=("${_MIGRATION_TX_TIMEOUT_FLAGS[@]}")
   [[ -n "$keyring_dir" ]] && args+=(--keyring-dir "$keyring_dir")
   [[ -n "$home_dir"    ]] && args+=(--home "$home_dir")
   (( yes == 1 )) && args+=(-y)
 
-  local broadcast_json tx_hash
-  broadcast_json=$("$BIN" "${args[@]}")
+  # Capture stdout, stderr, and exit code separately so a partial RPC failure
+  # (e.g. lumerad prints `EOF` to stderr after the CometBFT RPC stream drops)
+  # doesn't kill the script under `set -e` with no diagnostic. The tx may or
+  # may not have entered the mempool; before erroring out, probe chain state
+  # for the migration record so the operator gets a definitive answer instead
+  # of a bare `EOF` line.
+  local broadcast_json broadcast_err broadcast_rc=0 tx_hash
+  local stderr_file
+  stderr_file=$(mktemp)
+  broadcast_json=$("$BIN" "${args[@]}" 2>"$stderr_file") || broadcast_rc=$?
+  broadcast_err=$(<"$stderr_file")
+  rm -f "$stderr_file"
+  if (( broadcast_rc != 0 )); then
+    recover_submit_after_broadcast_error "$broadcast_rc" "$broadcast_err" "$legacy" "$new" "$snap"
+    return 0
+  fi
   tx_hash=$(assert_broadcast_accepted "$broadcast_json")
 
   log_info "broadcast tx $tx_hash; waiting for inclusion..."
@@ -650,6 +774,64 @@ BANNER
   log_info "  legacy: $(legacy_value "$legacy")"
   log_info "  new:    $(new_value "$new")"
   log_info "  tx:     $tx_hash"
+  if [[ "$kind" == "validator" ]]; then
+    log_info "NEXT: restart the validator node immediately and monitor missed-block/jail status"
+  else
+    log_info "NEXT: distribute the confirmed destination address and use the destination multisig for future transactions"
+  fi
+}
+
+recover_submit_after_broadcast_error() {
+  local broadcast_rc="$1" broadcast_err="$2" legacy="$3" new="$4" snap="$5"
+  local timeout="${LUMERA_TX_WAIT_TIMEOUT:-90}"
+  local started=$SECONDS
+  local logged_wait=0
+
+  log_error "broadcast command failed (rc=$broadcast_rc)"
+  [[ -n "$broadcast_err" ]] && log_error "lumerad stderr: $broadcast_err"
+  log_error "checking chain state — the tx may still have landed:"
+  log_error "  $BIN query evmigration migration-record $(legacy_value "$legacy") --node $NODE"
+
+  while true; do
+    local rec_json rec_legacy rec_new rec_height
+    if ! rec_json=$(lumerad_q_capture evmigration migration-record "$legacy"); then
+      log_error "could not query migration-record for $(legacy_value "$legacy"); cannot determine whether the tx landed"
+      log_lumerad_err
+      log_error "do not re-run submit until the migration record is checked manually"
+      exit 7
+    fi
+
+    rec_legacy=$(jq -r '.record.legacy_address // empty' <<<"$rec_json")
+    if [[ -n "$rec_legacy" ]]; then
+      rec_new=$(jq -r '.record.new_address // "<missing>"' <<<"$rec_json")
+      rec_height=$(jq -r '.record.migration_height // "<unknown>"' <<<"$rec_json")
+      if [[ "$rec_new" == "$new" ]]; then
+        log_info "on-chain migration record found for $(legacy_value "$legacy") -> $(new_value "$new") at height $rec_height"
+        log_info "broadcast appears to have succeeded despite the RPC error above; running post-broadcast verification"
+        verify_migration "$legacy" "$new" "$snap"
+        show_migration_summary "$legacy" "$new"
+        log_info "migration complete"
+        return 0
+      fi
+      log_error "migration record found for $(legacy_value "$legacy"), but it points to a DIFFERENT destination:"
+      log_error "  on-chain destination:  $(new_value "$rec_new") (migrated at height $rec_height)"
+      log_error "  destination you asked: $(new_value "$new")"
+      log_error "do not re-run submit until the destination mismatch is resolved"
+      exit 7
+    fi
+
+    if (( SECONDS - started >= timeout )); then
+      break
+    fi
+    if (( logged_wait == 0 )); then
+      log_info "no migration record visible yet; polling for up to ${timeout}s before giving retry guidance"
+      logged_wait=1
+    fi
+    sleep 1
+  done
+
+  log_error "no migration record found for $(legacy_value "$legacy") after ${timeout}s — tx did not land within the wait window; safe to re-run submit"
+  exit 2
 }
 
 main() {

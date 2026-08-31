@@ -51,7 +51,7 @@ Global chain parameters shared by every validator. Loaded by `devnet/config/conf
     },
     "lumera-uploader": {
         "enabled": true,
-        "grpc_port": 50051,
+        "grpc_port": 15051,
         "http_port": 8080,
         "max_accounts": 3,
         "account_balance": "10000000ulume"
@@ -126,7 +126,7 @@ Array of BIP-39 mnemonics for Supernode and sncli accounts. The first N entries 
 | Field | Type | Description |
 | --- | --- | --- |
 | `enabled` | bool | Global enable flag |
-| `grpc_port` | int | gRPC listen port (default 50051) |
+| `grpc_port` | int | gRPC listen port (default 15051) |
 | `http_port` | int | HTTP gateway listen port (default 8080) |
 | `max_accounts` | int | Number of funded uploader accounts to create per validator (minimum 1) |
 | `account_balance` | string | Funding amount per account (with or without denom suffix) |
@@ -168,7 +168,7 @@ Array of validator specifications. Each entry defines one validator container wi
     },
     "lumera-uploader": {
         "enabled": true,
-        "grpc_port": 50051,
+        "grpc_port": 15051,
         "http_port": 8080
     },
     "multisig": {
@@ -278,7 +278,7 @@ The devnet runs five validators plus a Hermes IBC relayer on a private Docker br
 | Supernode gRPC | `4444` | Action processing service |
 | Supernode P2P | `4445` | Supernode-to-supernode gossip |
 | Supernode HTTP gateway | `8002` | Supernode REST gateway |
-| Lumera-uploader gRPC | `50051` | Only when `lumera-uploader.enabled = true` |
+| Lumera-uploader gRPC | `15051` | Only when `lumera-uploader.enabled = true` |
 | Lumera-uploader HTTP | `8080` | Only when `lumera-uploader.enabled = true` |
 | Delve debugger | `40000` | Only when the binary is built in debug mode |
 
@@ -288,7 +288,7 @@ The devnet runs five validators plus a Hermes IBC relayer on a private Docker br
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `supernova_validator_1` | `172.28.0.11` | 26666 | 26667 | 1327 | 9091 | 8545 | 8546 | 7441 | 7442 | 18001 | 40000 | — |
 | 2 | `supernova_validator_2` | `172.28.0.12` | 26676 | 26677 | 1337 | 9092 | 8555 | 8556 | 7443 | 7444 | 18002 | 40001 | — |
-| 3 | `supernova_validator_3` | `172.28.0.13` | 26686 | 26687 | 1347 | 9093 | 8565 | 8566 | 7445 | 7446 | 18003 | 40002 | 50051 / 8080 |
+| 3 | `supernova_validator_3` | `172.28.0.13` | 26686 | 26687 | 1347 | 9093 | 8565 | 8566 | 7445 | 7446 | 18003 | 40002 | 15051 / 8080 |
 | 4 | `supernova_validator_4` | `172.28.0.14` | 26696 | 26697 | 1357 | 9094 | 8575 | 8576 | 7447 | 7448 | 18004 | 40003 | — |
 | 5 | `supernova_validator_5` | `172.28.0.15` | 26606 | 26607 | 1367 | 9095 | 8585 | 8586 | 7449 | 7450 | 18005 | 40004 | — |
 | — | `hermes` | `172.28.0.10` | 36656 | 36657 | 31317 | 39090 / 39091 | — | — | — | — | — | — | — |

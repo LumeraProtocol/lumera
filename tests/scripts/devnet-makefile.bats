@@ -54,3 +54,10 @@ teardown() {
   [[ "$output" == *"--remove-orphans"* ]]
   [[ "$output" != *"ssh example-devnet"*"go "* ]]
 }
+
+@test "v1.20.2 upgrade plan installs the superseding v1.20.3 binary" {
+  run make -C "$REPO_ROOT" -n devnet-upgrade-1202 MAKE=/bin/true
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"./upgrade.sh v1.20.2 auto-height ../bin v1.20.3"* ]]
+}

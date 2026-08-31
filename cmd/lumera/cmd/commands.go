@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 
 	tmcmd "github.com/cometbft/cometbft/cmd/cometbft/commands"
 	cmttypes "github.com/cometbft/cometbft/types"
@@ -134,7 +135,7 @@ func wrapJSONRPCAliasStartPreRun(startCmd *cobra.Command) {
 			return nil
 		}
 
-		internalAddr, err := reserveLoopbackAddr()
+		internalAddr, err := reserveLoopbackAddr(publicAddr)
 		if err != nil {
 			return err
 		}
@@ -146,16 +147,40 @@ func wrapJSONRPCAliasStartPreRun(startCmd *cobra.Command) {
 	}
 }
 
-func reserveLoopbackAddr() (string, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+func reserveLoopbackAddr(publicAddr string) (string, error) {
+	internalAddr, err := loopbackAddrForPublic(publicAddr)
 	if err != nil {
 		return "", err
 	}
-	addr := ln.Addr().String()
+
+	// Verify the derived address is currently available. Closing it before the
+	// native JSON-RPC server binds still leaves a small external-process race,
+	// but unlike port 0 the deterministic mapping prevents sibling lumerad
+	// processes with distinct public ports from selecting the same upstream.
+	ln, err := net.Listen("tcp", internalAddr)
+	if err != nil {
+		return "", fmt.Errorf("reserve internal JSON-RPC address %s: %w", internalAddr, err)
+	}
 	if closeErr := ln.Close(); closeErr != nil {
 		return "", closeErr
 	}
-	return addr, nil
+	return internalAddr, nil
+}
+
+func loopbackAddrForPublic(publicAddr string) (string, error) {
+	_, portText, err := net.SplitHostPort(publicAddr)
+	if err != nil {
+		return "", fmt.Errorf("parse public JSON-RPC address %q: %w", publicAddr, err)
+	}
+	publicPort, err := strconv.Atoi(portText)
+	if err != nil || publicPort < 1 || publicPort > 65535 {
+		return "", fmt.Errorf("invalid public JSON-RPC port %q", portText)
+	}
+
+	// Rotate the valid TCP port range by 32768 positions. This is a one-to-one
+	// mapping, so distinct public ports always yield distinct internal ports.
+	internalPort := ((publicPort + 32767) % 65535) + 1
+	return net.JoinHostPort("127.0.0.1", strconv.Itoa(internalPort)), nil
 }
 
 func addModuleInitFlags(startCmd *cobra.Command) {

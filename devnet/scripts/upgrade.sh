@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 3 ]]; then
-	echo "Usage: $0 <release-name> <upgrade-height|auto-height> <binaries-dir>"
+if [[ $# -lt 3 || $# -gt 4 ]]; then
+	echo "Usage: $0 <plan-name> <upgrade-height|auto-height> <binaries-dir> [expected-binary-version]"
 	exit 1
 fi
 
 RELEASE_NAME="$1"
 REQUESTED_HEIGHT="$2"
 BINARIES_DIR="$3"
+EXPECTED_BINARY_RELEASE_NAME="${4:-${RELEASE_NAME}}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
@@ -82,14 +83,19 @@ duration_to_seconds() {
 RUNNING_VERSION="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
 	lumerad version 2>/dev/null | head -n 1 | tr -d '\r' || true)"
 RUNNING_VERSION="$(normalize_version "${RUNNING_VERSION}")"
-EXPECTED_VERSION="$(normalize_version "${RELEASE_NAME}")"
+EXPECTED_BINARY_VERSION="$(normalize_version "${EXPECTED_BINARY_RELEASE_NAME}")"
 
-if [[ -n "${RUNNING_VERSION}" && "${RUNNING_VERSION}" == "${EXPECTED_VERSION}" ]]; then
-	echo "Node is already running version ${RUNNING_VERSION}. Upgrade to ${RELEASE_NAME} already complete."
+if [[ -z "${EXPECTED_BINARY_VERSION}" ]]; then
+	echo "Expected binary version is empty or invalid: ${EXPECTED_BINARY_RELEASE_NAME}" >&2
+	exit 1
+fi
+
+if [[ -n "${RUNNING_VERSION}" && "${RUNNING_VERSION}" == "${EXPECTED_BINARY_VERSION}" ]]; then
+	echo "Node is already running version ${RUNNING_VERSION}. Upgrade plan ${RELEASE_NAME} already complete."
 	exit 0
 fi
-if [[ -n "${RUNNING_VERSION}" ]] && versions_match "${EXPECTED_VERSION}" "${RUNNING_VERSION}"; then
-	echo "Node is already running compatible version ${RUNNING_VERSION}. Upgrade to ${RELEASE_NAME} already complete."
+if [[ -n "${RUNNING_VERSION}" ]] && versions_match "${EXPECTED_BINARY_VERSION}" "${RUNNING_VERSION}"; then
+	echo "Node is already running compatible version ${RUNNING_VERSION}. Upgrade plan ${RELEASE_NAME} already complete."
 	exit 0
 fi
 
@@ -102,7 +108,7 @@ if [[ "${REQUESTED_HEIGHT}" == "auto-height" ]]; then
 		# Chain is not responding — check if it halted for our upgrade
 		if detect_upgrade_halt; then
 			echo "Chain is already halted for ${RELEASE_NAME} upgrade. Skipping to binary upgrade..."
-			"${SCRIPT_DIR}/upgrade-binaries.sh" "${BINARIES_DIR}" "${RELEASE_NAME}"
+			"${SCRIPT_DIR}/upgrade-binaries.sh" "${BINARIES_DIR}" "${EXPECTED_BINARY_RELEASE_NAME}"
 			echo "Upgrade to ${RELEASE_NAME} initiated successfully."
 			exit 0
 		fi
@@ -266,6 +272,6 @@ if ! detect_upgrade_halt; then
 fi
 
 echo "Upgrading binaries from ${BINARIES_DIR}..."
-"${SCRIPT_DIR}/upgrade-binaries.sh" "${BINARIES_DIR}" "${RELEASE_NAME}"
+"${SCRIPT_DIR}/upgrade-binaries.sh" "${BINARIES_DIR}" "${EXPECTED_BINARY_RELEASE_NAME}"
 
 echo "Upgrade to ${RELEASE_NAME} initiated successfully."

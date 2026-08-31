@@ -701,8 +701,9 @@ devnet-upgrade-1201:
 	@$(MAKE) devnet-refresh-bin
 	@cd devnet/scripts && ./upgrade.sh v1.20.1 auto-height ../bin
 
-# v1.20.2 — same locally-built-binary pattern as devnet-upgrade-1201, because
-# v1.20.2 has no published release to pre-download. Drives the coordinated
+# v1.20.2 — same locally-built-binary pattern as devnet-upgrade-1201. The
+# on-chain plan remains v1.20.2, but the superseding binary must report v1.20.3.
+# Drives the coordinated
 # governance halt + binary swap, which is MANDATORY for this upgrade: v1.20.2
 # changes evmigration DeliverTx outcomes (PrevSupernodeAccounts append vs
 # rewrite, canonical ownership resolution, Everlight SNDistState move), so a
@@ -714,7 +715,7 @@ devnet-upgrade-1201:
 #   mainnet-shaped   1.12.0 -> 1.20.2   full EVM bring-up + add-only store mount
 devnet-upgrade-1202:
 	@$(MAKE) devnet-refresh-bin
-	@cd devnet/scripts && ./upgrade.sh v1.20.2 auto-height ../bin
+	@cd devnet/scripts && ./upgrade.sh v1.20.2 auto-height ../bin v1.20.3
 
 devnet-new-1120:
 	@$(MAKE) devnet-new-version VERSION=v1.12.0

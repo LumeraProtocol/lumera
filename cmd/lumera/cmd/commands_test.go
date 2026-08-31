@@ -81,6 +81,32 @@ func TestReserveLoopbackAddrFallsBackWhenPrimaryIsOccupied(t *testing.T) {
 	_ = probe.Close()
 }
 
+func TestReserveLoopbackAddrSkipsLaterListenerPorts(t *testing.T) {
+	const publicAddr = "0.0.0.0:39267" // primary candidate is default WS port 8546
+	primary, err := loopbackAddrForPublic(publicAddr)
+	if err != nil {
+		t.Fatalf("loopbackAddrForPublic(%q): %v", publicAddr, err)
+	}
+	if primary != "127.0.0.1:8546" {
+		t.Fatalf("test precondition: primary = %q, want default WS address", primary)
+	}
+
+	for _, excludedAddr := range []string{
+		"127.0.0.1:8546",
+		"tcp://127.0.0.1:8546",
+	} {
+		t.Run(excludedAddr, func(t *testing.T) {
+			got, err := reserveLoopbackAddr(publicAddr, excludedAddr)
+			if err != nil {
+				t.Fatalf("reserveLoopbackAddr(%q): %v", publicAddr, err)
+			}
+			if got == "127.0.0.1:8546" {
+				t.Fatalf("reserveLoopbackAddr(%q) selected excluded listener %q", publicAddr, got)
+			}
+		})
+	}
+}
+
 func publicAddrForInternalPort(t *testing.T, internalPort int) string {
 	t.Helper()
 

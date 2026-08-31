@@ -110,7 +110,7 @@ jobs:
 
       - name: Upload SARIF
         if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: lumera/${{ matrix.module }}/gosec.sarif
           checkout_path: ${{ github.workspace }}/lumera

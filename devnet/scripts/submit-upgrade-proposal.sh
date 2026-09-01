@@ -19,7 +19,14 @@ LUMERA_SHARED="/tmp/${CHAIN_ID}/shared"
 KEYRING="test"
 HOST_PROPOSAL_FILE="${LUMERA_SHARED}/upgrade_${VERSION}.json"
 CONTAINER_PROPOSAL_FILE="/shared/upgrade_${VERSION}.json"
-COMPOSE_FILE="../docker-compose.yml"
+# Resolve paths relative to THIS script, not the caller's working directory.
+# Previously this was "../docker-compose.yml", which only resolved when the
+# script happened to be invoked from devnet/scripts/. Run from the repository
+# root (as documented for the rehearsal flow), every `docker compose -f` call
+# silently failed, so key/account lookups returned empty and the script
+# misreported working accounts as "not present on-chain".
+SUBMIT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_FILE="${COMPOSE_FILE:-${SUBMIT_SCRIPT_DIR}/../docker-compose.yml}"
 STATUS_DIR="${LUMERA_SHARED}/status"
 ACCOUNT_REGISTRY_FILE="${STATUS_DIR}/${SERVICE}/accounts.json"
 

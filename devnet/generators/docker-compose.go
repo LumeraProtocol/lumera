@@ -123,6 +123,7 @@ func detectLumeraVersion(binaryName string) string {
 
 		resolved := candidate
 		if strings.ContainsRune(candidate, os.PathSeparator) {
+			// #nosec G703 -- candidate is an operator-configured devnet binary path.
 			info, err := os.Stat(candidate)
 			if err != nil || info.IsDir() {
 				continue
@@ -135,6 +136,7 @@ func detectLumeraVersion(binaryName string) string {
 			resolved = path
 		}
 
+		// #nosec G702 -- executing the configured devnet binary is intentional; no shell is used.
 		out, err := exec.Command(resolved, "version").CombinedOutput()
 		if err != nil {
 			continue

@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/LumeraProtocol/lumera/config" // init() sets Bech32 prefixes and seals config
 	textutil "github.com/LumeraProtocol/lumera/pkg/text"
+	sdkcrypto "github.com/LumeraProtocol/sdk-go/pkg/crypto"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -84,6 +85,13 @@ type ChainInfo struct {
 	Denom        string
 	KeyName      string
 	MnemonicFile string
+}
+
+func (s *lumeraHermesSuite) lumeraKeyType() sdkcrypto.KeyType {
+	if strings.EqualFold(s.lumeraKeyStyle, "cosmos") {
+		return sdkcrypto.KeyTypeCosmos
+	}
+	return sdkcrypto.KeyTypeEVM
 }
 
 func (s *lumeraHermesSuite) logInfo(msg string) {

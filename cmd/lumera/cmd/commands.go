@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
+	"strings"
+	"syscall"
 
 	tmcmd "github.com/cometbft/cometbft/cmd/cometbft/commands"
 	cmttypes "github.com/cometbft/cometbft/types"
@@ -134,7 +137,35 @@ func wrapJSONRPCAliasStartPreRun(startCmd *cobra.Command) {
 			return nil
 		}
 
-		internalAddr, err := reserveLoopbackAddr()
+		excludedAddrs := []string{
+			v.GetString("json-rpc.ws-address"),
+			v.GetString("json-rpc.metrics-address"),
+			v.GetString("evm.geth-metrics-address"),
+			v.GetString("api.address"),
+			v.GetString("grpc.address"),
+			v.GetString("lumera.json-rpc-ratelimit.proxy-address"),
+		}
+		if cometConfig := serverCtx.Config; cometConfig != nil {
+			excludedAddrs = append(excludedAddrs,
+				cometConfig.ProxyApp,
+				cometConfig.PrivValidatorListenAddr,
+			)
+			if cometConfig.RPC != nil {
+				excludedAddrs = append(excludedAddrs,
+					cometConfig.RPC.ListenAddress,
+					cometConfig.RPC.GRPCListenAddress,
+					cometConfig.RPC.PprofListenAddress,
+				)
+			}
+			if cometConfig.P2P != nil {
+				excludedAddrs = append(excludedAddrs, cometConfig.P2P.ListenAddress)
+			}
+			if cometConfig.Instrumentation != nil {
+				excludedAddrs = append(excludedAddrs, cometConfig.Instrumentation.PrometheusListenAddr)
+			}
+		}
+
+		internalAddr, err := reserveLoopbackAddr(publicAddr, excludedAddrs...)
 		if err != nil {
 			return err
 		}
@@ -146,16 +177,105 @@ func wrapJSONRPCAliasStartPreRun(startCmd *cobra.Command) {
 	}
 }
 
-func reserveLoopbackAddr() (string, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+func reserveLoopbackAddr(publicAddr string, excludedAddrs ...string) (string, error) {
+	internalAddr, err := loopbackAddrForPublic(publicAddr)
 	if err != nil {
 		return "", err
 	}
-	addr := ln.Addr().String()
-	if closeErr := ln.Close(); closeErr != nil {
-		return "", closeErr
+
+	_, primaryPortText, err := net.SplitHostPort(internalAddr)
+	if err != nil {
+		return "", err
 	}
-	return addr, nil
+	primaryPort, err := strconv.Atoi(primaryPortText)
+	if err != nil {
+		return "", err
+	}
+
+	excludedPorts := make(map[int]struct{}, len(excludedAddrs)+1)
+	if publicPort, ok := portFromListenAddr(publicAddr); ok {
+		excludedPorts[publicPort] = struct{}{}
+	}
+	for _, addr := range excludedAddrs {
+		if port, ok := portFromListenAddr(addr); ok {
+			excludedPorts[port] = struct{}{}
+		}
+	}
+
+	// Verify a deterministic candidate is currently available. Closing it
+	// before the native JSON-RPC server binds still leaves a small
+	// external-process race, but the deterministic primary prevents sibling
+	// lumerad processes with distinct public ports from selecting the same
+	// upstream. If another service owns that primary, walk a deterministic
+	// permutation of the unprivileged range instead of making an otherwise
+	// valid public listener unusable. The relatively prime step keeps nearby
+	// public ports from immediately falling back onto each other's primaries.
+	const fallbackProbeStep = 7919
+	for attempt := 0; attempt < unprivilegedPortCount; attempt++ {
+		candidatePort := firstUnprivilegedPort +
+			((primaryPort-firstUnprivilegedPort)+(attempt*fallbackProbeStep))%unprivilegedPortCount
+		// The alias proxy and the daemon's other servers bind later in startup,
+		// so never consume one of their configured ports as the native HTTP
+		// server's upstream.
+		if _, excluded := excludedPorts[candidatePort]; excluded {
+			continue
+		}
+
+		candidateAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(candidatePort))
+		ln, listenErr := net.Listen("tcp", candidateAddr)
+		if listenErr != nil {
+			if errors.Is(listenErr, syscall.EADDRINUSE) {
+				continue
+			}
+			return "", fmt.Errorf("reserve internal JSON-RPC address %s: %w", candidateAddr, listenErr)
+		}
+		if closeErr := ln.Close(); closeErr != nil {
+			return "", closeErr
+		}
+		return candidateAddr, nil
+	}
+
+	return "", fmt.Errorf("no unprivileged internal JSON-RPC port available for %s", publicAddr)
+}
+
+func portFromListenAddr(addr string) (int, bool) {
+	addr = strings.TrimSpace(addr)
+	if _, remainder, hasScheme := strings.Cut(addr, "://"); hasScheme {
+		addr = remainder
+	}
+	_, portText, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 0, false
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, false
+	}
+	return port, true
+}
+
+const (
+	firstUnprivilegedPort = 1024
+	lastUnprivilegedPort  = 65535
+	unprivilegedPortCount = lastUnprivilegedPort - firstUnprivilegedPort + 1
+)
+
+func loopbackAddrForPublic(publicAddr string) (string, error) {
+	_, portText, err := net.SplitHostPort(publicAddr)
+	if err != nil {
+		return "", fmt.Errorf("parse public JSON-RPC address %q: %w", publicAddr, err)
+	}
+	publicPort, err := strconv.Atoi(portText)
+	if err != nil || publicPort < 1 || publicPort > 65535 {
+		return "", fmt.Errorf("invalid public JSON-RPC port %q", portText)
+	}
+
+	// Rotate within the unprivileged TCP port range. Integration fixtures use
+	// ephemeral public ports, so rotating across the full 1..65535 range could
+	// map them below 1024 and fail for non-root processes.
+	internalPort := firstUnprivilegedPort +
+		((publicPort - 1 + 32768) % unprivilegedPortCount)
+	return net.JoinHostPort("127.0.0.1", strconv.Itoa(internalPort)), nil
 }
 
 func addModuleInitFlags(startCmd *cobra.Command) {

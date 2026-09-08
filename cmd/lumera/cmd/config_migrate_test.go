@@ -112,8 +112,6 @@ func TestNeedsConfigMigration_DisabledMempool(t *testing.T) {
 // start with a legacy pre-EVM app.toml, run the migrator, and confirm both
 // the disk file and in-memory Viper contain the correct EVM config.
 func TestMigrateAppConfig_LegacyTomlOnDisk(t *testing.T) {
-	t.Parallel()
-
 	// Create a temp directory with a minimal legacy app.toml (no EVM sections).
 	tmpDir := t.TempDir()
 	configDir := filepath.Join(tmpDir, "config")
@@ -193,8 +191,6 @@ max-txs = 3000
 }
 
 func TestMigrateAppConfig_FullyMigratedNegativeMaxTxsTriggersRepair(t *testing.T) {
-	t.Parallel()
-
 	tmpDir := t.TempDir()
 	configDir := filepath.Join(tmpDir, "config")
 	require.NoError(t, os.MkdirAll(configDir, 0o755))
@@ -245,8 +241,6 @@ certificate-path = ""
 }
 
 func TestMigrateAppConfig_LegacyNegativeMaxTxsUsesNetworkDefault(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name             string
 		chainID          string
@@ -262,8 +256,6 @@ func TestMigrateAppConfig_LegacyNegativeMaxTxsUsesNetworkDefault(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			tmpDir := t.TempDir()
 			configDir := filepath.Join(tmpDir, "config")
 			require.NoError(t, os.MkdirAll(configDir, 0o755))

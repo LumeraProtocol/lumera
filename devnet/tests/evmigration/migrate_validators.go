@@ -736,7 +736,7 @@ func verifySupernodeMigration(
 		for i, preHist := range preSN.PrevSupernodeAccounts {
 			postHist := postSN.PrevSupernodeAccounts[i]
 			if postHist.Account != preHist.Account || postHist.Height != preHist.Height {
-				return fmt.Errorf("PrevSupernodeAccounts[%d] changed: expected account=%s height=%d got account=%s height=%d",
+				return fmt.Errorf("PrevSupernodeAccounts[%d] changed: expected account=%s height=%s got account=%s height=%s",
 					i, preHist.Account, preHist.Height, postHist.Account, postHist.Height)
 			}
 		}

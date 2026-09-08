@@ -656,8 +656,10 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 		}(pid, cmd, i)
 	})
 
-	// Wait in background and close the channel when all nodes are done
-	go func() {
+	// Drain node process results during test cleanup. Reporting through t from a
+	// detached goroutine can panic if a node exits after the test has completed.
+	t.Cleanup(func() {
+		s.StopChain()
 		wg.Wait()
 		close(errChan)
 
@@ -666,7 +668,7 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 				t.Errorf("%v", err)
 			}
 		}
-	}()
+	})
 }
 
 func (s *SystemUnderTest) withEachNodeHome(cb func(i int, home string)) {

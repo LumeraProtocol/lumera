@@ -34,20 +34,39 @@ func sendOneLegacyTx(t *testing.T, rpcURL string, keyInfo testaccounts.TestKeyIn
 
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, keyInfo)
 	privateKey := mustDerivePrivateKey(t, keyInfo.Mnemonic)
-
-	nonce := mustGetPendingNonceWithRetry(t, rpcURL, fromAddr.Hex(), 20*time.Second)
-	gasPrice := mustGetGasPriceWithRetry(t, rpcURL, 20*time.Second)
 	toAddr := fromAddr
+	deadline := time.Now().Add(10 * time.Second)
 
-	return sendLegacyTxWithParams(t, rpcURL, legacyTxParams{
-		PrivateKey: privateKey,
-		Nonce:      nonce,
-		To:         &toAddr,
-		Value:      big.NewInt(1),
-		Gas:        21_000,
-		GasPrice:   gasPrice,
-		Data:       nil,
-	})
+	for {
+		nonce := mustGetPendingNonceWithRetry(t, rpcURL, fromAddr.Hex(), 20*time.Second)
+		gasPrice := mustGetGasPriceWithRetry(t, rpcURL, 20*time.Second)
+		txHash, err := sendLegacyTxWithParamsResult(rpcURL, legacyTxParams{
+			PrivateKey: privateKey,
+			Nonce:      nonce,
+			To:         &toAddr,
+			Value:      big.NewInt(1),
+			Gas:        21_000,
+			GasPrice:   gasPrice,
+			Data:       nil,
+		})
+		if err == nil {
+			return txHash
+		}
+		if !isTransientBlockGasLimitError(err) || time.Now().After(deadline) {
+			t.Fatalf("send legacy tx: %v", err)
+		}
+
+		// At startup the JSON-RPC mempool can briefly observe the previous
+		// block's exhausted/zero remaining gas before the next block opens. A
+		// plain 21k transfer is always below this fixture's 25M block limit, so
+		// retry only this specific transient rejection across a block boundary.
+		t.Logf("retrying legacy tx after transient block gas-limit rejection: %v", err)
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+func isTransientBlockGasLimitError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "exceeds block gas limit")
 }
 
 // sendOneCosmosBankTx broadcasts a simple bank MsgSend transaction and returns tx hash.

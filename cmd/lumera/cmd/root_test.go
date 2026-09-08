@@ -25,8 +25,6 @@ func TestNewRootCmd_DoesNotPanic(t *testing.T) {
 // TestNewRootCmdStartWiresEVMFlags verifies `start` command includes Cosmos EVM
 // server flags required by JSON-RPC and indexer startup path.
 func TestNewRootCmdStartWiresEVMFlags(t *testing.T) {
-	t.Parallel()
-
 	rootCmd := NewRootCmd()
 	startCmd := mustFindSubcommand(t, rootCmd, "start")
 
@@ -39,8 +37,6 @@ func TestNewRootCmdStartWiresEVMFlags(t *testing.T) {
 // TestNewRootCmdDefaultKeyTypeOverridden verifies recursive default overrides
 // set EthSecp256k1 key type across key-management and testnet commands.
 func TestNewRootCmdDefaultKeyTypeOverridden(t *testing.T) {
-	t.Parallel()
-
 	rootCmd := NewRootCmd()
 	expectedAlgo := string(evmhd.EthSecp256k1Type)
 

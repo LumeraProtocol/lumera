@@ -1303,18 +1303,24 @@ const infrastructureCandidateReadyTimeout = 90 * time.Second
 // exist on this host (e.g. governance_key on a secondary validator) it just
 // returns false after the first quick check without sleeping.
 func waitForInfrastructureKeyReady(name string, timeout time.Duration) bool {
-	if keyExists(name) && readStatusRegistryMnemonic(name) != "" {
+	// Probe with the silent lookup: absence is the expected outcome for
+	// candidates that don't apply to this host and must not log WARN.
+	registryMnemonic := func() string {
+		mnemonic, _ := lookupStatusRegistryMnemonic(name)
+		return mnemonic
+	}
+	if keyExists(name) && registryMnemonic() != "" {
 		return true
 	}
 	// If neither the keyring nor the registry knows about this name at all,
 	// there's nothing to wait for — it's a candidate that doesn't apply to
 	// this host (e.g. governance_key on a secondary validator).
-	if !keyExists(name) && readStatusRegistryMnemonic(name) == "" {
+	if !keyExists(name) && registryMnemonic() == "" {
 		return false
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if keyExists(name) && readStatusRegistryMnemonic(name) != "" {
+		if keyExists(name) && registryMnemonic() != "" {
 			return true
 		}
 		time.Sleep(3 * time.Second)
@@ -1344,8 +1350,8 @@ func recordInfrastructureLegacyAccounts(af *AccountsFile, existingByName map[str
 		if _, ok := existingByName[addr]; ok {
 			continue
 		}
-		mnemonic := readStatusRegistryMnemonic(name)
-		if mnemonic == "" {
+		mnemonic, found := lookupStatusRegistryMnemonic(name)
+		if !found || mnemonic == "" {
 			log.Printf("  WARN: %s has no mnemonic in status registry; skipping", name)
 			continue
 		}

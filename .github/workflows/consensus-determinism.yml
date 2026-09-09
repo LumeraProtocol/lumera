@@ -32,10 +32,13 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Install jq
+      - name: Ensure jq is available
         run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y jq
+          fi
+          jq --version
 
       - name: Build chain binary
         run: make build

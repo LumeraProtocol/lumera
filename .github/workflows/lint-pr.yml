@@ -49,6 +49,25 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Detect root Go lint inputs
+        id: root-go-diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          changed="false"
+          while IFS= read -r path; do
+            case "$path" in
+              *.go|go.mod|go.sum|.golangci.yml)
+                changed="true"
+                break
+                ;;
+            esac
+          done < <(git diff --name-only "$base" "$head")
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "root Go lint inputs changed: $changed"
+
       # Same-repo PRs: post findings as inline review comments. The default
       # GITHUB_TOKEN has the `pull-requests: write` scope declared above,
       # so reviewdog can call the review API. Findings are filtered to lines
@@ -60,7 +79,7 @@ jobs:
       # finding's native severity, so error-level diagnostics (e.g. govet,
       # staticcheck SA*) trip `fail_level: error` as intended.
       - name: golangci-lint via reviewdog (same-repo PR — inline comments)
-        if: github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event.pull_request.head.repo.full_name == github.repository && steps.root-go-diff.outputs.changed == 'true'
         # Pin to v2.10.0 (>=v2.8.0 required for golangci-lint v2 support;
         # earlier reviewdog releases on the @v2 major tag still default to
         # downloading golangci-lint v1.x even when a v2.x version is

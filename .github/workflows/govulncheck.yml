@@ -24,4 +24,8 @@ jobs:
       - name: Run govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+          # Keep this gate actionable: fail on any newly introduced or fixed-version
+          # vulnerability, while allowing only reviewed baseline IDs with no upstream
+          # fix available yet. The allowlist lives in the wrapper with rationale so it
+          # is visible in code review and can be removed when upstream fixes land.
+          scripts/govulncheck-baseline.sh .

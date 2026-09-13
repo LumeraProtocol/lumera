@@ -55,6 +55,15 @@ Suite: `tests/integration/evm/precompiles/suite_test.go`
 | `WasmPrecompileExecuteFailsWithBadMessage` | Verifies unrecognized execute message causes receipt status=0x0. |
 | `WasmPrecompileExecuteRejectedInEthCall` | Verifies the state-changing wasm `execute` entrypoint is rejected when invoked via read-only `eth_call`. |
 | `WasmPrecompileQueryInvalidContract` | Verifies querying a non-existent bech32 contract returns a JSON-RPC error. |
+
+## Wasm Precompile Balance Accounting (unit)
+
+Suite: `precompiles/wasm/balance_test.go`
+
+| Test | Description |
+| --- | --- |
+| `TestWasmBalanceReplayDoesNotMintOrDoubleApply` | Regression for the EVM→Wasm accounting defect: a 32-byte wasm contract sends N to a 20-byte recipient. Asserts the precompile installs NO balance handler, the truncated EVM alias stays zero, and the recipient's StateDB balance is not double-applied. Includes a defect-demonstration subtest pinning the vulnerable behavior of the pre-fix wiring (alias wraps to ~2^256, recipient double-credited). |
+| `TestWasmBalanceReplayKeepsEVMAccountBehavior` | Guards the legitimate upstream balance-handler path used by the other (unchanged) EVM precompiles for 20-byte EVM accounts. |
 | `WasmPrecompileContractInfoNotFound` | Verifies `contractInfo` for a non-existent contract returns a JSON-RPC error. |
 | `WasmPrecompileInvalidBech32Fails` | Verifies invalid bech32 address causes tx revert (status=0x0). |
 

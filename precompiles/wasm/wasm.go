@@ -44,18 +44,24 @@ type Precompile struct {
 }
 
 // NewPrecompile creates a new CosmWasm precompile instance.
+// bankKeeper is retained in the signature for call-site compatibility and
+// future query-side use; it is intentionally NOT wired into a balance
+// handler (see NewBalanceHandlerFactory).
 func NewPrecompile(
 	wasmKeeper *wasmkeeper.Keeper,
-	bankKeeper cmn.BankKeeper,
+	_ cmn.BankKeeper,
 	addrCdc address.Codec,
 ) *Precompile {
 	permKeeper := wasmkeeper.NewDefaultPermissionKeeper(wasmKeeper)
 	return &Precompile{
 		Precompile: cmn.Precompile{
-			KvGasConfig:           storetypes.KVGasConfig(),
-			TransientKVGasConfig:  storetypes.TransientGasConfig(),
-			ContractAddress:       common.HexToAddress(WasmPrecompileAddress),
-			BalanceHandlerFactory: cmn.NewBalanceHandlerFactory(bankKeeper),
+			KvGasConfig:          storetypes.KVGasConfig(),
+			TransientKVGasConfig: storetypes.TransientGasConfig(),
+			ContractAddress:      common.HexToAddress(WasmPrecompileAddress),
+			// BalanceHandlerFactory is intentionally nil: wasm bank events are
+			// native movements owned by x/bank and must never be mirrored into
+			// the EVM StateDB. See NewBalanceHandlerFactory and balance_test.go.
+			BalanceHandlerFactory: NewBalanceHandlerFactory(),
 		},
 		ABI:            ABI,
 		wasmKeeper:     wasmKeeper,

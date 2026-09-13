@@ -269,6 +269,29 @@ This matters because `eth_call` requires a `from` address. Using the wasm contra
 
 ## Cross-Cutting Concerns
 
+### Balance Accounting (EVM -> CosmWasm direction)
+
+The wasm precompile installs **no** balance handler. Bank balance events
+emitted by a CosmWasm contract are native x/bank movements of the contract's
+own funds; the bank keeper is the single source of truth for them.
+
+They must never be mirrored into the EVM StateDB:
+
+1. The upstream `BalanceHandler` maps event addresses into EVM accounts via
+   `common.BytesToAddress`, silently truncating the 32-byte wasm contract
+   address. The truncated alias has no EVM balance, so `SubBalance` wraps
+   uint256 (x/vm/statedb has no insufficient-balance guard) and the
+   `SetBalance` reconciliation at commit mints ~2^256 extended-denom units
+   into the alias account.
+2. The matching `coin_received` replay credits the recipient in the StateDB
+   journal on top of the native bank credit; reconciliation then mints the
+   amount a second time.
+
+Filtering only non-20-byte addresses is insufficient (case 2 persists for
+20-byte recipients), so `NewPrecompile` wires
+`BalanceHandlerFactory: NewBalanceHandlerFactory()`, which returns nil.
+Regression tests: `precompiles/wasm/balance_test.go`.
+
 ### Sender Identity
 
 **Cross-runtime calls always execute as the calling contract, not the outer user (tx.origin).**

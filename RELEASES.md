@@ -18,3 +18,4 @@ Oldest first. Releases up to v1.20.3 were copied from the previous repository.
 - v1.9.1 (released 2026-01-06)
 - v1.10.0 (released 2026-01-30)
 - v1.10.1 (released 2026-02-05)
+- v1.11.0 (released 2026-03-03)

@@ -8,3 +8,4 @@ Oldest first. Releases up to v1.20.3 were copied from the previous repository.
 - v1.5.0 (released 2025-06-14)
 - v1.6.0 (released 2025-06-28)
 - v1.6.1 (released 2025-07-10)
+- v1.7.0 (released 2025-07-27)

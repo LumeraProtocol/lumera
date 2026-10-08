@@ -24,3 +24,4 @@ Oldest first. Releases up to v1.20.3 were copied from the previous repository.
 - v1.12.0 (released 2026-05-13)
 - v1.20.0 (released 2026-06-25)
 - v1.20.1 (released 2026-07-06)
+- v1.20.1-hotfix (released 2026-07-14)
